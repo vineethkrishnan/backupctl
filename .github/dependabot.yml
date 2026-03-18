@@ -6,32 +6,30 @@ updates:
     schedule:
       interval: weekly
       day: monday
-    open-pull-requests-limit: 10
+    open-pull-requests-limit: 5
     commit-message:
       prefix: "chore(deps)"
     labels:
       - dependencies
     groups:
-      nestjs:
-        patterns:
-          - "@nestjs/*"
-          - "nest-*"
-      testing:
-        patterns:
-          - "jest"
-          - "@types/jest"
-          - "ts-jest"
-          - "supertest"
-      typescript:
-        patterns:
-          - "typescript"
-          - "@typescript-eslint/*"
+      production:
+        dependency-type: production
+        update-types:
+          - minor
+          - patch
+      development:
+        dependency-type: development
+        update-types:
+          - minor
+          - patch
+      major:
+        update-types:
+          - major
 
   - package-ecosystem: docker
     directory: /
     schedule:
-      interval: weekly
-      day: monday
+      interval: monthly
     commit-message:
       prefix: "chore(docker)"
     labels:
@@ -41,10 +39,13 @@ updates:
   - package-ecosystem: github-actions
     directory: /
     schedule:
-      interval: weekly
-      day: monday
+      interval: monthly
     commit-message:
       prefix: "ci(deps)"
     labels:
       - dependencies
       - ci
+    groups:
+      actions:
+        patterns:
+          - "*"
