@@ -1,0 +1,11 @@
+export { DatabaseDumperPort } from './database-dumper.port';
+export { RemoteStoragePort, SyncOptions } from './remote-storage.port';
+export { RemoteStorageFactory } from './remote-storage-factory.port';
+export { DumpEncryptorPort } from './dump-encryptor.port';
+export { LocalCleanupPort } from './local-cleanup.port';
+export { HookExecutorPort } from './hook-executor.port';
+export { BackupLockPort } from './backup-lock.port';
+export { BackupUseCase, RestoreOptions } from './backup.use-case';
+export { CacheUseCase } from './cache.use-case';
+export { HealthUseCase } from './health.use-case';
+export { SnapshotUseCase } from './snapshot.use-case';

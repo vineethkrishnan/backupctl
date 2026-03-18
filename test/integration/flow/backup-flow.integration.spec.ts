@@ -1,0 +1,440 @@
+import * as fs from 'fs';
+import * as path from 'path';
+import * as os from 'os';
+import { Test, TestingModule } from '@nestjs/testing';
+import { ConfigModule } from '@nestjs/config';
+
+import { BackupOrchestratorService } from '@application/backup/backup-orchestrator.service';
+import { DumperRegistry } from '@application/backup/registries/dumper.registry';
+import { NotifierRegistry } from '@application/backup/registries/notifier.registry';
+
+import { ProjectConfig } from '@domain/config/models/project-config.model';
+import { ConfigLoaderPort, ValidationResult } from '@domain/config/ports/config-loader.port';
+import { DatabaseDumperPort } from '@domain/backup/ports/database-dumper.port';
+import { RemoteStoragePort } from '@domain/backup/ports/remote-storage.port';
+import { NotifierPort } from '@domain/notification/ports/notifier.port';
+import { AuditLogPort } from '@domain/audit/ports/audit-log.port';
+import { FallbackWriterPort, FallbackEntry } from '@domain/audit/ports/fallback-writer.port';
+import { BackupLockPort } from '@domain/backup/ports/backup-lock.port';
+import { ClockPort } from '@domain/shared/ports/clock.port';
+import { DumpEncryptorPort } from '@domain/backup/ports/dump-encryptor.port';
+import { HookExecutorPort } from '@domain/backup/ports/hook-executor.port';
+import { LocalCleanupPort } from '@domain/backup/ports/local-cleanup.port';
+import { BackupResult } from '@domain/backup/models/backup-result.model';
+import { BackupStage } from '@domain/backup/models/backup-stage.enum';
+import { BackupStatus } from '@domain/backup/models/backup-status.enum';
+import { DumpResult } from '@domain/backup/models/dump-result.model';
+import { SyncResult } from '@domain/backup/models/sync-result.model';
+import { PruneResult } from '@domain/backup/models/prune-result.model';
+import { CleanupResult } from '@domain/backup/models/cleanup-result.model';
+import { RetentionPolicy } from '@domain/config/models/retention-policy.model';
+import { CacheInfo } from '@domain/backup/models/cache-info.model';
+
+import {
+  CONFIG_LOADER_PORT,
+  DUMPER_REGISTRY,
+  NOTIFIER_REGISTRY,
+  BACKUP_LOCK_PORT,
+  AUDIT_LOG_PORT,
+  FALLBACK_WRITER_PORT,
+  CLOCK_PORT,
+  DUMP_ENCRYPTOR_PORT,
+  HOOK_EXECUTOR_PORT,
+  LOCAL_CLEANUP_PORT,
+  REMOTE_STORAGE_FACTORY,
+} from '@shared/injection-tokens';
+
+jest.setTimeout(30000);
+
+// ── Test project config ─────────────────────────────────────────────────
+
+function buildTestConfig(overrides: Partial<ProjectConfig> = {}): ProjectConfig {
+  return new ProjectConfig({
+    name: 'locaboo',
+    enabled: true,
+    cron: '0 2 * * *',
+    timeoutMinutes: null,
+    database: {
+      type: 'postgres',
+      host: 'localhost',
+      port: 5432,
+      name: 'locaboo_prod',
+      user: 'locaboo_user',
+      password: 'test-pass',
+    },
+    compression: { enabled: true },
+    assets: { paths: [] },
+    restic: {
+      repositoryPath: 'sftp:storage:/backups/locaboo',
+      password: 'restic-pass',
+      snapshotMode: 'combined',
+    },
+    retention: new RetentionPolicy(7, 7, 4, 3),
+    encryption: null,
+    hooks: null,
+    verification: { enabled: false },
+    notification: { type: 'slack', config: {} },
+    ...overrides,
+  });
+}
+
+// ── In-memory audit log ─────────────────────────────────────────────────
+
+class InMemoryAuditLog implements AuditLogPort {
+  readonly records: Array<{
+    runId: string;
+    projectName: string;
+    status: BackupStatus;
+    currentStage: BackupStage;
+    startedAt: Date;
+    completedAt: Date | null;
+    result: BackupResult | null;
+  }> = [];
+
+  private counter = 0;
+
+  async startRun(projectName: string): Promise<string> {
+    const runId = `run-${++this.counter}`;
+    this.records.push({
+      runId,
+      projectName,
+      status: BackupStatus.Started,
+      currentStage: BackupStage.NotifyStarted,
+      startedAt: new Date(),
+      completedAt: null,
+      result: null,
+    });
+    return runId;
+  }
+
+  async trackProgress(runId: string, stage: BackupStage): Promise<void> {
+    const record = this.records.find((r) => r.runId === runId);
+    if (record) {
+      record.currentStage = stage;
+    }
+  }
+
+  async finishRun(runId: string, result: BackupResult): Promise<void> {
+    const record = this.records.find((r) => r.runId === runId);
+    if (record) {
+      record.status = result.status;
+      record.completedAt = result.completedAt;
+      record.result = result;
+    }
+  }
+
+  async findByProject(_projectName: string, _limit?: number): Promise<BackupResult[]> {
+    return [];
+  }
+
+  async findFailed(_projectName: string, _limit?: number): Promise<BackupResult[]> {
+    return [];
+  }
+
+  async findSince(_since: Date): Promise<BackupResult[]> {
+    return [];
+  }
+
+  async findOrphaned(): Promise<BackupResult[]> {
+    return [];
+  }
+}
+
+// ── In-memory fallback writer ───────────────────────────────────────────
+
+class InMemoryFallbackWriter implements FallbackWriterPort {
+  readonly entries: FallbackEntry[] = [];
+
+  async writeAuditFallback(_result: BackupResult): Promise<void> {
+    // no-op for tests
+  }
+
+  async writeNotificationFallback(_type: string, _payload: unknown): Promise<void> {
+    // no-op for tests
+  }
+
+  async readPendingEntries(): Promise<FallbackEntry[]> {
+    return this.entries;
+  }
+
+  async clearReplayed(_ids: string[]): Promise<void> {
+    // no-op
+  }
+}
+
+// ── File-based backup lock using temp dir ───────────────────────────────
+
+class TestFileBackupLock implements BackupLockPort {
+  constructor(private readonly baseDir: string) {}
+
+  async acquire(projectName: string): Promise<boolean> {
+    const lockPath = this.lockFilePath(projectName);
+    if (fs.existsSync(lockPath)) return false;
+    fs.mkdirSync(path.dirname(lockPath), { recursive: true });
+    fs.writeFileSync(lockPath, new Date().toISOString(), 'utf-8');
+    return true;
+  }
+
+  async acquireOrQueue(projectName: string): Promise<void> {
+    while (!(await this.acquire(projectName))) {
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    }
+  }
+
+  async release(projectName: string): Promise<void> {
+    const lockPath = this.lockFilePath(projectName);
+    try { fs.unlinkSync(lockPath); } catch { /* already removed */ }
+  }
+
+  isLocked(projectName: string): boolean {
+    return fs.existsSync(this.lockFilePath(projectName));
+  }
+
+  private lockFilePath(projectName: string): string {
+    return path.join(this.baseDir, projectName, '.lock');
+  }
+}
+
+// ── Test setup ──────────────────────────────────────────────────────────
+
+describe('BackupOrchestratorService (integration flow)', () => {
+  let moduleRef: TestingModule;
+  let orchestrator: BackupOrchestratorService;
+  let tempDir: string;
+
+  // Mock ports
+  let mockDumper: jest.Mocked<DatabaseDumperPort>;
+  let mockStorage: jest.Mocked<RemoteStoragePort>;
+  let mockNotifier: jest.Mocked<NotifierPort>;
+  let mockEncryptor: jest.Mocked<DumpEncryptorPort>;
+  let mockHookExecutor: jest.Mocked<HookExecutorPort>;
+  let mockCleanup: jest.Mocked<LocalCleanupPort>;
+  let auditLog: InMemoryAuditLog;
+  let backupLock: TestFileBackupLock;
+
+  const testConfig = buildTestConfig();
+
+  const configLoader: ConfigLoaderPort = {
+    loadAll: () => [testConfig],
+    getProject: (name: string) => {
+      if (name === 'locaboo') return testConfig;
+      throw new Error(`Project "${name}" not found in configuration`);
+    },
+    validate: (): ValidationResult => ({ isValid: true, errors: [] }),
+    reload: () => { /* no-op */ },
+  };
+
+  beforeEach(async () => {
+    tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'backupctl-flow-test-'));
+
+    mockDumper = {
+      dump: jest.fn().mockResolvedValue(new DumpResult('/data/backups/locaboo/dump.sql.gz', 1024000, 5000)),
+      verify: jest.fn().mockResolvedValue(true),
+    };
+
+    mockStorage = {
+      sync: jest.fn().mockResolvedValue(new SyncResult('snap-abc123', 2, 1, 512000, 8000)),
+      prune: jest.fn().mockResolvedValue(new PruneResult(1, '100MB')),
+      listSnapshots: jest.fn().mockResolvedValue([]),
+      restore: jest.fn().mockResolvedValue(undefined),
+      exec: jest.fn().mockResolvedValue(''),
+      getCacheInfo: jest.fn().mockResolvedValue({ totalSize: '10MB', location: '/tmp/cache' } as unknown as CacheInfo),
+      clearCache: jest.fn().mockResolvedValue(undefined),
+      unlock: jest.fn().mockResolvedValue(undefined),
+    };
+
+    mockNotifier = {
+      notifyStarted: jest.fn().mockResolvedValue(undefined),
+      notifySuccess: jest.fn().mockResolvedValue(undefined),
+      notifyFailure: jest.fn().mockResolvedValue(undefined),
+      notifyWarning: jest.fn().mockResolvedValue(undefined),
+      notifyDailySummary: jest.fn().mockResolvedValue(undefined),
+    };
+
+    mockEncryptor = {
+      encrypt: jest.fn().mockResolvedValue('/data/backups/locaboo/dump.sql.gz.gpg'),
+      decrypt: jest.fn().mockResolvedValue('/data/backups/locaboo/dump.sql.gz'),
+    };
+
+    mockHookExecutor = {
+      execute: jest.fn().mockResolvedValue(undefined),
+    };
+
+    mockCleanup = {
+      cleanup: jest.fn().mockResolvedValue(new CleanupResult(3, 2048)),
+    };
+
+    auditLog = new InMemoryAuditLog();
+    backupLock = new TestFileBackupLock(tempDir);
+
+    const dumperRegistry = new DumperRegistry();
+    dumperRegistry.register('postgres', mockDumper);
+
+    const notifierRegistry = new NotifierRegistry();
+    notifierRegistry.register('slack', mockNotifier);
+
+    const storageFactory = {
+      create: () => mockStorage,
+      createStorage: () => mockStorage,
+    };
+
+    moduleRef = await Test.createTestingModule({
+      imports: [ConfigModule.forRoot({ isGlobal: true })],
+      providers: [
+        BackupOrchestratorService,
+        { provide: CONFIG_LOADER_PORT, useValue: configLoader },
+        { provide: DUMPER_REGISTRY, useValue: dumperRegistry },
+        { provide: NOTIFIER_REGISTRY, useValue: notifierRegistry },
+        { provide: BACKUP_LOCK_PORT, useValue: backupLock },
+        { provide: AUDIT_LOG_PORT, useValue: auditLog },
+        { provide: FALLBACK_WRITER_PORT, useValue: new InMemoryFallbackWriter() },
+        { provide: CLOCK_PORT, useValue: { now: () => new Date(), timestamp: () => '20260318-020000' } satisfies ClockPort },
+        { provide: DUMP_ENCRYPTOR_PORT, useValue: mockEncryptor },
+        { provide: HOOK_EXECUTOR_PORT, useValue: mockHookExecutor },
+        { provide: LOCAL_CLEANUP_PORT, useValue: mockCleanup },
+        { provide: REMOTE_STORAGE_FACTORY, useValue: storageFactory },
+      ],
+    }).compile();
+
+    orchestrator = moduleRef.get(BackupOrchestratorService);
+  });
+
+  afterEach(async () => {
+    await moduleRef?.close();
+    if (fs.existsSync(tempDir)) {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  // ── Happy path ──────────────────────────────────────────────────────
+
+  it('should complete full backup flow: dump → sync → prune → cleanup → audit → notify', async () => {
+    const result = await orchestrator.runBackup('locaboo');
+
+    expect(result.status).toBe(BackupStatus.Success);
+    expect(result.projectName).toBe('locaboo');
+    expect(result.durationMs).toBeGreaterThanOrEqual(0);
+
+    // Verify each step was called
+    expect(mockNotifier.notifyStarted).toHaveBeenCalledWith('locaboo');
+    expect(mockDumper.dump).toHaveBeenCalled();
+    expect(mockStorage.sync).toHaveBeenCalled();
+    expect(mockStorage.prune).toHaveBeenCalled();
+    expect(mockCleanup.cleanup).toHaveBeenCalled();
+    expect(mockNotifier.notifySuccess).toHaveBeenCalledWith(expect.objectContaining({
+      status: BackupStatus.Success,
+    }));
+
+    // Verify audit was tracked
+    expect(auditLog.records).toHaveLength(1);
+    expect(auditLog.records[0].status).toBe(BackupStatus.Success);
+    expect(auditLog.records[0].result).not.toBeNull();
+
+    // Verify lock was released
+    expect(backupLock.isLocked('locaboo')).toBe(false);
+  });
+
+  // ── Lock prevents concurrent backup ────────────────────────────────
+
+  it('should prevent concurrent backup via lock', async () => {
+    // Manually acquire the lock
+    await backupLock.acquire('locaboo');
+
+    await expect(orchestrator.runBackup('locaboo')).rejects.toThrow(
+      'Backup already in progress for locaboo',
+    );
+
+    // Release for cleanup
+    await backupLock.release('locaboo');
+  });
+
+  // ── Dry run ────────────────────────────────────────────────────────
+
+  it('should not execute backup steps during dry run', async () => {
+    const report = await orchestrator.executeDryRun('locaboo');
+
+    expect(report.projectName).toBe('locaboo');
+    expect(report.checks.length).toBeGreaterThan(0);
+
+    const configCheck = report.checks.find((c) => c.name === 'Config loaded');
+    expect(configCheck?.passed).toBe(true);
+
+    const dumperCheck = report.checks.find((c) => c.name === 'Database dumper');
+    expect(dumperCheck?.passed).toBe(true);
+
+    expect(mockDumper.dump).not.toHaveBeenCalled();
+    expect(mockStorage.sync).not.toHaveBeenCalled();
+    expect(mockStorage.prune).not.toHaveBeenCalled();
+    expect(mockCleanup.cleanup).not.toHaveBeenCalled();
+    expect(mockNotifier.notifyStarted).not.toHaveBeenCalled();
+  });
+
+  // ── Retry on dump failure ──────────────────────────────────────────
+
+  it('should retry on dump failure up to max retries', async () => {
+    let callCount = 0;
+    mockDumper.dump.mockImplementation(async () => {
+      callCount++;
+      if (callCount < 3) {
+        throw new Error('pg_dump connection refused');
+      }
+      return new DumpResult('/data/backups/locaboo/dump.sql.gz', 1024000, 5000);
+    });
+
+    const result = await orchestrator.runBackup('locaboo');
+
+    expect(result.status).toBe(BackupStatus.Success);
+    // First call + 2 retries = 3 total calls
+    expect(mockDumper.dump).toHaveBeenCalledTimes(3);
+    expect(result.retryCount).toBeGreaterThan(0);
+  });
+
+  // ── Failure after max retries ──────────────────────────────────────
+
+  it('should fail after exhausting retries', async () => {
+    mockDumper.dump.mockRejectedValue(new Error('pg_dump persistent failure'));
+
+    const result = await orchestrator.runBackup('locaboo');
+
+    expect(result.status).toBe(BackupStatus.Failed);
+    expect(result.errorStage).toBe(BackupStage.Dump);
+    expect(result.errorMessage).toContain('pg_dump persistent failure');
+
+    // Verify failure notification was sent
+    expect(mockNotifier.notifyFailure).toHaveBeenCalled();
+
+    // Verify lock was still released
+    expect(backupLock.isLocked('locaboo')).toBe(false);
+  });
+
+  // ── Audit records stages ──────────────────────────────────────────
+
+  it('should track progress through audit log stages', async () => {
+    const trackSpy = jest.spyOn(auditLog, 'trackProgress');
+
+    await orchestrator.runBackup('locaboo');
+
+    expect(trackSpy).toHaveBeenCalledWith(expect.any(String), BackupStage.NotifyStarted);
+    expect(trackSpy).toHaveBeenCalledWith(expect.any(String), BackupStage.Dump);
+    expect(trackSpy).toHaveBeenCalledWith(expect.any(String), BackupStage.Sync);
+    expect(trackSpy).toHaveBeenCalledWith(expect.any(String), BackupStage.Prune);
+    expect(trackSpy).toHaveBeenCalledWith(expect.any(String), BackupStage.Cleanup);
+  });
+
+  // ── Sync receives correct paths and tags ──────────────────────────
+
+  it('should pass dump file path and tags to storage sync', async () => {
+    await orchestrator.runBackup('locaboo');
+
+    expect(mockStorage.sync).toHaveBeenCalledWith(
+      ['/data/backups/locaboo/dump.sql.gz'],
+      expect.objectContaining({
+        tags: expect.arrayContaining([
+          'project:locaboo',
+          'db:postgres',
+        ]),
+        snapshotMode: 'combined',
+      }),
+    );
+  });
+});

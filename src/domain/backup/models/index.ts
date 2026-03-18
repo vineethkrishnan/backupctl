@@ -1,0 +1,10 @@
+export { BackupStage } from './backup-stage.enum';
+export { BackupStatus } from './backup-status.enum';
+export { BackupResult, type BackupResultParams } from './backup-result.model';
+export { BackupStageError } from './backup-stage-error';
+export { CacheInfo } from './cache-info.model';
+export { CleanupResult } from './cleanup-result.model';
+export { DumpResult } from './dump-result.model';
+export { PruneResult } from './prune-result.model';
+export { SnapshotInfo } from './snapshot-info.model';
+export { SyncResult } from './sync-result.model';

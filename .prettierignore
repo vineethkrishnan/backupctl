@@ -1,0 +1,9 @@
+node_modules
+dist
+coverage
+.plans
+.claude
+.cursor
+_docs
+package-lock.json
+CHANGELOG.md

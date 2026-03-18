@@ -1,0 +1,53 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+
+# Environment & secrets
+.env
+.env.local
+.env.*.local
+
+# SSH & GPG keys
+ssh-keys/
+gpg-keys/
+
+# Backup artifacts
+*.sql.gz
+*.gpg
+*.lock
+
+# Fallback audit files
+.fallback-audit/
+
+# Coverage
+coverage/
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Internal planning & AI context (keep CLAUDE.md)
+.plans/
+.claude/
+.cursor/
+
+# Temp files
+tmp/
+temp/
+*.tmp

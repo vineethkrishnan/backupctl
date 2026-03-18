@@ -1,0 +1,41 @@
+version: "3.8"
+
+services:
+  backupctl:
+    container_name: backupctl
+    build:
+      context: .
+      dockerfile: Dockerfile
+    env_file: .env
+    ports:
+      - "${APP_PORT:-3100}:${APP_PORT:-3100}"
+    volumes:
+      - ${BACKUP_BASE_DIR:-/data/backups}:/data/backups
+      - ./config:/app/config:ro
+      - ./ssh-keys:/root/.ssh:ro
+      - ./gpg-keys:/app/gpg-keys:ro
+    networks:
+      - backupctl-network
+    depends_on:
+      - backupctl-audit-db
+    restart: unless-stopped
+
+  backupctl-audit-db:
+    container_name: backupctl-audit-db
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${AUDIT_DB_NAME:-backup_audit}
+      POSTGRES_USER: ${AUDIT_DB_USER:-audit_user}
+      POSTGRES_PASSWORD: ${AUDIT_DB_PASSWORD:-audit_secret}
+    volumes:
+      - backupctl-audit-data:/var/lib/postgresql/data
+    networks:
+      - backupctl-network
+    restart: unless-stopped
+
+volumes:
+  backupctl-audit-data:
+
+networks:
+  backupctl-network:
+    driver: bridge

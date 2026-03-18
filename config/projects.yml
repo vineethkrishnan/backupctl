@@ -1,0 +1,90 @@
+projects:
+  - name: locaboo
+    enabled: true
+    cron: "0 0 * * *"
+    timeout_minutes: 30
+    database:
+      type: postgres
+      host: postgres-locaboo
+      port: 5432
+      name: locaboo_db
+      user: backup_user
+      password: ${LOCABOO_DB_PASSWORD}
+    compression:
+      enabled: true
+    assets:
+      paths:
+        - /data/locaboo/uploads
+        - /data/locaboo/assets
+    restic:
+      repository_path: /backups/locaboo
+      password: ${LOCABOO_RESTIC_PASSWORD}
+      snapshot_mode: combined
+    retention:
+      local_days: 7
+      keep_daily: 7
+      keep_weekly: 4
+      keep_monthly: 0
+    encryption:
+      enabled: true
+      type: gpg
+      recipient: locaboo-backup@company.com
+    hooks:
+      pre_backup: "curl -s http://locaboo-app:3000/maintenance/on"
+      post_backup: "curl -s http://locaboo-app:3000/maintenance/off"
+    verification:
+      enabled: true
+    notification:
+      type: slack
+      config:
+        webhook_url: https://hooks.slack.com/services/LOCABOO/SPECIFIC/HOOK
+
+  - name: project-x
+    enabled: true
+    cron: "30 1 * * *"
+    database:
+      type: mysql
+      host: mysql-projectx
+      port: 3306
+      name: projectx_db
+      user: backup_user
+      password: ${PROJECTX_DB_PASSWORD}
+    assets:
+      paths:
+        - /data/projectx/storage
+    restic:
+      repository_path: /backups/project-x
+      snapshot_mode: separate
+    retention:
+      local_days: 14
+      keep_daily: 14
+      keep_weekly: 8
+    notification:
+      type: email
+      config:
+        smtp_host: smtp.gmail.com
+        smtp_port: 587
+        smtp_secure: true
+        to: devops@company.com
+        from: backup@company.com
+        password: ${EMAIL_PASSWORD}
+
+  - name: project-y
+    enabled: true
+    cron: "0 2 * * *"
+    database:
+      type: postgres
+      host: postgres-projecty
+      port: 5432
+      name: projecty_db
+      user: backup_user
+      password: ${PROJECTY_DB_PASSWORD}
+    assets:
+      paths: []
+    restic:
+      repository_path: /backups/project-y
+      snapshot_mode: combined
+    retention:
+      local_days: 7
+      keep_daily: 7
+      keep_weekly: 4
