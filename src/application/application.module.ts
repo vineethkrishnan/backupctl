@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+import { BackupOrchestratorService } from './backup/backup-orchestrator.service';
 import { HealthCheckService } from './health/health-check.service';
 import { SnapshotManagementService } from './snapshot/snapshot-management.service';
 import { AuditQueryService } from './audit/audit-query.service';
@@ -12,6 +13,7 @@ import { DUMPER_REGISTRY, NOTIFIER_REGISTRY } from '@shared/injection-tokens';
 @Module({
   imports: [ConfigModule],
   providers: [
+    BackupOrchestratorService,
     HealthCheckService,
     SnapshotManagementService,
     AuditQueryService,
@@ -21,6 +23,7 @@ import { DUMPER_REGISTRY, NOTIFIER_REGISTRY } from '@shared/injection-tokens';
     { provide: NOTIFIER_REGISTRY, useClass: NotifierRegistry },
   ],
   exports: [
+    BackupOrchestratorService,
     HealthCheckService,
     SnapshotManagementService,
     AuditQueryService,

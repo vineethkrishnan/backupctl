@@ -8,6 +8,7 @@ dist/
 .env
 .env.local
 .env.*.local
+config/projects.yml
 
 # SSH & GPG keys
 ssh-keys/

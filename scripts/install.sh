@@ -28,7 +28,7 @@ WARNING="${YELLOW}⚠${RESET}"
 
 # ── State ────────────────────────────────────────────────────
 
-TOTAL_STEPS=11
+TOTAL_STEPS=12
 ENV_VARS=""
 PROJECTS=()
 PROJECT_COUNT=0
@@ -101,12 +101,12 @@ ask() {
   local result
 
   if [ -n "$default" ]; then
-    echo -ne "  ${prompt} ${DIM}[${default}]${RESET}: "
+    echo -ne "  ${prompt} ${DIM}[${default}]${RESET}: " >/dev/tty
   else
-    echo -ne "  ${prompt}: "
+    echo -ne "  ${prompt}: " >/dev/tty
   fi
 
-  read -r result
+  read -r result </dev/tty
   if [ -z "$result" ]; then
     result="$default"
   fi
@@ -118,9 +118,9 @@ ask_password() {
   local prompt="$1"
   local result
 
-  echo -ne "  ${prompt}: "
-  read -rs result
-  echo ""
+  echo -ne "  ${prompt}: " >/dev/tty
+  read -rs result </dev/tty
+  echo "" >/dev/tty
   echo "$result"
 }
 
@@ -160,7 +160,7 @@ validate_not_empty() {
   local field_name="$2"
 
   if [ -z "$value" ]; then
-    print_error "${field_name} cannot be empty"
+    echo -e "  ${CROSSMARK} ${RED}${field_name} cannot be empty${RESET}" >/dev/tty
     return 1
   fi
   return 0
@@ -170,7 +170,7 @@ validate_not_empty() {
 validate_port() {
   local port="$1"
   if ! [[ "$port" =~ ^[0-9]+$ ]] || [ "$port" -lt 1 ] || [ "$port" -gt 65535 ]; then
-    print_error "Invalid port number: ${port}"
+    echo -e "  ${CROSSMARK} ${RED}Invalid port number: ${port}${RESET}" >/dev/tty
     return 1
   fi
   return 0
@@ -642,8 +642,15 @@ step_encryption() {
       while true; do
         GPG_KEY_PATH=$(ask "Path to GPG public key file" "")
         if [ -f "$GPG_KEY_PATH" ]; then
-          cp "$GPG_KEY_PATH" gpg-keys/
-          print_success "Copied $(basename "$GPG_KEY_PATH") to gpg-keys/"
+          local real_src real_dest
+          real_src="$(cd "$(dirname "$GPG_KEY_PATH")" && pwd)/$(basename "$GPG_KEY_PATH")"
+          real_dest="$(cd gpg-keys && pwd)/$(basename "$GPG_KEY_PATH")"
+          if [ "$real_src" = "$real_dest" ]; then
+            print_success "$(basename "$GPG_KEY_PATH") is already in gpg-keys/"
+          else
+            cp "$GPG_KEY_PATH" gpg-keys/
+            print_success "Copied $(basename "$GPG_KEY_PATH") to gpg-keys/"
+          fi
           break
         else
           print_error "File not found: ${GPG_KEY_PATH}"
@@ -748,15 +755,11 @@ add_project() {
   proj_env_key=$(project_env_key "$proj_name")
 
   echo ""
-  if ask_yn "Auto-generate database password?" "y"; then
-    proj_db_password=$(generate_password)
-    print_success "Password generated (stored as ${proj_env_key}_DB_PASSWORD in .env)"
-  else
-    while true; do
-      proj_db_password=$(ask_password "Database password")
-      if validate_not_empty "$proj_db_password" "Database password"; then break; fi
-    done
-  fi
+  while true; do
+    proj_db_password=$(ask_password "Database password")
+    if validate_not_empty "$proj_db_password" "Database password"; then break; fi
+  done
+  print_success "Password stored as ${proj_env_key}_DB_PASSWORD in .env"
 
   # Assets
   echo ""
@@ -798,11 +801,15 @@ add_project() {
   # Retention
   echo ""
   echo -e "  ${BOLD}Retention:${RESET}"
+  print_dim "Local = days to keep dump files on disk before cleanup deletes them"
+  print_dim "Remote = how many restic snapshots to keep (daily/weekly/monthly)"
+  print_dim "Example: 7 daily + 4 weekly + 6 monthly ≈ 3 months of recovery points"
+  echo ""
   local proj_ret_local proj_ret_daily proj_ret_weekly proj_ret_monthly
   proj_ret_local=$(ask "Local retention days" "7")
   proj_ret_daily=$(ask "Remote keep daily" "7")
   proj_ret_weekly=$(ask "Remote keep weekly" "4")
-  proj_ret_monthly=$(ask "Remote keep monthly" "0")
+  proj_ret_monthly=$(ask "Remote keep monthly" "6")
 
   # Encryption override
   echo ""
@@ -1037,11 +1044,89 @@ add_project() {
 }
 
 # ════════════════════════════════════════════════════════════
-# Step 9: Generate Configuration Files
+# Step 9: Review Configuration
+# ════════════════════════════════════════════════════════════
+
+step_review() {
+  while true; do
+    print_step 9 "Review Configuration"
+
+    echo -e "  ${BOLD}Application${RESET}"
+    echo -e "    Port: ${CYAN}${APP_PORT}${RESET}  |  Timezone: ${CYAN}${TIMEZONE}${RESET}  |  Backup dir: ${CYAN}${BACKUP_BASE_DIR}${RESET}"
+    echo -e "    Log level: ${CYAN}${LOG_LEVEL}${RESET}  |  Min free disk: ${CYAN}${HEALTH_DISK_MIN_FREE_GB} GB${RESET}"
+    echo ""
+
+    echo -e "  ${BOLD}Audit Database${RESET}"
+    echo -e "    ${CYAN}${AUDIT_DB_USER}@${AUDIT_DB_HOST}:${AUDIT_DB_PORT}/${AUDIT_DB_NAME}${RESET}"
+    echo ""
+
+    echo -e "  ${BOLD}Hetzner Storage Box${RESET}"
+    echo -e "    ${CYAN}${HETZNER_SSH_USER}@${HETZNER_SSH_HOST}:${HETZNER_SSH_PORT}${RESET}"
+    echo ""
+
+    echo -e "  ${BOLD}Restic${RESET}"
+    echo -e "    Password: ${DIM}(generated)${RESET}  |  Retries: ${CYAN}${BACKUP_RETRY_COUNT}${RESET}  |  Delay: ${CYAN}${BACKUP_RETRY_DELAY_MS}ms${RESET}"
+    echo ""
+
+    echo -e "  ${BOLD}Notifications${RESET}"
+    echo -e "    Type: ${CYAN}${NOTIFICATION_TYPE}${RESET}  |  Summary cron: ${CYAN}${DAILY_SUMMARY_CRON}${RESET}"
+    echo ""
+
+    echo -e "  ${BOLD}Encryption${RESET}"
+    if [ "$ENCRYPTION_ENABLED" = "true" ]; then
+      echo -e "    Enabled: ${CYAN}yes${RESET}  |  Type: ${CYAN}${ENCRYPTION_TYPE}${RESET}  |  Recipient: ${CYAN}${GPG_RECIPIENT}${RESET}"
+    else
+      echo -e "    Enabled: ${CYAN}no${RESET}"
+    fi
+    echo ""
+
+    echo -e "  ${BOLD}Projects (${PROJECT_COUNT})${RESET}"
+    if [ ${#PROJECTS[@]} -eq 0 ]; then
+      echo -e "    ${DIM}(none configured)${RESET}"
+    else
+      for proj_yaml in "${PROJECTS[@]}"; do
+        local pname pdb_type pdb_host pdb_name pcron
+        pname=$(echo "$proj_yaml" | grep 'name:' | head -1 | sed 's/.*name: //')
+        pdb_type=$(echo "$proj_yaml" | grep 'type:' | head -1 | sed 's/.*type: //')
+        pdb_host=$(echo "$proj_yaml" | grep 'host:' | head -1 | sed 's/.*host: //')
+        pdb_name=$(echo "$proj_yaml" | grep 'name:' | tail -1 | sed 's/.*name: //')
+        pcron=$(echo "$proj_yaml" | grep 'cron:' | head -1 | sed 's/.*cron: "//;s/"//')
+        echo -e "    ${CHECKMARK} ${BOLD}${pname}${RESET} — ${pdb_type} @ ${pdb_host}/${pdb_name} — cron: ${DIM}${pcron}${RESET}"
+      done
+    fi
+    echo ""
+
+    echo -e "  ${BOLD}━━━ Re-run a step? ━━━${RESET}"
+    echo -e "    ${DIM}2)${RESET} Application    ${DIM}3)${RESET} Audit DB      ${DIM}4)${RESET} Hetzner"
+    echo -e "    ${DIM}5)${RESET} Restic         ${DIM}6)${RESET} Notifications ${DIM}7)${RESET} Encryption"
+    echo -e "    ${DIM}8)${RESET} Projects       ${DIM}c)${RESET} Continue to generate files"
+    echo ""
+
+    local choice
+    choice=$(ask "Re-run step or continue" "c")
+
+    case "$choice" in
+      2) step_app_settings ;;
+      3) step_audit_db ;;
+      4) step_hetzner ;;
+      5) step_restic ;;
+      6) step_notifications ;;
+      7) step_encryption ;;
+      8) step_projects ;;
+      c|C) break ;;
+      *) print_error "Invalid choice. Enter a step number (2-8) or 'c' to continue." ;;
+    esac
+  done
+
+  print_success "Configuration reviewed"
+}
+
+# ════════════════════════════════════════════════════════════
+# Step 10: Generate Configuration Files
 # ════════════════════════════════════════════════════════════
 
 step_generate() {
-  print_step 9 "Generate Configuration Files"
+  print_step 10 "Generate Configuration Files"
 
   # Create directories
   mkdir -p config ssh-keys gpg-keys
@@ -1166,11 +1251,11 @@ YMLEOF
 }
 
 # ════════════════════════════════════════════════════════════
-# Step 10: Docker Setup
+# Step 11: Docker Setup
 # ════════════════════════════════════════════════════════════
 
 step_docker() {
-  print_step 10 "Docker Setup"
+  print_step 11 "Docker Setup"
 
   if ! ask_yn "Build and start Docker containers now?" "y"; then
     print_info "Skipping Docker setup. Run later with: docker compose up -d --build"
@@ -1179,13 +1264,22 @@ step_docker() {
 
   # Build and start
   echo ""
-  echo -ne "  Building and starting containers..."
-  if docker compose up -d --build 2>&1 | tail -5; then
-    echo -e "  ${CHECKMARK} Containers started"
+  print_info "Building and starting containers (this may take a few minutes)..."
+  echo ""
+  local build_log
+  build_log=$(mktemp)
+  if docker compose up -d --build >"$build_log" 2>&1; then
+    print_success "Containers started"
   else
-    print_error "Docker Compose failed. Check docker-compose.yml and try manually."
+    echo ""
+    print_error "Docker Compose failed:"
+    echo -e "  ${DIM}$(tail -10 "$build_log")${RESET}"
+    echo ""
+    print_info "Fix the issue and re-run: docker compose up -d --build"
+    rm -f "$build_log"
     return
   fi
+  rm -f "$build_log"
 
   # Wait for health
   echo ""
@@ -1236,11 +1330,11 @@ step_docker() {
 }
 
 # ════════════════════════════════════════════════════════════
-# Step 11: Completion
+# Step 12: Completion
 # ════════════════════════════════════════════════════════════
 
 step_completion() {
-  print_step 11 "Installation Complete"
+  print_step 12 "Installation Complete"
 
   echo -e "${BOLD}${GREEN}"
   echo "  ╔═══════════════════════════════════════════════════════════╗"
@@ -1317,6 +1411,7 @@ main() {
   step_notifications
   step_encryption
   step_projects
+  step_review
   step_generate
   step_docker
   step_completion

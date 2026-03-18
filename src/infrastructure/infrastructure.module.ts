@@ -1,4 +1,5 @@
-import { Module } from '@nestjs/common';
+import { Global, Module } from '@nestjs/common';
+import { TypeOrmModule } from '@nestjs/typeorm';
 
 import {
   AUDIT_LOG_PORT,
@@ -22,9 +23,7 @@ import { ResticStorageFactory } from './adapters/storage/restic-storage.factory'
 import { TypeormAuditLogAdapter } from './persistence/audit/typeorm-audit-log.adapter';
 import { JsonlFallbackWriterAdapter } from './persistence/fallback/jsonl-fallback-writer.adapter';
 import { FileBackupLockAdapter } from './persistence/lock/file-backup-lock.adapter';
-import { HttpModule } from './http/http.module';
-import { BackupSchedulerModule } from './scheduler/scheduler.module';
-
+import { BackupLogEntity } from './persistence/audit/entities/backup-log.entity';
 const portBindings = [
   { provide: CLOCK_PORT, useClass: SystemClockAdapter },
   { provide: CONFIG_LOADER_PORT, useClass: YamlConfigLoaderAdapter },
@@ -37,14 +36,14 @@ const portBindings = [
   { provide: REMOTE_STORAGE_FACTORY, useClass: ResticStorageFactory },
 ];
 
+@Global()
 @Module({
-  imports: [HttpModule, BackupSchedulerModule],
+  imports: [TypeOrmModule.forFeature([BackupLogEntity])],
   providers: [...portBindings, GpgKeyManager, ResticStorageFactory],
   exports: [
     ...portBindings.map((binding) => binding.provide),
     GpgKeyManager,
     ResticStorageFactory,
-    BackupSchedulerModule,
   ],
 })
 export class InfrastructureModule {}

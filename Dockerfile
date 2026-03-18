@@ -1,12 +1,23 @@
+# ── Build stage ───────────────────────────────────────────
+FROM node:20-alpine AS builder
+
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci
+COPY tsconfig*.json nest-cli.json ./
+COPY src/ ./src/
+RUN npm run build
+
+# ── Production stage ──────────────────────────────────────
 FROM node:20-alpine
 
-RUN apk add --no-cache \
+RUN apk add --no-cache --repository=https://dl-cdn.alpinelinux.org/alpine/v3.20/community \
     postgresql-client \
-    mysql-client \
+    mariadb-client \
     mongodb-tools \
     openssh-client \
     gnupg \
-    fuse \
+    fuse3 \
     bzip2
 
 # Install restic
@@ -18,8 +29,7 @@ RUN wget https://github.com/restic/restic/releases/download/v0.17.3/restic_0.17.
 WORKDIR /app
 COPY package*.json ./
 RUN npm ci --omit=dev
-COPY dist/ ./dist/
-COPY config/ ./config/
+COPY --from=builder /app/dist ./dist/
 
 EXPOSE 3100
 CMD ["node", "dist/main.js"]

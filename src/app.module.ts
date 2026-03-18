@@ -7,6 +7,9 @@ import * as winston from 'winston';
 import DailyRotateFile from 'winston-daily-rotate-file';
 import { ApplicationModule } from '@application/application.module';
 import { InfrastructureModule } from '@infrastructure/infrastructure.module';
+import { DynamicSchedulerService } from '@infrastructure/scheduler/dynamic-scheduler.service';
+import { HealthController } from '@infrastructure/http/health.controller';
+import { StatusController } from '@infrastructure/http/status.controller';
 import { BackupLogEntity } from '@infrastructure/persistence/audit/entities/backup-log.entity';
 
 @Module({
@@ -64,5 +67,7 @@ import { BackupLogEntity } from '@infrastructure/persistence/audit/entities/back
     InfrastructureModule,
     ApplicationModule,
   ],
+  controllers: [HealthController, StatusController],
+  providers: [DynamicSchedulerService],
 })
 export class AppModule {}
