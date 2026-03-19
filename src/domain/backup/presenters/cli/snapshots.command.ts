@@ -1,5 +1,6 @@
 import { Command, CommandRunner, Option } from 'nest-commander';
 import { ListSnapshotsUseCase } from '@domain/backup/application/use-cases/list-snapshots/list-snapshots.use-case';
+import { ListSnapshotsQuery } from '@domain/backup/application/use-cases/list-snapshots/list-snapshots.query';
 
 interface SnapshotsOptions { last?: number; }
 
@@ -14,9 +15,11 @@ export class SnapshotsCommand extends CommandRunner {
     const projectName = params[0];
 
     try {
-      const snapshots = await this.listSnapshots.execute(
-        { projectName, limit: options?.last } as import('@domain/backup/application/use-cases/list-snapshots/list-snapshots.query').ListSnapshotsQuery,
-      );
+      const query: ListSnapshotsQuery = new ListSnapshotsQuery({
+        projectName,
+        limit: options?.last,
+      });
+      const snapshots = await this.listSnapshots.execute(query);
 
       if (snapshots.length === 0) { console.log(`No snapshots found for ${projectName}.`); return; }
 

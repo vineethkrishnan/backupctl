@@ -7,7 +7,9 @@ import { ConfigModule } from '@nestjs/config';
 import { RunBackupUseCase } from '@domain/backup/application/use-cases/run-backup/run-backup.use-case';
 import { RunBackupCommand } from '@domain/backup/application/use-cases/run-backup/run-backup.command';
 import { DumperRegistry } from '@domain/backup/application/registries/dumper.registry';
-import { NotifierRegistry } from '@domain/backup/application/registries/notifier.registry';
+import { NotifierRegistry } from '@domain/notification/application/registries/notifier.registry';
+import { FileSystemPort } from '@common/filesystem/filesystem.port';
+import { GpgKeyManagerPort } from '@domain/backup/application/ports/gpg-key-manager.port';
 
 import { ProjectConfig } from '@domain/config/domain/project-config.model';
 import { ConfigLoaderPort, ValidationResult } from '@domain/config/application/ports/config-loader.port';
@@ -42,6 +44,8 @@ import {
   DUMP_ENCRYPTOR_PORT,
   HOOK_EXECUTOR_PORT,
   LOCAL_CLEANUP_PORT,
+  FILESYSTEM_PORT,
+  GPG_KEY_MANAGER_PORT,
   REMOTE_STORAGE_FACTORY,
 } from '@common/di/injection-tokens';
 
@@ -269,14 +273,13 @@ describe('RunBackupUseCase (integration flow)', () => {
     backupLock = new TestFileBackupLock(tempDir);
 
     const dumperRegistry = new DumperRegistry();
-    dumperRegistry.register('postgres', mockDumper);
+    dumperRegistry.register('postgres', () => mockDumper);
 
     const notifierRegistry = new NotifierRegistry();
     notifierRegistry.register('slack', mockNotifier);
 
     const storageFactory = {
       create: () => mockStorage,
-      createStorage: () => mockStorage,
     };
 
     moduleRef = await Test.createTestingModule({
@@ -294,6 +297,8 @@ describe('RunBackupUseCase (integration flow)', () => {
         { provide: HOOK_EXECUTOR_PORT, useValue: mockHookExecutor },
         { provide: LOCAL_CLEANUP_PORT, useValue: mockCleanup },
         { provide: REMOTE_STORAGE_FACTORY, useValue: storageFactory },
+        { provide: FILESYSTEM_PORT, useValue: { exists: () => true, diskFreeGb: () => 20, listDirectory: () => [], removeFile: () => undefined } satisfies FileSystemPort },
+        { provide: GPG_KEY_MANAGER_PORT, useValue: { importKey: jest.fn(), importAllFromDirectory: jest.fn().mockResolvedValue([]), listKeys: jest.fn().mockResolvedValue(''), hasKey: jest.fn().mockResolvedValue(true) } satisfies GpgKeyManagerPort },
       ],
     }).compile();
 

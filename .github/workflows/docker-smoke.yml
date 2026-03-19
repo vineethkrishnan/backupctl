@@ -1,0 +1,93 @@
+name: Docker Smoke Test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: docker-smoke-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  smoke-test:
+    name: Build & Smoke Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Create minimal .env for CI
+        run: |
+          cat > .env <<'EOF'
+          NODE_ENV=production
+          APP_PORT=3100
+          AUDIT_DB_HOST=backupctl-audit-db
+          AUDIT_DB_PORT=5432
+          AUDIT_DB_USER=audit_user
+          AUDIT_DB_PASSWORD=ci_test_password
+          AUDIT_DB_NAME=backup_audit
+          TIMEZONE=UTC
+          BACKUP_BASE_DIR=/data/backups
+          HETZNER_SSH_HOST=localhost
+          HETZNER_SSH_USER=test
+          HETZNER_SSH_KEY_PATH=/home/node/.ssh/id_ed25519
+          HETZNER_SSH_PORT=23
+          RESTIC_PASSWORD=ci_test_restic_pass
+          EOF
+
+      - name: Create minimal config
+        run: |
+          mkdir -p config ssh-keys gpg-keys
+          cat > config/projects.yml <<'EOF'
+          projects: []
+          EOF
+          ssh-keygen -t ed25519 -f ssh-keys/id_ed25519 -N "" -q
+
+      - name: Build Docker image
+        run: docker compose build backupctl
+
+      - name: Start services
+        run: docker compose up -d
+
+      - name: Wait for audit DB to be healthy
+        run: |
+          for i in $(seq 1 30); do
+            if docker compose exec -T backupctl-audit-db pg_isready -U audit_user -d backup_audit > /dev/null 2>&1; then
+              echo "Audit DB is ready"
+              break
+            fi
+            echo "Waiting for audit DB... ($i/30)"
+            sleep 2
+          done
+
+      - name: Wait for app to start
+        run: |
+          for i in $(seq 1 30); do
+            if docker compose exec -T backupctl curl -sf http://localhost:3100/health > /dev/null 2>&1; then
+              echo "App is healthy"
+              break
+            fi
+            echo "Waiting for app... ($i/30)"
+            sleep 2
+          done
+
+      - name: Smoke test — health endpoint returns 200
+        run: |
+          STATUS=$(docker compose exec -T backupctl curl -sf -o /dev/null -w "%{http_code}" http://localhost:3100/health)
+          echo "Health endpoint returned: $STATUS"
+          [ "$STATUS" = "200" ]
+
+      - name: Smoke test — health CLI exits 0
+        run: docker compose exec -T backupctl node dist/cli.js health
+
+      - name: Smoke test — config validate CLI
+        run: docker compose exec -T backupctl node dist/cli.js config validate
+
+      - name: Collect logs on failure
+        if: failure()
+        run: docker compose logs --tail=100
+
+      - name: Tear down
+        if: always()
+        run: docker compose down -v

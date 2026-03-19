@@ -40,6 +40,11 @@ cmd_setup() {
     cat > .env <<'ENVEOF'
 # backupctl environment configuration
 
+# Application
+APP_PORT=3100
+BACKUP_BASE_DIR=/data/backups
+TIMEZONE=Europe/Berlin
+
 # Audit database
 AUDIT_DB_HOST=backupctl-audit-db
 AUDIT_DB_PORT=5432
@@ -47,12 +52,32 @@ AUDIT_DB_NAME=backup_audit
 AUDIT_DB_USER=audit_user
 AUDIT_DB_PASSWORD=changeme
 
-# Application
-APP_PORT=3100
-BACKUP_BASE_DIR=/data/backups
-TIMEZONE=Europe/Berlin
+# Hetzner Storage Box
+HETZNER_SSH_HOST=u123456.your-storagebox.de
+HETZNER_SSH_USER=u123456
+HETZNER_SSH_PORT=23
+HETZNER_SSH_KEY_PATH=/home/node/.ssh/id_ed25519
+
+# Restic (global defaults)
+RESTIC_PASSWORD=changeme
+
+# Retry
+BACKUP_RETRY_COUNT=3
+BACKUP_RETRY_DELAY_MS=5000
+
+# Notifications (global defaults)
+NOTIFICATION_TYPE=none
+# SLACK_WEBHOOK_URL=
+# WEBHOOK_URL=
+
+# Encryption (global defaults)
+ENCRYPTION_ENABLED=false
+# ENCRYPTION_TYPE=gpg
+# GPG_RECIPIENT=
+GPG_KEYS_DIR=/app/gpg-keys
 
 # Logging
+LOG_LEVEL=info
 LOG_DIR=/data/backups/.logs
 LOG_MAX_SIZE=10m
 LOG_MAX_FILES=5
@@ -60,18 +85,8 @@ LOG_MAX_FILES=5
 # Health checks
 HEALTH_DISK_MIN_FREE_GB=5
 
-# Restic
-# RESTIC_PASSWORD=
-
-# Notifications (global defaults)
-# NOTIFICATION_TYPE=slack
-# SLACK_WEBHOOK_URL=
-
-# Encryption (global defaults)
-# ENCRYPTION_ENABLED=false
-# ENCRYPTION_TYPE=gpg
-# GPG_RECIPIENT=
-# GPG_KEYS_DIR=./gpg-keys
+# Daily summary cron
+DAILY_SUMMARY_CRON=0 8 * * *
 ENVEOF
     echo "  Created .env with defaults — edit passwords before deploying!"
   else
@@ -90,9 +105,8 @@ ENVEOF
   # Known hosts
   echo "[4/6] SSH known_hosts..."
   if [ ! -f ssh-keys/known_hosts ]; then
-    echo "  Generating known_hosts for common storage providers..."
-    ssh-keyscan -H your-storage-box.your-server.de >> ssh-keys/known_hosts 2>/dev/null || true
-    echo "  Update ssh-keys/known_hosts with your storage box hostname"
+    echo "  No known_hosts found. After configuring .env, scan your storage box:"
+    echo "  ssh-keyscan -p \$HETZNER_SSH_PORT -H \$HETZNER_SSH_HOST >> ssh-keys/known_hosts"
   else
     echo "  known_hosts already exists"
   fi
@@ -111,10 +125,13 @@ ENVEOF
   if [ ! -f config/projects.yml ]; then
     cat > config/projects.yml <<'YMLEOF'
 # backupctl project configuration
-# See docs/initial/prd.md for full config reference
+# See docs/15-faq.md for setup guidance
 
 projects: []
   # - name: myproject
+  #   enabled: true
+  #   cron: "0 2 * * *"
+  #   docker_network: myapp_default  # optional — Docker network to reach this DB
   #   database:
   #     type: postgres
   #     host: localhost
@@ -122,14 +139,19 @@ projects: []
   #     name: mydb
   #     user: myuser
   #     password: ${DB_PASSWORD}
-  #   schedule: "0 2 * * *"
-  #   retention:
-  #     daily: 7
-  #     weekly: 4
-  #     monthly: 6
+  #   compression:
+  #     enabled: true
   #   restic:
-  #     repository: sftp:user@host:/backups/myproject
+  #     repository_path: backups/myproject
   #     password: ${RESTIC_PASSWORD}
+  #     snapshot_mode: combined
+  #   retention:
+  #     local_days: 3
+  #     keep_daily: 7
+  #     keep_weekly: 4
+  #     keep_monthly: 6
+  #   verification:
+  #     enabled: false
 YMLEOF
     echo "  Created config/projects.yml template — configure your projects!"
   else
@@ -228,6 +250,34 @@ cmd_check() {
 # ──────────────────────────────────────────────
 # deploy: Build and start containers
 # ──────────────────────────────────────────────
+connect_project_networks() {
+  local container="${1:-backupctl}"
+  local config_file="$PROJECT_DIR/config/projects.yml"
+  [ -f "$config_file" ] || return 0
+
+  local networks
+  networks=$(grep 'docker_network:' "$config_file" 2>/dev/null \
+    | awk '{print $2}' | tr -d '"' | tr -d "'") || return 0
+
+  for network in $networks; do
+    [ -z "$network" ] && continue
+
+    if ! docker network ls --format '{{.Name}}' | grep -q "^${network}$"; then
+      echo "  WARNING: Docker network '$network' not found — skipping"
+      continue
+    fi
+
+    if docker inspect "$container" --format '{{json .NetworkSettings.Networks}}' 2>/dev/null \
+        | grep -q "\"${network}\""; then
+      continue
+    fi
+
+    docker network connect "$network" "$container" 2>/dev/null \
+      && echo "  Connected to network: $network" \
+      || echo "  WARNING: Failed to connect to network: $network"
+  done
+}
+
 cmd_deploy() {
   local REBUILD=""
   if [ "${1:-}" = "--rebuild" ]; then
@@ -236,17 +286,20 @@ cmd_deploy() {
 
   echo "=== backupctl deploy ==="
 
-  echo "[1/3] Building and starting containers..."
+  echo "[1/4] Building and starting containers..."
   if [ -n "$REBUILD" ]; then
     docker compose -f "$COMPOSE_FILE" up -d $REBUILD
   else
     docker compose -f "$COMPOSE_FILE" up -d --build
   fi
 
-  echo "[2/3] Waiting for services to start..."
+  echo "[2/4] Connecting project Docker networks..."
+  connect_project_networks backupctl
+
+  echo "[3/4] Waiting for services to start..."
   sleep 5
 
-  echo "[3/3] Running health check..."
+  echo "[4/4] Running health check..."
   docker exec backupctl node dist/cli.js health || echo "Health check failed — check logs with: $0 logs"
 
   echo "=== backupctl deployed ==="
@@ -258,19 +311,16 @@ cmd_deploy() {
 cmd_update() {
   echo "=== backupctl update ==="
 
-  echo "[1/5] Pulling latest changes..."
+  echo "[1/4] Pulling latest changes..."
   git pull
 
-  echo "[2/5] Installing dependencies..."
-  npm ci
-
-  echo "[3/5] Building project..."
-  npm run build
-
-  echo "[4/5] Rebuilding containers..."
+  echo "[2/4] Rebuilding containers (includes npm ci + build)..."
   docker compose -f "$COMPOSE_FILE" up -d --build
 
-  echo "[5/5] Running health check..."
+  echo "[3/4] Connecting project Docker networks..."
+  connect_project_networks backupctl
+
+  echo "[4/4] Running health check..."
   sleep 5
   docker exec backupctl node dist/cli.js health || echo "Health check failed — check logs"
 

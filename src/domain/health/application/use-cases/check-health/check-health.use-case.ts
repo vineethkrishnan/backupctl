@@ -1,34 +1,38 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { AuditLogPort } from '@domain/audit/application/ports/audit-log.port';
+import { SystemHealthPort, SshCheckConfig } from '@domain/health/application/ports/system-health.port';
 import { HealthCheckResult } from '@domain/audit/domain/health-check-result.model';
-import { AUDIT_LOG_PORT } from '@common/di/injection-tokens';
-import { safeExecFile } from '@common/helpers/child-process.util';
+import { AUDIT_LOG_PORT, SYSTEM_HEALTH_PORT } from '@common/di/injection-tokens';
 
 @Injectable()
 export class CheckHealthUseCase {
   constructor(
     @Inject(AUDIT_LOG_PORT) private readonly auditLog: AuditLogPort,
+    @Inject(SYSTEM_HEALTH_PORT) private readonly systemHealth: SystemHealthPort,
     private readonly configService: ConfigService,
   ) {}
 
-  async checkHealth(): Promise<HealthCheckResult> {
+  async execute(): Promise<HealthCheckResult> {
     const uptime = process.uptime();
+    const minFreeGb = this.configService.get<number>('HEALTH_DISK_MIN_FREE_GB', 5);
+    const sshConfig = this.buildSshConfig();
 
-    const auditDbConnected = await this.checkAuditDb();
-    const { diskSpaceAvailable, diskFreeGb } = await this.checkDiskSpace();
-
-    const sshConnected = true;
-    const sshAuthenticated = true;
-    const resticReposHealthy = true;
+    const [auditDbConnected, diskResult, sshConnected, sshAuthenticated] =
+      await Promise.all([
+        this.checkAuditDb(),
+        this.systemHealth.checkDiskSpace('/', minFreeGb),
+        sshConfig ? this.systemHealth.checkSshConnectivity(sshConfig) : Promise.resolve(false),
+        sshConfig?.keyPath ? this.systemHealth.checkSshAuthentication(sshConfig.keyPath) : Promise.resolve(false),
+      ]);
 
     return new HealthCheckResult(
       auditDbConnected,
-      diskSpaceAvailable,
-      diskFreeGb,
+      diskResult.available,
+      diskResult.freeGb,
       sshConnected,
       sshAuthenticated,
-      resticReposHealthy,
+      sshConnected && sshAuthenticated,
       uptime,
     );
   }
@@ -42,21 +46,15 @@ export class CheckHealthUseCase {
     }
   }
 
-  private async checkDiskSpace(): Promise<{ diskSpaceAvailable: boolean; diskFreeGb: number }> {
-    const minFreeGb = this.configService.get<number>('HEALTH_DISK_MIN_FREE_GB', 5);
+  private buildSshConfig(): SshCheckConfig | null {
+    const host = this.configService.get<string>('HETZNER_SSH_HOST', '');
+    if (!host) return null;
 
-    try {
-      const { stdout } = await safeExecFile('df', ['-BG', '--output=avail', '/']);
-      const lines = stdout.trim().split('\n');
-      const valueLine = lines[lines.length - 1].trim();
-      const diskFreeGb = parseInt(valueLine.replace('G', ''), 10);
-
-      return {
-        diskSpaceAvailable: diskFreeGb >= minFreeGb,
-        diskFreeGb,
-      };
-    } catch {
-      return { diskSpaceAvailable: false, diskFreeGb: 0 };
-    }
+    return {
+      host,
+      port: this.configService.get<number>('HETZNER_SSH_PORT', 22),
+      user: this.configService.get<string>('HETZNER_SSH_USER', ''),
+      keyPath: this.configService.get<string>('HETZNER_SSH_KEY_PATH', ''),
+    };
   }
 }

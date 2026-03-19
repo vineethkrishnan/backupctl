@@ -1000,12 +1000,14 @@ No authentication — internal network only as per requirement.
 FROM node:20-alpine
 
 RUN apk add --no-cache \
-    postgresql-client \
-    mysql-client \
+    --repository=https://dl-cdn.alpinelinux.org/alpine/edge/main \
+    --repository=https://dl-cdn.alpinelinux.org/alpine/v3.20/community \
+    postgresql17-client \
+    mariadb-client \
     mongodb-tools \
     openssh-client \
     gnupg \
-    fuse \
+    fuse3 \
     bzip2
 
 # Install restic

@@ -12,6 +12,7 @@ interface RawProjectEntry {
   enabled?: boolean;
   cron: string;
   timeout_minutes?: number;
+  docker_network?: string;
   database: {
     type: string;
     host: string;
@@ -76,11 +77,8 @@ export class YamlConfigLoaderAdapter implements ConfigLoaderPort {
   }
 
   getProject(name: string): ProjectConfig {
-    if (!this.projects) {
-      this.loadAll();
-    }
-
-    const project = this.projects!.find((p) => p.name === name);
+    const projects = this.projects ?? this.loadAll();
+    const project = projects.find((p) => p.name === name);
 
     if (!project) {
       throw new Error(`Project "${name}" not found in configuration`);
@@ -173,7 +171,7 @@ export class YamlConfigLoaderAdapter implements ConfigLoaderPort {
           if (typeof item === 'object' && item !== null) {
             return this.resolveEnvVarsInObject(item as Record<string, unknown>);
           }
-          return item;
+          return item as unknown;
         });
       } else if (typeof value === 'object' && value !== null) {
         result[key] = this.resolveEnvVarsInObject(value as Record<string, unknown>);
@@ -239,17 +237,12 @@ export class YamlConfigLoaderAdapter implements ConfigLoaderPort {
       }
     }
 
-    if (!entry.restic.password) {
-      const globalResticPassword = this.configService.get<string>('RESTIC_PASSWORD');
-      if (globalResticPassword) {
-        entry.restic.password = globalResticPassword;
-      }
-    }
+    entry.restic.password ??= this.configService.get<string>('RESTIC_PASSWORD') ?? undefined;
 
     if (!entry.compression) {
       entry.compression = { enabled: true };
-    } else if (entry.compression.enabled === undefined) {
-      entry.compression.enabled = true;
+    } else {
+      entry.compression.enabled ??= true;
     }
   }
 
@@ -272,6 +265,7 @@ export class YamlConfigLoaderAdapter implements ConfigLoaderPort {
       enabled: resolved.enabled ?? true,
       cron: resolved.cron,
       timeoutMinutes: resolved.timeout_minutes ?? null,
+      dockerNetwork: resolved.docker_network ?? null,
       database: {
         type: resolved.database.type,
         host: resolved.database.host,

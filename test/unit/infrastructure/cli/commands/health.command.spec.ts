@@ -8,7 +8,7 @@ describe('HealthCommand', () => {
 
   beforeEach(() => {
     checkHealth = {
-      checkHealth: jest.fn(),
+      execute: jest.fn(),
     } as unknown as jest.Mocked<CheckHealthUseCase>;
 
     command = new HealthCommand(checkHealth);
@@ -23,7 +23,7 @@ describe('HealthCommand', () => {
   });
 
   it('should print healthy status when all checks pass', async () => {
-    checkHealth.checkHealth.mockResolvedValue(
+    checkHealth.execute.mockResolvedValue(
       new HealthCheckResult(true, true, 50, true, true, true, 3600),
     );
 
@@ -34,7 +34,7 @@ describe('HealthCommand', () => {
   });
 
   it('should set exit code 1 when unhealthy', async () => {
-    checkHealth.checkHealth.mockResolvedValue(
+    checkHealth.execute.mockResolvedValue(
       new HealthCheckResult(false, true, 50, true, true, true, 3600),
     );
 
@@ -45,7 +45,7 @@ describe('HealthCommand', () => {
   });
 
   it('should display individual check results', async () => {
-    checkHealth.checkHealth.mockResolvedValue(
+    checkHealth.execute.mockResolvedValue(
       new HealthCheckResult(true, true, 42, true, true, true, 7200),
     );
 
@@ -56,7 +56,7 @@ describe('HealthCommand', () => {
   });
 
   it('should set exit code 1 on error', async () => {
-    checkHealth.checkHealth.mockRejectedValue(new Error('Health check failed'));
+    checkHealth.execute.mockRejectedValue(new Error('Health check failed'));
 
     await command.run([]);
 

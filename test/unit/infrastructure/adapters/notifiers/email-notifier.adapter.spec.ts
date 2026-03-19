@@ -127,6 +127,30 @@ describe('EmailNotifierAdapter', () => {
       expect(htmlBody).toContain('a1b2c3d4');
       expect(htmlBody).toContain('3m 12s');
     });
+
+    it('should show N/A when dumpResult is null', async () => {
+      const result = createSuccessResult({ dumpResult: null });
+
+      await adapter.notifySuccess(result);
+
+      const htmlBody = mockSendMail.mock.calls[0][0].html as string;
+      expect(htmlBody).toContain('N/A');
+    });
+
+    it('should omit sync/prune/cleanup rows when they are null', async () => {
+      const result = createSuccessResult({
+        syncResult: null,
+        pruneResult: null,
+        cleanupResult: null,
+      });
+
+      await adapter.notifySuccess(result);
+
+      const htmlBody = mockSendMail.mock.calls[0][0].html as string;
+      expect(htmlBody).not.toContain('Snapshot');
+      expect(htmlBody).not.toContain('Pruned');
+      expect(htmlBody).not.toContain('Local Cleaned');
+    });
   });
 
   describe('notifyFailure', () => {
@@ -193,6 +217,32 @@ describe('EmailNotifierAdapter', () => {
       expect(htmlBody).toContain('project-y');
       expect(htmlBody).toContain('FAILED');
       expect(htmlBody).toContain('1/2 successful');
+    });
+
+    it('should show unknown error when errorMessage is null', async () => {
+      const results = [
+        createSuccessResult({
+          projectName: 'project-z',
+          status: BackupStatus.Failed,
+          errorMessage: null,
+          dumpResult: null,
+          syncResult: null,
+        }),
+      ];
+
+      await adapter.notifyDailySummary(results);
+
+      const htmlBody = mockSendMail.mock.calls[0][0].html as string;
+      expect(htmlBody).toContain('unknown error');
+    });
+
+    it('should show N/A for successful result without syncResult', async () => {
+      const results = [createSuccessResult({ syncResult: null, dumpResult: null })];
+
+      await adapter.notifyDailySummary(results);
+
+      const htmlBody = mockSendMail.mock.calls[0][0].html as string;
+      expect(htmlBody).toContain('N/A');
     });
   });
 });

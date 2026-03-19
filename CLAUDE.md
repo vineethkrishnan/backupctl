@@ -150,9 +150,7 @@ src/
 │   │   │       ├── typeorm/
 │   │   │       │   ├── schema/
 │   │   │       │   │   └── backup-log.record.ts
-│   │   │       │   ├── typeorm-audit-log.repository.ts
-│   │   │       │   ├── data-source.ts
-│   │   │       │   └── migrations/
+│   │   │       │   └── typeorm-audit-log.repository.ts
 │   │   │       └── fallback/
 │   │   │           └── jsonl-fallback-writer.adapter.ts
 │   │   ├── presenters/
@@ -209,14 +207,22 @@ src/
 │       ├── clock.port.ts                      # Shared clock port interface
 │       └── system-clock.adapter.ts            # System clock implementation
 │
+├── config/
+│   └── typeorm.config.ts                      # Env-aware TypeORM config (dev/prod)
+│
+├── db/
+│   ├── datasource.ts                          # Standalone DataSource for CLI migrations
+│   └── migrations/                            # All TypeORM migration files
+│       └── 1710720000000-CreateBackupLogTable.ts
+│
 ├── app/
 │   └── app.module.ts                          # Root module — imports all domain modules
 ├── main.ts                                    # HTTP entry point
 └── cli.ts                                     # CLI entry point
 
 scripts/                                       # Host-side ONLY
-├── deploy.sh
-└── backupctl-manage.sh                        # setup, check, deploy, update, logs, shell
+├── backupctl-manage.sh                        # setup, check, deploy, update, logs, shell
+└── dev.sh                                     # Dev environment: up, down, cli, test, lint, migrations
 ```
 
 ### Path Aliases
@@ -263,7 +269,8 @@ Modules may only import another module's **`application/ports/`** or **`domain/`
 | `presenters/` layer | CLI commands and HTTP controllers as driving adapters, separate from infrastructure |
 | `ClockPort` in `common/clock/` | Shared across modules, not owned by any single domain |
 | Compression always on | No toggle. Each dumper uses best method per DB type |
-| Explicit TypeORM migrations | No `synchronize: true`. Safe for production |
+| Schema-driven TypeORM migrations | No `synchronize`, no `migrationsRun`. Modify `*.record.ts` first → `migrate:generate` → review → `migrate:run`. Use `migrate:create` only for data migrations or custom SQL |
+| Infrastructure mappers (`mappers/`) | Record ↔ Domain translation in dedicated mapper classes, keeping repositories clean |
 | Winston with log rotation | JSON for prod, pretty for dev. `winston-daily-rotate-file` |
 | CLI exit codes 0-5 | 0=success, 1=failure, 2=locked, 3=config error, 4=connectivity, 5=partial |
 | `BACKUP_BASE_DIR` env var | Configurable base dir, default `/data/backups` |
@@ -334,7 +341,11 @@ docker exec backupctl node dist/cli.js health
 docker exec backupctl node dist/cli.js run locaboo --dry-run
 
 # Migrations
-npx typeorm migration:run -d src/domain/audit/infrastructure/persistence/typeorm/data-source.ts
+scripts/dev.sh migrate:run                    # run pending
+scripts/dev.sh migrate:show                   # check status
+scripts/dev.sh migrate:generate <Name>        # from entity diff
+scripts/dev.sh migrate:create <Name>          # empty migration
+scripts/dev.sh migrate:revert                 # undo last
 ```
 
 ## Testing
@@ -558,7 +569,7 @@ Two containers via `docker-compose.yml`:
 
 Volumes: `${BACKUP_BASE_DIR}`, `./config:ro`, `./ssh-keys:ro`, `./gpg-keys:ro`, asset paths
 
-Host scripts: `scripts/deploy.sh`, `scripts/backupctl-manage.sh`
+Host scripts: `scripts/backupctl-manage.sh` (prod), `scripts/dev.sh` (dev)
 
 ## Files to Never Commit
 

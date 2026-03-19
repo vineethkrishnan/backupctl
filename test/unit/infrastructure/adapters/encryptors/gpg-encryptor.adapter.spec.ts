@@ -1,3 +1,4 @@
+import { ConfigService } from '@nestjs/config';
 import { GpgEncryptorAdapter } from '@domain/backup/infrastructure/adapters/encryptors/gpg-encryptor.adapter';
 
 jest.mock('@common/helpers/child-process.util', () => ({
@@ -8,13 +9,17 @@ import { safeExecFile } from '@common/helpers/child-process.util';
 
 const mockSafeExecFile = safeExecFile as jest.MockedFunction<typeof safeExecFile>;
 
+function buildConfigService(recipient: string): ConfigService {
+  return { get: jest.fn().mockReturnValue(recipient) } as unknown as ConfigService;
+}
+
 describe('GpgEncryptorAdapter', () => {
   const recipient = 'backup@example.com';
   let adapter: GpgEncryptorAdapter;
 
   beforeEach(() => {
     jest.clearAllMocks();
-    adapter = new GpgEncryptorAdapter(recipient);
+    adapter = new GpgEncryptorAdapter(buildConfigService(recipient));
   });
 
   describe('encrypt', () => {
@@ -26,6 +31,8 @@ describe('GpgEncryptorAdapter', () => {
       expect(mockSafeExecFile).toHaveBeenCalledWith('gpg', [
         '--batch',
         '--yes',
+        '--trust-model',
+        'always',
         '--encrypt',
         '--recipient',
         recipient,
@@ -34,6 +41,25 @@ describe('GpgEncryptorAdapter', () => {
         filePath,
       ]);
       expect(result).toBe(`${filePath}.gpg`);
+    });
+
+    it('should use explicit recipient over default when provided', async () => {
+      const filePath = '/data/backups/myproject/dump.sql.gz';
+      const overrideRecipient = 'other@example.com';
+
+      await adapter.encrypt(filePath, overrideRecipient);
+
+      expect(mockSafeExecFile).toHaveBeenCalledWith('gpg', expect.arrayContaining([
+        '--recipient', overrideRecipient,
+      ]));
+    });
+
+    it('should throw when no recipient configured and none provided', async () => {
+      adapter = new GpgEncryptorAdapter(buildConfigService(''));
+
+      await expect(adapter.encrypt('/some/file.sql.gz')).rejects.toThrow(
+        'GPG recipient not configured',
+      );
     });
 
     it('should propagate errors from safeExecFile', async () => {

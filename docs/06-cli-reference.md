@@ -4,19 +4,34 @@ backupctl provides 14 commands for managing backups, restores, health checks, co
 
 ## Entry Points
 
-**Docker (production):**
+**CLI shortcuts (recommended):**
 
 ```bash
-docker exec backupctl node dist/cli.js <command>
+backupctl <command>               # production
+backupctl-dev <command>           # development
 ```
 
-**Dev mode:**
+Install these with `./scripts/install-cli.sh`. See [Installation → CLI Shortcuts](04-installation.md#11-cli-shortcuts).
+
+**Docker exec (without shortcuts):**
 
 ```bash
-npx ts-node src/cli.ts <command>
+docker exec backupctl node dist/cli.js <command>          # production
+docker exec backupctl-dev npx ts-node -r tsconfig-paths/register src/cli.ts <command>  # dev
 ```
 
-All examples in this document use the shorthand `backupctl` for brevity. Replace with the appropriate entry point for your environment.
+All examples in this document use the shorthand `backupctl` for brevity.
+
+### Global Option: --verbose / -v
+
+Add `-v` or `--verbose` to any command to see detailed NestJS bootstrap logs, module initialization, and debug-level messages. Useful for diagnosing slow startup or connectivity issues.
+
+```bash
+backupctl -v health
+backupctl --verbose run myproject --dry-run
+```
+
+Without verbose, the CLI only shows warnings and errors during bootstrap. With verbose, you see every step: module loading, DB connection, GPG key imports, notifier registration, etc.
 
 ---
 
@@ -995,8 +1010,9 @@ backupctl uses per-project file-based locks to prevent concurrent backups of the
 ### Log Output
 
 - **Console:** All commands write structured output to stdout. Errors go to stderr.
+- **Verbose mode:** Add `-v` or `--verbose` to any command to see NestJS bootstrap logs, module initialization, DB connections, and debug messages. Without it, the CLI suppresses all bootstrap noise and only shows warnings/errors.
 - **Log files:** The background service writes JSON-formatted logs (via Winston) to `{LOG_DIR}/backupctl-YYYY-MM-DD.log` with daily rotation.
-- **Log level:** Controlled by the `LOG_LEVEL` environment variable (default: `info`).
+- **Log level:** Controlled by the `LOG_LEVEL` environment variable (default: `info`). The `-v` flag overrides this to `debug` for the current invocation.
 - **Max size / rotation:** Controlled by `LOG_MAX_SIZE` (default: `10m`) and `LOG_MAX_FILES` (default: `5`).
 
 ### Timezone

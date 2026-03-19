@@ -212,5 +212,63 @@ describe('WebhookNotifierAdapter', () => {
         error_message: 'sync timeout',
       });
     });
+
+    it('should show unknown error when errorMessage is null', async () => {
+      const results = [
+        createSuccessResult({
+          projectName: 'z',
+          status: BackupStatus.Failed,
+          errorMessage: null,
+          dumpResult: null,
+          syncResult: null,
+        }),
+      ];
+
+      await adapter.notifyDailySummary(results);
+
+      const payload = getPayload();
+      expect(payload.text).toContain('unknown error');
+    });
+  });
+
+  describe('notifySuccess with missing optional results', () => {
+    it('should show N/A when dumpResult is null', async () => {
+      const result = createSuccessResult({ dumpResult: null });
+
+      await adapter.notifySuccess(result);
+
+      const payload = getPayload();
+      expect(payload.text).toContain('N/A');
+      expect(payload.data).toMatchObject({ dump_size_bytes: null });
+    });
+
+    it('should omit sync lines when syncResult is null', async () => {
+      const result = createSuccessResult({ syncResult: null });
+
+      await adapter.notifySuccess(result);
+
+      const payload = getPayload();
+      expect(payload.text).not.toContain('Snapshot:');
+      expect(payload.data).toMatchObject({ snapshot_id: null });
+    });
+
+    it('should show prune-only when cleanupResult is null', async () => {
+      const result = createSuccessResult({ cleanupResult: null });
+
+      await adapter.notifySuccess(result);
+
+      const payload = getPayload();
+      expect(payload.text).toContain('Pruned: 2 snapshots');
+      expect(payload.text).toContain('Local cleaned: 0 files');
+    });
+
+    it('should omit prune/cleanup line when both are null', async () => {
+      const result = createSuccessResult({ pruneResult: null, cleanupResult: null });
+
+      await adapter.notifySuccess(result);
+
+      const payload = getPayload();
+      expect(payload.text).not.toContain('Pruned:');
+    });
   });
 });

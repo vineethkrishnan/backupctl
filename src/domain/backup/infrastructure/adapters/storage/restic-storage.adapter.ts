@@ -28,22 +28,26 @@ interface ResticSnapshot {
 }
 
 interface ResticForgetGroup {
-  keep: ResticSnapshot[];
-  remove: ResticSnapshot[];
+  keep: ResticSnapshot[] | null;
+  remove: ResticSnapshot[] | null;
 }
 
 export class ResticStorageAdapter implements RemoteStoragePort {
   private readonly repository: string;
+
+  private readonly sshCommand: string;
 
   constructor(
     repositoryPath: string,
     private readonly password: string,
     sshHost: string,
     sshUser: string,
-    private readonly sshKeyPath: string,
+    sshKeyPath: string,
     private readonly projectName: string,
+    sshPort = 22,
   ) {
     this.repository = `sftp:${sshUser}@${sshHost}:${repositoryPath}`;
+    this.sshCommand = `ssh -i ${sshKeyPath} -p ${sshPort} -o StrictHostKeyChecking=accept-new`;
   }
 
   async sync(paths: string[], options: SyncOptions): Promise<SyncResult> {
@@ -85,9 +89,9 @@ export class ResticStorageAdapter implements RemoteStoragePort {
     args.push('--json');
 
     const { stdout } = await safeExecFile('restic', args, { env: this.getEnv() });
-    const parsed: ResticForgetGroup[] = JSON.parse(stdout);
+    const parsed = JSON.parse(stdout) as ResticForgetGroup[];
 
-    const totalRemoved = parsed.reduce((sum, group) => sum + group.remove.length, 0);
+    const totalRemoved = parsed.reduce((sum, group) => sum + (group.remove?.length ?? 0), 0);
 
     return new PruneResult(totalRemoved, '');
   }
@@ -97,7 +101,7 @@ export class ResticStorageAdapter implements RemoteStoragePort {
       env: this.getEnv(),
     });
 
-    const snapshots: ResticSnapshot[] = JSON.parse(stdout);
+    const snapshots = JSON.parse(stdout) as ResticSnapshot[];
 
     return snapshots.map(
       (snapshot) =>
@@ -133,7 +137,7 @@ export class ResticStorageAdapter implements RemoteStoragePort {
     return stdout;
   }
 
-  async getCacheInfo(): Promise<CacheInfo> {
+  getCacheInfo(): Promise<CacheInfo> {
     const homeDir = process.env.HOME ?? '/root';
     const cachePath = path.join(homeDir, '.cache', 'restic');
 
@@ -144,7 +148,7 @@ export class ResticStorageAdapter implements RemoteStoragePort {
       cacheSizeBytes = 0;
     }
 
-    return new CacheInfo(this.projectName, cacheSizeBytes, cachePath);
+    return Promise.resolve(new CacheInfo(this.projectName, cacheSizeBytes, cachePath));
   }
 
   async clearCache(): Promise<void> {
@@ -159,7 +163,7 @@ export class ResticStorageAdapter implements RemoteStoragePort {
     return {
       RESTIC_REPOSITORY: this.repository,
       RESTIC_PASSWORD: this.password,
-      SSH_KEY_PATH: this.sshKeyPath,
+      RESTIC_SSH_COMMAND: this.sshCommand,
     };
   }
 

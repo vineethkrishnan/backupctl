@@ -1,64 +1,19 @@
-# Git
-.git
-.gitignore
-
-# Dependencies (rebuilt in container)
 node_modules
-
-# Build output (rebuilt in container)
 dist
-
-# Documentation & plans
-docs
-.plans
-.claude
-.cursor
-_docs
-*.md
-!package.json
-
-# Tests
-test
-coverage
-jest.config.ts
-test/jest-e2e.config.ts
-
-# CI/CD
-.github
-.husky
-commitlint.config.js
-
-# Environment (injected at runtime)
+.git
 .env
-.env.example
-.env.local
-.env.*.local
-
-# SSH & GPG keys (mounted as volumes)
+.env.*
 ssh-keys
 gpg-keys
-
-# IDE
-.idea
-.vscode
-*.swp
-*.swo
-
-# OS
-.DS_Store
-Thumbs.db
-
-# Backup artifacts
-*.sql.gz
-*.gpg
-*.lock
-.fallback-audit
-
-# Logs
-logs
-*.log
-npm-debug.log*
-
-# License (not needed in image)
-LICENSE
-CHANGELOG.md
+coverage
+*.md
+.github
+.plans
+_docs
+docs
+test
+.jscpd.json
+knip.json
+eslint.config.mjs
+.husky
+.cursor

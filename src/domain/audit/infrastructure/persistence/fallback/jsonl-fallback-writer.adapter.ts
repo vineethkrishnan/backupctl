@@ -19,7 +19,7 @@ export class JsonlFallbackWriterAdapter implements FallbackWriterPort {
     this.fallbackFile = path.join(this.fallbackDir, 'fallback.jsonl');
   }
 
-  async writeAuditFallback(result: BackupResult): Promise<void> {
+  writeAuditFallback(result: BackupResult): Promise<void> {
     const entry: FallbackEntry = {
       id: uuidv4(),
       type: 'audit',
@@ -28,9 +28,10 @@ export class JsonlFallbackWriterAdapter implements FallbackWriterPort {
     };
 
     this.appendEntry(entry);
+    return Promise.resolve();
   }
 
-  async writeNotificationFallback(
+  writeNotificationFallback(
     notificationType: string,
     payload: unknown,
   ): Promise<void> {
@@ -42,22 +43,24 @@ export class JsonlFallbackWriterAdapter implements FallbackWriterPort {
     };
 
     this.appendEntry(entry);
+    return Promise.resolve();
   }
 
-  async readPendingEntries(): Promise<FallbackEntry[]> {
+  readPendingEntries(): Promise<FallbackEntry[]> {
     if (!fs.existsSync(this.fallbackFile)) {
-      return [];
+      return Promise.resolve([]);
     }
 
     const content = fs.readFileSync(this.fallbackFile, 'utf-8').trim();
     if (!content) {
-      return [];
+      return Promise.resolve([]);
     }
 
-    return content
+    const entries = content
       .split('\n')
       .filter((line) => line.trim())
       .map((line) => JSON.parse(line) as FallbackEntry);
+    return Promise.resolve(entries);
   }
 
   async clearReplayed(ids: string[]): Promise<void> {

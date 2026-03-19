@@ -1,21 +1,28 @@
 import { DatabaseDumperPort } from '@domain/backup/application/ports/database-dumper.port';
+import { ProjectConfig } from '@domain/config/domain/project-config.model';
+
+export type DumperFactory = (config: ProjectConfig) => DatabaseDumperPort;
 
 export class DumperRegistry {
-  private readonly dumpers = new Map<string, DatabaseDumperPort>();
+  private readonly factories = new Map<string, DumperFactory>();
 
-  register(type: string, dumper: DatabaseDumperPort): void {
-    this.dumpers.set(type.toLowerCase(), dumper);
+  register(type: string, factory: DumperFactory): void {
+    this.factories.set(type.toLowerCase(), factory);
   }
 
-  resolve(type: string): DatabaseDumperPort {
-    const dumper = this.dumpers.get(type.toLowerCase());
-    if (!dumper) {
+  create(type: string, config: ProjectConfig): DatabaseDumperPort {
+    const factory = this.factories.get(type.toLowerCase());
+    if (!factory) {
       throw new Error(`No database dumper registered for type: ${type}`);
     }
-    return dumper;
+    return factory(config);
+  }
+
+  has(type: string): boolean {
+    return this.factories.has(type.toLowerCase());
   }
 
   getRegisteredTypes(): string[] {
-    return Array.from(this.dumpers.keys());
+    return Array.from(this.factories.keys());
   }
 }

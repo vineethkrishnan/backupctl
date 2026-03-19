@@ -37,13 +37,13 @@ describe('safeExecFile', () => {
     expect(result.stderr).toBe('warning info');
   });
 
-  it('should pass timeout option to execFile (default 30000ms)', async () => {
+  it('should pass timeout option to execFile (default 300000ms)', async () => {
     mockExecFileSuccess('', '');
 
     await safeExecFile('restic', ['backup', '/data']);
 
     const callOptions = execFileMock.mock.calls[0][2];
-    expect(callOptions.timeout).toBe(30000);
+    expect(callOptions.timeout).toBe(300000);
   });
 
   it('should use custom timeout when provided', async () => {

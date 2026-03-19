@@ -5,12 +5,15 @@ import { ConfigLoaderPort } from '@domain/config/application/ports/config-loader
 import { BackupLockPort } from '@domain/backup/application/ports/backup-lock.port';
 import { RemoteStorageFactory } from '@domain/backup/application/ports/remote-storage-factory.port';
 import { RemoteStoragePort } from '@domain/backup/application/ports/remote-storage.port';
+import { GpgKeyManagerPort } from '@domain/backup/application/ports/gpg-key-manager.port';
 import { ClockPort } from '@common/clock/clock.port';
+import { FileSystemPort } from '@common/filesystem/filesystem.port';
 import { BackupResult } from '@domain/backup/domain/backup-result.model';
 import { BackupStatus } from '@domain/backup/domain/value-objects/backup-status.enum';
 import { BackupStage } from '@domain/backup/domain/value-objects/backup-stage.enum';
 import { ProjectConfig } from '@domain/config/domain/project-config.model';
 import { RetentionPolicy } from '@domain/config/domain/retention-policy.model';
+import { ConfigService } from '@nestjs/config';
 
 describe('RecoverStartupUseCase', () => {
   let service: RecoverStartupUseCase;
@@ -21,6 +24,9 @@ describe('RecoverStartupUseCase', () => {
   let mockStorageFactory: jest.Mocked<RemoteStorageFactory>;
   let mockStorage: jest.Mocked<RemoteStoragePort>;
   let mockClock: jest.Mocked<ClockPort>;
+  let mockFilesystem: jest.Mocked<FileSystemPort>;
+  let mockGpgKeyManager: jest.Mocked<GpgKeyManagerPort>;
+  let mockConfigService: jest.Mocked<ConfigService>;
 
   const fixedNow = new Date('2026-03-18T10:00:00Z');
 
@@ -114,6 +120,24 @@ describe('RecoverStartupUseCase', () => {
       timestamp: jest.fn().mockReturnValue('2026-03-18T10:00:00Z'),
     };
 
+    mockFilesystem = {
+      exists: jest.fn().mockReturnValue(false),
+      diskFreeGb: jest.fn().mockReturnValue(100),
+      listDirectory: jest.fn().mockReturnValue([]),
+      removeFile: jest.fn(),
+    };
+
+    mockGpgKeyManager = {
+      importKey: jest.fn(),
+      importAllFromDirectory: jest.fn().mockResolvedValue([]),
+      listKeys: jest.fn().mockResolvedValue(''),
+      hasKey: jest.fn().mockResolvedValue(false),
+    };
+
+    mockConfigService = {
+      get: jest.fn().mockReturnValue('/data/backups'),
+    } as unknown as jest.Mocked<ConfigService>;
+
     service = new RecoverStartupUseCase(
       mockAuditLog,
       mockFallbackWriter,
@@ -121,6 +145,9 @@ describe('RecoverStartupUseCase', () => {
       mockBackupLock,
       mockStorageFactory,
       mockClock,
+      mockFilesystem,
+      mockGpgKeyManager,
+      mockConfigService,
     );
   });
 
@@ -139,6 +166,31 @@ describe('RecoverStartupUseCase', () => {
         errorMessage: 'crash_recovery',
       }),
     );
+  });
+
+  it('cleans orphaned dump files from project directories', async () => {
+    const projects = [createProjectConfig('locaboo')];
+    mockConfigLoader.loadAll.mockReturnValue(projects);
+    mockFilesystem.exists.mockReturnValue(true);
+    mockFilesystem.listDirectory.mockReturnValue(['locaboo.sql.gz', 'locaboo.sql.gz.gpg', '.lock', 'notes.txt']);
+
+    await service.onModuleInit();
+
+    expect(mockFilesystem.removeFile).toHaveBeenCalledWith('/data/backups/locaboo/locaboo.sql.gz');
+    expect(mockFilesystem.removeFile).toHaveBeenCalledWith('/data/backups/locaboo/locaboo.sql.gz.gpg');
+    expect(mockFilesystem.removeFile).not.toHaveBeenCalledWith('/data/backups/locaboo/.lock');
+    expect(mockFilesystem.removeFile).not.toHaveBeenCalledWith('/data/backups/locaboo/notes.txt');
+  });
+
+  it('skips dump cleanup when project directory does not exist', async () => {
+    const projects = [createProjectConfig('newproject')];
+    mockConfigLoader.loadAll.mockReturnValue(projects);
+    mockFilesystem.exists.mockReturnValue(false);
+
+    await service.onModuleInit();
+
+    expect(mockFilesystem.listDirectory).not.toHaveBeenCalled();
+    expect(mockFilesystem.removeFile).not.toHaveBeenCalled();
   });
 
   it('releases stale locks for all projects', async () => {
@@ -165,7 +217,6 @@ describe('RecoverStartupUseCase', () => {
 
     await service.onModuleInit();
 
-    // Only enabled projects get unlocked
     expect(mockStorageFactory.create).toHaveBeenCalledTimes(2);
     expect(mockStorage.unlock).toHaveBeenCalledTimes(2);
   });
@@ -211,44 +262,37 @@ describe('RecoverStartupUseCase', () => {
     expect(mockFallbackWriter.clearReplayed).toHaveBeenCalledWith(['fb-1', 'fb-2']);
   });
 
-  it('clears replayed entries after successful replay', async () => {
-    const entry: FallbackEntry = {
-      id: 'fb-clear',
-      type: 'audit',
-      payload: new BackupResult({
-        runId: 'run-clear',
-        projectName: 'locaboo',
-        status: BackupStatus.Success,
-        currentStage: BackupStage.NotifyResult,
-        startedAt: new Date(),
-        completedAt: new Date(),
-        dumpResult: null,
-        syncResult: null,
-        pruneResult: null,
-        cleanupResult: null,
-        encrypted: false,
-        verified: false,
-        snapshotMode: 'combined',
-        errorStage: null,
-        errorMessage: null,
-        retryCount: 0,
-        durationMs: 100,
-      }),
-      timestamp: '2026-03-18T02:00:00Z',
-    };
-
-    mockFallbackWriter.readPendingEntries.mockResolvedValue([entry]);
-
-    await service.onModuleInit();
-
-    expect(mockFallbackWriter.clearReplayed).toHaveBeenCalledWith(['fb-clear']);
-  });
-
   it('does not clear entries when no fallback entries exist', async () => {
     mockFallbackWriter.readPendingEntries.mockResolvedValue([]);
 
     await service.onModuleInit();
 
     expect(mockFallbackWriter.clearReplayed).not.toHaveBeenCalled();
+  });
+
+  it('imports GPG keys on startup', async () => {
+    mockGpgKeyManager.importAllFromDirectory.mockResolvedValue(['admin@test.com']);
+
+    await service.onModuleInit();
+
+    expect(mockGpgKeyManager.importAllFromDirectory).toHaveBeenCalled();
+  });
+
+  it('handles GPG import failure gracefully', async () => {
+    mockGpgKeyManager.importAllFromDirectory.mockRejectedValue(new Error('gpg not found'));
+
+    await expect(service.onModuleInit()).resolves.not.toThrow();
+  });
+
+  it('handles dump cleanup failure for individual files gracefully', async () => {
+    const projects = [createProjectConfig('locaboo')];
+    mockConfigLoader.loadAll.mockReturnValue(projects);
+    mockFilesystem.exists.mockReturnValue(true);
+    mockFilesystem.listDirectory.mockReturnValue(['dump.sql.gz']);
+    mockFilesystem.removeFile.mockImplementation(() => {
+      throw new Error('permission denied');
+    });
+
+    await expect(service.onModuleInit()).resolves.not.toThrow();
   });
 });

@@ -1,6 +1,7 @@
 import { Repository } from 'typeorm';
 
 import { TypeormAuditLogRepository } from '@domain/audit/infrastructure/persistence/typeorm/typeorm-audit-log.repository';
+import { BackupLogMapper } from '@domain/audit/infrastructure/persistence/typeorm/mappers/backup-log.mapper';
 import { BackupLogRecord } from '@domain/audit/infrastructure/persistence/typeorm/schema/backup-log.record';
 import { BackupResult } from '@domain/backup/domain/backup-result.model';
 import { BackupStage } from '@domain/backup/domain/value-objects/backup-stage.enum';
@@ -22,6 +23,8 @@ function createMockRepository() {
     find: jest.fn().mockResolvedValue([]),
   };
 }
+
+const mapper = new BackupLogMapper();
 
 function createSampleEntity(overrides: Partial<BackupLogRecord> = {}): BackupLogRecord {
   return {
@@ -59,6 +62,7 @@ describe('TypeormAuditLogRepository', () => {
     mockRepo = createMockRepository();
     adapter = new TypeormAuditLogRepository(
       mockRepo as unknown as Repository<BackupLogRecord>,
+      mapper,
     );
   });
 

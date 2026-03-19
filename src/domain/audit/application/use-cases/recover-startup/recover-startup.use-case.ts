@@ -1,10 +1,14 @@
+import * as path from 'path';
 import { Inject, Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { AuditLogPort } from '@domain/audit/application/ports/audit-log.port';
 import { FallbackWriterPort } from '@domain/audit/application/ports/fallback-writer.port';
 import { ConfigLoaderPort } from '@domain/config/application/ports/config-loader.port';
 import { BackupLockPort } from '@domain/backup/application/ports/backup-lock.port';
 import { RemoteStorageFactory } from '@domain/backup/application/ports/remote-storage-factory.port';
+import { GpgKeyManagerPort } from '@domain/backup/application/ports/gpg-key-manager.port';
 import { ClockPort } from '@common/clock/clock.port';
+import { FileSystemPort } from '@common/filesystem/filesystem.port';
 import { BackupResult } from '@domain/backup/domain/backup-result.model';
 import { BackupStatus } from '@domain/backup/domain/value-objects/backup-status.enum';
 import {
@@ -14,11 +18,16 @@ import {
   BACKUP_LOCK_PORT,
   REMOTE_STORAGE_FACTORY,
   CLOCK_PORT,
+  FILESYSTEM_PORT,
+  GPG_KEY_MANAGER_PORT,
 } from '@common/di/injection-tokens';
+
+const DUMP_FILE_EXTENSIONS = ['.sql', '.sql.gz', '.sql.bz2', '.archive', '.gz', '.bson', '.gpg'];
 
 @Injectable()
 export class RecoverStartupUseCase implements OnModuleInit {
   private readonly logger = new Logger(RecoverStartupUseCase.name);
+  private readonly baseDir: string;
 
   constructor(
     @Inject(AUDIT_LOG_PORT) private readonly auditLog: AuditLogPort,
@@ -27,20 +36,33 @@ export class RecoverStartupUseCase implements OnModuleInit {
     @Inject(BACKUP_LOCK_PORT) private readonly backupLock: BackupLockPort,
     @Inject(REMOTE_STORAGE_FACTORY) private readonly storageFactory: RemoteStorageFactory,
     @Inject(CLOCK_PORT) private readonly clock: ClockPort,
-  ) {}
+    @Inject(FILESYSTEM_PORT) private readonly filesystem: FileSystemPort,
+    @Inject(GPG_KEY_MANAGER_PORT) private readonly gpgKeyManager: GpgKeyManagerPort,
+    configService: ConfigService,
+  ) {
+    this.baseDir = configService.get<string>('BACKUP_BASE_DIR', '/data/backups');
+  }
 
   async onModuleInit(): Promise<void> {
+    // Skip recovery for short-lived CLI commands — only run for the HTTP server
+    if (process.env.BACKUPCTL_CLI_MODE === '1') {
+      return;
+    }
+
     this.logger.log('Starting recovery checks...');
 
     const orphanCount = await this.markOrphanedRuns();
+    const dumpCount = this.cleanOrphanedDumps();
     const lockCount = await this.cleanStaleLocks();
     const unlockCount = await this.unlockResticRepos();
     const replayCount = await this.replayFallbackEntries();
+    const gpgCount = await this.importGpgKeys();
 
     this.logger.log(
       `Recovery complete: ${orphanCount} orphaned runs marked, ` +
+        `${dumpCount} orphaned dumps cleaned, ` +
         `${lockCount} stale locks cleaned, ${unlockCount} restic repos unlocked, ` +
-        `${replayCount} fallback entries replayed`,
+        `${replayCount} fallback entries replayed, ${gpgCount} GPG keys imported`,
     );
   }
 
@@ -69,6 +91,41 @@ export class RecoverStartupUseCase implements OnModuleInit {
       this.logger.error('Failed to mark orphaned runs', error);
       return 0;
     }
+  }
+
+  private cleanOrphanedDumps(): number {
+    let cleaned = 0;
+
+    try {
+      const projects = this.configLoader.loadAll();
+
+      for (const project of projects) {
+        const projectDir = path.join(this.baseDir, project.name);
+        if (!this.filesystem.exists(projectDir)) continue;
+
+        const files = this.filesystem.listDirectory(projectDir);
+        for (const file of files) {
+          const isLock = file === '.lock';
+          const isDumpFile = DUMP_FILE_EXTENSIONS.some((ext) => file.endsWith(ext));
+          if (isDumpFile && !isLock) {
+            try {
+              this.filesystem.removeFile(path.join(projectDir, file));
+              cleaned++;
+            } catch (error) {
+              this.logger.warn(`Failed to remove orphaned dump ${file}: ${String(error)}`);
+            }
+          }
+        }
+      }
+
+      if (cleaned > 0) {
+        this.logger.warn(`Cleaned ${cleaned} orphaned dump file(s)`);
+      }
+    } catch (error) {
+      this.logger.error('Failed to clean orphaned dumps', error);
+    }
+
+    return cleaned;
   }
 
   private async cleanStaleLocks(): Promise<number> {
@@ -150,5 +207,18 @@ export class RecoverStartupUseCase implements OnModuleInit {
     }
 
     return replayed;
+  }
+
+  private async importGpgKeys(): Promise<number> {
+    try {
+      const imported = await this.gpgKeyManager.importAllFromDirectory();
+      if (imported.length > 0) {
+        this.logger.log(`Imported ${imported.length} GPG key(s): ${imported.join(', ')}`);
+      }
+      return imported.length;
+    } catch (error) {
+      this.logger.warn(`GPG key import failed: ${String(error)}`);
+      return 0;
+    }
   }
 }

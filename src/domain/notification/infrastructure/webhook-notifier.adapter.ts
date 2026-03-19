@@ -3,7 +3,7 @@ import { NotifierPort } from '@domain/notification/application/ports/notifier.po
 import { BackupResult } from '@domain/backup/domain/backup-result.model';
 import { BackupStageError } from '@domain/backup/domain/backup-stage-error';
 import { BackupStatus } from '@domain/backup/domain/value-objects/backup-status.enum';
-import { formatBytes, formatDuration } from '@common/helpers/format.util';
+import { formatFailureText, formatSuccessText, formatDailySummaryText } from './notification-formatter';
 
 type WebhookEvent =
   | 'backup_started'
@@ -24,39 +24,39 @@ export class WebhookNotifierAdapter implements NotifierPort {
 
   async notifyStarted(projectName: string): Promise<void> {
     const timestamp = new Date().toISOString();
-    const text = `🔄 Backup started — ${projectName}\nTime: ${timestamp}`;
 
     await this.postWebhook({
       event: 'backup_started',
       project: projectName,
-      text,
+      text: `🔄 Backup started — ${projectName}\nTime: ${timestamp}`,
       data: { project_name: projectName, timestamp },
     });
   }
 
   async notifySuccess(result: BackupResult): Promise<void> {
-    const text = this.formatSuccessText(result);
-    const data = this.buildSuccessData(result);
-
     await this.postWebhook({
       event: 'backup_success',
       project: result.projectName,
-      text,
-      data,
+      text: formatSuccessText(result),
+      data: {
+        run_id: result.runId,
+        project_name: result.projectName,
+        status: result.status,
+        snapshot_id: result.syncResult?.snapshotId ?? null,
+        dump_size_bytes: result.dumpResult?.sizeBytes ?? null,
+        encrypted: result.encrypted,
+        verified: result.verified,
+        duration_ms: result.durationMs,
+        timestamp: new Date().toISOString(),
+      },
     });
   }
 
   async notifyFailure(projectName: string, error: BackupStageError): Promise<void> {
-    const text = [
-      `❌ Backup failed — ${projectName}`,
-      `Stage: ${error.stage} | Retryable: ${error.isRetryable ? 'Yes' : 'No'}`,
-      `Error: ${error.message}`,
-    ].join('\n');
-
     await this.postWebhook({
       event: 'backup_failed',
       project: projectName,
-      text,
+      text: formatFailureText(projectName, error),
       data: {
         project_name: projectName,
         stage: error.stage,
@@ -68,12 +68,10 @@ export class WebhookNotifierAdapter implements NotifierPort {
   }
 
   async notifyWarning(projectName: string, message: string): Promise<void> {
-    const text = `⚠️ ${message}`;
-
     await this.postWebhook({
       event: 'backup_warning',
       project: projectName,
-      text,
+      text: `⚠️ ${message}`,
       data: {
         project_name: projectName,
         message,
@@ -84,13 +82,12 @@ export class WebhookNotifierAdapter implements NotifierPort {
 
   async notifyDailySummary(results: BackupResult[]): Promise<void> {
     const date = new Date().toISOString().split('T')[0];
-    const text = this.formatDailySummaryText(results, date);
     const successCount = results.filter((r) => r.status === BackupStatus.Success).length;
 
     await this.postWebhook({
       event: 'daily_summary',
       project: 'all',
-      text,
+      text: formatDailySummaryText(results, date),
       data: {
         date,
         total: results.length,
@@ -106,89 +103,6 @@ export class WebhookNotifierAdapter implements NotifierPort {
         })),
       },
     });
-  }
-
-  private formatSuccessText(result: BackupResult): string {
-    const lines = [`✅ Backup completed — ${result.projectName}`];
-
-    const dumpSize = result.dumpResult ? formatBytes(result.dumpResult.sizeBytes) : 'N/A';
-    const dumpPath = result.dumpResult?.filePath ?? 'N/A';
-    const dbName = dumpPath.split('/').pop()?.split('.')[0] ?? result.projectName;
-    lines.push(
-      `DB: ${dbName} | Dump: ${dumpSize}` +
-        ` | Encrypted: ${result.encrypted ? 'Yes' : 'No'}` +
-        ` | Verified: ${result.verified ? 'Yes' : 'No'}`,
-    );
-
-    if (result.syncResult) {
-      lines.push(
-        `Snapshot: ${result.syncResult.snapshotId} | Mode: ${result.snapshotMode}`,
-      );
-      lines.push(
-        `New files: ${result.syncResult.filesNew}` +
-          ` | Changed: ${result.syncResult.filesChanged}` +
-          ` | Added: ${formatBytes(result.syncResult.bytesAdded)}`,
-      );
-    }
-
-    if (result.pruneResult || result.cleanupResult) {
-      const pruned = result.pruneResult
-        ? `${result.pruneResult.snapshotsRemoved} snapshots`
-        : '0 snapshots';
-      const cleaned = result.cleanupResult
-        ? `${result.cleanupResult.filesRemoved} files`
-        : '0 files';
-      lines.push(`Pruned: ${pruned} | Local cleaned: ${cleaned}`);
-    }
-
-    lines.push(`Duration: ${formatDuration(result.durationMs)}`);
-
-    return lines.join('\n');
-  }
-
-  private buildSuccessData(result: BackupResult): Record<string, unknown> {
-    return {
-      run_id: result.runId,
-      project_name: result.projectName,
-      status: result.status,
-      snapshot_id: result.syncResult?.snapshotId ?? null,
-      dump_size_bytes: result.dumpResult?.sizeBytes ?? null,
-      encrypted: result.encrypted,
-      verified: result.verified,
-      duration_ms: result.durationMs,
-      timestamp: new Date().toISOString(),
-    };
-  }
-
-  private formatDailySummaryText(results: BackupResult[], date: string): string {
-    const lines = [`📊 Daily Backup Summary — ${date}`, ''];
-
-    for (const result of results) {
-      if (result.status === BackupStatus.Success) {
-        const dumpSize = result.dumpResult
-          ? formatBytes(result.dumpResult.sizeBytes)
-          : 'N/A';
-        const snapshotId = result.syncResult?.snapshotId ?? 'N/A';
-        lines.push(
-          `✅ ${result.projectName}` +
-            ` — ${dumpSize}` +
-            ` — ${formatDuration(result.durationMs)}` +
-            ` — ${snapshotId}`,
-        );
-      } else {
-        lines.push(
-          `❌ ${result.projectName} — FAILED — ${result.errorMessage ?? 'unknown error'}`,
-        );
-      }
-    }
-
-    const successCount = results.filter((r) => r.status === BackupStatus.Success).length;
-    lines.push('');
-    lines.push(
-      `Total: ${successCount}/${results.length} successful | Next run: per project schedule`,
-    );
-
-    return lines.join('\n');
   }
 
   private async postWebhook(payload: WebhookPayload): Promise<void> {

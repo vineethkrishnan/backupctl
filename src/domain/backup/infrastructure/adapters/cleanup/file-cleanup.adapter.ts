@@ -10,9 +10,9 @@ const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
 @Injectable()
 export class FileCleanupAdapter implements LocalCleanupPort {
-  async cleanup(directory: string, retentionDays: number): Promise<CleanupResult> {
+  cleanup(directory: string, retentionDays: number): Promise<CleanupResult> {
     if (!fs.existsSync(directory)) {
-      return new CleanupResult(0, 0);
+      return Promise.resolve(new CleanupResult(0, 0));
     }
 
     const cutoffTime = Date.now() - retentionDays * MS_PER_DAY;
@@ -36,6 +36,6 @@ export class FileCleanupAdapter implements LocalCleanupPort {
       }
     }
 
-    return new CleanupResult(filesRemoved, spaceFreed);
+    return Promise.resolve(new CleanupResult(filesRemoved, spaceFreed));
   }
 }

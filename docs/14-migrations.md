@@ -1,47 +1,56 @@
 # TypeORM Migration Guide
 
-backupctl uses **explicit TypeORM migrations** for all audit database schema changes. `synchronize` is always `false` — every schema change requires a migration file.
+backupctl uses **schema-driven TypeORM migrations** for all audit database schema changes. The workflow is: modify the `*.record.ts` schema first, then use `migration:generate` to produce the migration from the entity diff. Migrations are **never auto-run** — you have full manual control.
+
+> **Golden rule**: The record schema (`*.record.ts`) is the source of truth. Always change the schema first, then generate the migration. Never hand-write migrations for schema changes.
 
 ---
 
 ## How It Works
 
 - **Entity**: `src/domain/audit/infrastructure/persistence/typeorm/schema/backup-log.record.ts`
-- **Data source**: `src/domain/audit/infrastructure/persistence/typeorm/data-source.ts`
-- **Migrations dir**: `src/domain/audit/infrastructure/persistence/typeorm/migrations/`
-- **Auto-run on startup**: `migrationsRun: true` in `AppModule` TypeORM config
+- **Config**: `src/config/typeorm.config.ts` (env-aware, `__dirname`-relative paths)
+- **CLI Data Source**: `src/db/datasource.ts`
+- **Migrations dir**: `src/db/migrations/`
+- **Auto-run**: `migrationsRun: false` — you must run migrations manually
 
-When the NestJS app starts, TypeORM automatically runs any pending migrations against the audit database. A `migrations` table in PostgreSQL tracks which migrations have already been applied.
+TypeORM tracks applied migrations in the `migrations` table in PostgreSQL. Run `migrate:show` to see pending vs applied migrations.
 
 ---
 
-## Data Source Configuration
+## Config Architecture
 
-The CLI data source at `src/domain/audit/infrastructure/persistence/typeorm/data-source.ts` is used by the TypeORM CLI for generating and running migrations manually:
+The TypeORM config is extracted into `src/config/typeorm.config.ts` with environment-specific settings:
 
-```typescript
-import { DataSource } from 'typeorm';
-import { BackupLogRecord } from './schema/backup-log.record';
+- **Development**: uses `*.{js,ts}` globs, enables `migration` + `warn` + `error` logging
+- **Production**: uses `*.js` only, enables `error` logging only
+- Both environments: `migrationsRun: false`, `synchronize: false`
 
-export default new DataSource({
-  type: 'postgres',
-  host: process.env.AUDIT_DB_HOST || 'localhost',
-  port: parseInt(process.env.AUDIT_DB_PORT || '5432', 10),
-  database: process.env.AUDIT_DB_NAME || 'backup_audit',
-  username: process.env.AUDIT_DB_USER || 'audit_user',
-  password: process.env.AUDIT_DB_PASSWORD || 'audit_secret',
-  entities: [BackupLogRecord],
-  migrations: ['src/domain/audit/infrastructure/persistence/typeorm/migrations/*.ts'],
-});
-```
+The config is registered via `@nestjs/config`'s `registerAs('typeorm', ...)` and consumed by `AppModule` through `ConfigService`.
 
-All TypeORM CLI commands reference this file via the `-d` flag.
+A standalone `src/db/datasource.ts` exposes the same config as a raw `DataSource` for the TypeORM CLI.
 
 ---
 
 ## Migration Commands
 
 The easiest way to run migration commands is through `scripts/dev.sh`. All commands below assume the dev environment is running (`scripts/dev.sh up`).
+
+### Run Pending Migrations
+
+```bash
+scripts/dev.sh migrate:run
+```
+
+This is required after pulling new migration files or creating new ones.
+
+### Show Migration Status
+
+```bash
+scripts/dev.sh migrate:show
+```
+
+Shows all migrations and whether they have been applied (`[X]`) or are pending.
 
 ### Generate a Migration (from Entity Changes)
 
@@ -65,14 +74,6 @@ scripts/dev.sh migrate:create DescriptiveName
 
 This creates a blank migration file with `up()` and `down()` methods for you to fill in.
 
-### Run Pending Migrations
-
-```bash
-scripts/dev.sh migrate:run
-```
-
-> **Note**: Migrations run automatically on app startup (`migrationsRun: true`), so manual `migrate:run` is only needed for debugging or out-of-band execution.
-
 ### Revert Last Migration
 
 ```bash
@@ -80,14 +81,6 @@ scripts/dev.sh migrate:revert
 ```
 
 This reverts the most recently applied migration by calling its `down()` method.
-
-### Show Migration Status
-
-```bash
-scripts/dev.sh migrate:show
-```
-
-Shows all migrations and whether they have been applied (`[X]`) or are pending.
 
 ### Direct TypeORM CLI (without dev.sh)
 
@@ -97,12 +90,12 @@ If you need to run TypeORM commands directly, use `ts-node` with `tsconfig-paths
 # Inside dev container
 docker exec backupctl-dev npx ts-node -r tsconfig-paths/register \
   ./node_modules/typeorm/cli.js migration:show \
-  -d src/domain/audit/infrastructure/persistence/typeorm/data-source.ts
+  -d src/db/datasource.ts
 
 # Local (with Postgres accessible on localhost)
 npx ts-node -r tsconfig-paths/register \
   ./node_modules/typeorm/cli.js migration:run \
-  -d src/domain/audit/infrastructure/persistence/typeorm/data-source.ts
+  -d src/db/datasource.ts
 ```
 
 ---
@@ -158,19 +151,18 @@ export class AddTagsColumnToBackupLog1710820000000 implements MigrationInterface
 
 ### Rules
 
-1. **Always implement `down()`** — reversibility is required, even if you think you'll never revert
-2. **Use the QueryRunner API** (`addColumn`, `createIndex`, `createTable`) instead of raw SQL when possible — this keeps migrations database-agnostic
-3. **Use raw SQL for complex operations** when the QueryRunner API falls short:
-   ```typescript
-   await queryRunner.query(`ALTER TABLE backup_log ADD CONSTRAINT ...`);
-   ```
+1. **Schema first** — always modify the `*.record.ts` file, then run `migrate:generate`. Never hand-write schema migrations
+2. **Use `migrate:create` only for** data migrations, custom indexes, or SQL that `generate` can't capture
+3. **Always implement `down()`** — reversibility is required, even if you think you'll never revert
 4. **Never modify an existing migration** that has been applied in any environment — create a new one instead
 5. **Keep migrations small and focused** — one logical change per migration
-6. **Update the entity** (`backup-log.record.ts`) to match the new schema after writing the migration
-7. **Test migrations** by running them against a fresh database:
+6. **Review the generated migration** before running it — `generate` can sometimes produce unnecessary changes
+7. **Update the mapper** (`backup-log.mapper.ts`) if the new columns need domain-level representation
+8. **Test migrations** by running them against a fresh database:
    ```bash
    docker compose -f docker-compose.dev.yml down -v
    docker compose -f docker-compose.dev.yml up -d
+   scripts/dev.sh migrate:run
    ```
 
 ---
@@ -262,12 +254,13 @@ async up(queryRunner: QueryRunner): Promise<void> {
 ## Workflow Summary
 
 ```
-1. Modify entity       →  backup-log.record.ts
-2. Generate migration  →  scripts/dev.sh migrate:generate DescriptiveName
-3. Review the generated file
-4. Run migration       →  scripts/dev.sh migrate:run (or restart app)
-5. Verify              →  scripts/dev.sh migrate:show
-6. Commit both the entity change and migration file together
+1. Modify record schema   →  *.record.ts (source of truth)
+2. Generate migration     →  scripts/dev.sh migrate:generate DescriptiveName
+3. Review generated file  →  src/db/migrations/
+4. Run migration          →  scripts/dev.sh migrate:run
+5. Verify                 →  scripts/dev.sh migrate:show
+6. Update mapper          →  *.mapper.ts (if new columns need domain mapping)
+7. Commit record + migration + mapper together
 ```
 
 ---
@@ -293,7 +286,7 @@ SELECT * FROM migrations ORDER BY timestamp DESC;
 DELETE FROM migrations WHERE name = 'MigrationName1710820000000';
 ```
 
-Then re-run `migration:run`.
+Then re-run `migrate:run`.
 
 ### "Cannot find data source" or "Cannot find module"
 
@@ -301,7 +294,7 @@ Make sure you're using `ts-node` with `tsconfig-paths/register` to resolve path 
 
 ```bash
 npx ts-node -r tsconfig-paths/register ./node_modules/typeorm/cli.js migration:show \
-  -d src/domain/audit/infrastructure/persistence/typeorm/data-source.ts
+  -d src/db/datasource.ts
 ```
 
 Also verify the database is running and accessible with the credentials in `.env`.
@@ -310,6 +303,7 @@ Also verify the database is running and accessible with the credentials in `.env
 
 ```bash
 scripts/dev.sh reset
+scripts/dev.sh migrate:run
 ```
 
 All migrations will re-run from scratch on the fresh database.

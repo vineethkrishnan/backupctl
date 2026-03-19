@@ -28,7 +28,7 @@ WARNING="${YELLOW}⚠${RESET}"
 
 # ── State ────────────────────────────────────────────────────
 
-TOTAL_STEPS=12
+TOTAL_STEPS=13
 ENV_VARS=""
 PROJECTS=()
 PROJECT_COUNT=0
@@ -454,7 +454,7 @@ step_hetzner() {
 Host ${HETZNER_SSH_HOST}
     User ${HETZNER_SSH_USER}
     Port ${HETZNER_SSH_PORT}
-    IdentityFile /root/.ssh/id_${SSH_KEY_TYPE}
+    IdentityFile /home/node/.ssh/id_${SSH_KEY_TYPE}
     StrictHostKeyChecking accept-new
 SSHCONF
     chmod 600 ssh-keys/config
@@ -725,6 +725,27 @@ add_project() {
   local proj_timeout
   proj_timeout=$(ask "Timeout minutes (empty = no timeout)" "")
 
+  # Docker network
+  echo ""
+  echo -e "  ${BOLD}Docker Network:${RESET}"
+  print_dim "If this project's database runs in a Docker container on another network,"
+  print_dim "specify the network name so backupctl can reach it. Leave empty if the"
+  print_dim "database is on the host machine or already reachable."
+
+  local available_networks
+  available_networks=$(docker network ls --format '{{.Name}}' 2>/dev/null | grep -v '^bridge$\|^host$\|^none$' | sort)
+  if [ -n "$available_networks" ]; then
+    echo ""
+    print_dim "Available Docker networks:"
+    while IFS= read -r net; do
+      echo -e "    ${DIM}• ${net}${RESET}"
+    done <<< "$available_networks"
+  fi
+
+  echo ""
+  local proj_docker_network
+  proj_docker_network=$(ask "Docker network (empty = host/default)" "")
+
   # Database
   echo ""
   echo -e "  ${BOLD}Database:${RESET}"
@@ -770,7 +791,8 @@ add_project() {
   echo ""
   echo -e "  ${BOLD}Restic:${RESET}"
   local proj_restic_path
-  proj_restic_path=$(ask "Restic repository path on storage box" "/backups/${proj_name}")
+  print_dim "Use a relative path (no leading /) for Hetzner Storage Box SFTP"
+  proj_restic_path=$(ask "Restic repository path on storage box" "backups/${proj_name}")
 
   local proj_restic_password_mode proj_restic_password
   if ask_yn "Use global restic password for this project?" "y"; then
@@ -944,6 +966,9 @@ add_project() {
   if [ -n "$proj_timeout" ]; then
     yaml+="    timeout_minutes: ${proj_timeout}"$'\n'
   fi
+  if [ -n "$proj_docker_network" ]; then
+    yaml+="    docker_network: ${proj_docker_network}"$'\n'
+  fi
   yaml+=""$'\n'
   yaml+="    database:"$'\n'
   yaml+="      type: ${proj_db_type}"$'\n'
@@ -1085,13 +1110,18 @@ step_review() {
       echo -e "    ${DIM}(none configured)${RESET}"
     else
       for proj_yaml in "${PROJECTS[@]}"; do
-        local pname pdb_type pdb_host pdb_name pcron
+        local pname pdb_type pdb_host pdb_name pcron pnet
         pname=$(echo "$proj_yaml" | grep 'name:' | head -1 | sed 's/.*name: //')
         pdb_type=$(echo "$proj_yaml" | grep 'type:' | head -1 | sed 's/.*type: //')
         pdb_host=$(echo "$proj_yaml" | grep 'host:' | head -1 | sed 's/.*host: //')
         pdb_name=$(echo "$proj_yaml" | grep 'name:' | tail -1 | sed 's/.*name: //')
         pcron=$(echo "$proj_yaml" | grep 'cron:' | head -1 | sed 's/.*cron: "//;s/"//')
-        echo -e "    ${CHECKMARK} ${BOLD}${pname}${RESET} — ${pdb_type} @ ${pdb_host}/${pdb_name} — cron: ${DIM}${pcron}${RESET}"
+        pnet=$(echo "$proj_yaml" | grep 'docker_network:' | head -1 | sed 's/.*docker_network: //')
+        local net_info=""
+        if [ -n "$pnet" ]; then
+          net_info=" — net: ${DIM}${pnet}${RESET}"
+        fi
+        echo -e "    ${CHECKMARK} ${BOLD}${pname}${RESET} — ${pdb_type} @ ${pdb_host}/${pdb_name} — cron: ${DIM}${pcron}${RESET}${net_info}"
       done
     fi
     echo ""
@@ -1128,7 +1158,7 @@ step_review() {
 step_generate() {
   print_step 10 "Generate Configuration Files"
 
-  # Create directories
+  # Create directories (gpg-keys/ always needed — Docker compose mounts it)
   mkdir -p config ssh-keys gpg-keys
   print_success "Directories created: config/, ssh-keys/, gpg-keys/"
 
@@ -1160,6 +1190,7 @@ AUDIT_DB_PASSWORD=${AUDIT_DB_PASSWORD}
 HETZNER_SSH_HOST=${HETZNER_SSH_HOST}
 HETZNER_SSH_USER=${HETZNER_SSH_USER}
 HETZNER_SSH_PORT=${HETZNER_SSH_PORT}
+HETZNER_SSH_KEY_PATH=/home/node/.ssh/id_${SSH_KEY_TYPE:-ed25519}
 
 # ── Restic ───────────────────────────────────────────────
 RESTIC_PASSWORD=${RESTIC_PASSWORD}
@@ -1199,13 +1230,13 @@ ENVEOF
 
 # ── Encryption ───────────────────────────────────────────
 ENCRYPTION_ENABLED=${ENCRYPTION_ENABLED}
+GPG_KEYS_DIR=./gpg-keys
 ENVEOF
 
   if [ "$ENCRYPTION_ENABLED" = "true" ]; then
     cat >> .env <<ENVEOF
 ENCRYPTION_TYPE=${ENCRYPTION_TYPE}
 GPG_RECIPIENT=${GPG_RECIPIENT}
-GPG_KEYS_DIR=./gpg-keys
 ENVEOF
   fi
 
@@ -1270,6 +1301,21 @@ step_docker() {
   build_log=$(mktemp)
   if docker compose up -d --build >"$build_log" 2>&1; then
     print_success "Containers started"
+
+    # Auto-connect project Docker networks
+    for proj_yaml in "${PROJECTS[@]}"; do
+      local pnet
+      pnet=$(echo "$proj_yaml" | grep 'docker_network:' | head -1 | sed 's/.*docker_network: //')
+      if [ -n "$pnet" ]; then
+        if docker network ls --format '{{.Name}}' | grep -q "^${pnet}$"; then
+          docker network connect "$pnet" backupctl 2>/dev/null \
+            && print_success "Connected to network: ${pnet}" \
+            || print_warning "Failed to connect to network: ${pnet}"
+        else
+          print_warning "Docker network '${pnet}' not found — connect manually after it's created"
+        fi
+      fi
+    done
   else
     echo ""
     print_error "Docker Compose failed:"
@@ -1301,9 +1347,48 @@ step_docker() {
     print_warning "Audit database did not become ready in time. Check logs with: docker compose logs"
   fi
 
-  # Initialize restic repos
+  # Create remote directories + initialize restic repos
   if [ ${#PROJECTS[@]} -gt 0 ] && ask_yn "Initialize restic repositories for configured projects?" "y"; then
     echo ""
+
+    # Pre-create remote directories on the storage box via SFTP
+    local key_file="ssh-keys/id_${SSH_KEY_TYPE:-ed25519}"
+    if [ -f "$key_file" ]; then
+      print_info "Creating remote directories on storage box..."
+      for proj_yaml in "${PROJECTS[@]}"; do
+        local repo_path
+        repo_path=$(echo "$proj_yaml" | grep 'repository_path:' | head -1 | sed 's/.*repository_path: //')
+        if [ -n "$repo_path" ]; then
+          echo -ne "  Creating remote directory: ${repo_path}..."
+          if echo "mkdir ${repo_path}" | sftp -b - \
+            -i "$key_file" \
+            -P "${HETZNER_SSH_PORT:-23}" \
+            -o StrictHostKeyChecking=accept-new \
+            "${HETZNER_SSH_USER}@${HETZNER_SSH_HOST}" &>/dev/null; then
+            echo -e " ${CHECKMARK}"
+          else
+            echo -e " ${WARNING} ${DIM}(may already exist or parent dir missing)${RESET}"
+            # Try creating parent + child
+            local parent_dir
+            parent_dir=$(dirname "$repo_path")
+            if [ "$parent_dir" != "." ]; then
+              printf "mkdir %s\nmkdir %s\n" "$parent_dir" "$repo_path" | sftp -b - \
+                -i "$key_file" \
+                -P "${HETZNER_SSH_PORT:-23}" \
+                -o StrictHostKeyChecking=accept-new \
+                "${HETZNER_SSH_USER}@${HETZNER_SSH_HOST}" &>/dev/null || true
+              print_dim "Attempted to create parent directory: ${parent_dir}"
+            fi
+          fi
+        fi
+      done
+      echo ""
+    else
+      print_warning "SSH key not found at ${key_file}. Skipping remote directory creation."
+      print_dim "Create directories manually: sftp -P ${HETZNER_SSH_PORT:-23} ${HETZNER_SSH_USER:-user}@${HETZNER_SSH_HOST:-host}"
+    fi
+
+    # Initialize restic repos inside the container
     for proj_yaml in "${PROJECTS[@]}"; do
       local pname
       pname=$(echo "$proj_yaml" | head -1 | sed 's/.*name: //')
@@ -1330,11 +1415,52 @@ step_docker() {
 }
 
 # ════════════════════════════════════════════════════════════
-# Step 12: Completion
+# Step 12: CLI Shortcuts
+# ════════════════════════════════════════════════════════════
+
+step_cli_shortcuts() {
+  print_step 12 "CLI Shortcuts"
+
+  print_dim "Install 'backupctl' and 'backupctl-dev' commands so you can run"
+  print_dim "CLI commands from any directory without the Docker exec prefix."
+  echo ""
+  echo -e "  ${DIM}Instead of:  docker exec backupctl node dist/cli.js health${RESET}"
+  echo -e "  ${DIM}Just type:   backupctl health${RESET}"
+  echo ""
+
+  if ! ask_yn "Install CLI shortcuts?" "y"; then
+    print_info "Skipped. Install later with: ./scripts/install-cli.sh"
+    return
+  fi
+
+  echo ""
+  echo -e "  Install location:"
+  echo ""
+  echo -e "    ${BOLD}1)${RESET} ${HOME}/.local/bin  ${DIM}(user only, no sudo)${RESET}"
+  echo -e "    ${BOLD}2)${RESET} /usr/local/bin  ${DIM}(system-wide, requires sudo)${RESET}"
+  echo ""
+
+  local choice
+  choice=$(ask "Choose" "1")
+
+  echo ""
+
+  case "$choice" in
+    2)
+      "${SCRIPT_DIR}/install-cli.sh" --system
+      ;;
+    *)
+      "${SCRIPT_DIR}/install-cli.sh" --user
+      ;;
+  esac
+}
+
+# ════════════════════════════════════════════════════════════
+# Step 13: Completion
 # ════════════════════════════════════════════════════════════
 
 step_completion() {
-  print_step 12 "Installation Complete"
+  print_step 13 "Installation Complete"
 
   echo -e "${BOLD}${GREEN}"
   echo "  ╔═══════════════════════════════════════════════════════════╗"
@@ -1370,30 +1496,67 @@ step_completion() {
     echo -e "     ${DIM}ssh-copy-id -p ${HETZNER_SSH_PORT:-23} -i ssh-keys/id_${SSH_KEY_TYPE:-ed25519}.pub ${HETZNER_SSH_USER:-user}@${HETZNER_SSH_HOST:-host}${RESET}"
     echo ""
   fi
+  # Detect whether CLI shortcuts are installed
+  local use_shortcut=false
+  if command -v backupctl &>/dev/null; then
+    use_shortcut=true
+  fi
+
   echo -e "  ${BOLD}2.${RESET} Verify the installation:"
-  echo -e "     ${CYAN}docker exec backupctl node dist/cli.js health${RESET}"
+  if [ "$use_shortcut" = true ]; then
+    echo -e "     ${CYAN}backupctl health${RESET}"
+  else
+    echo -e "     ${CYAN}docker exec backupctl node dist/cli.js health${RESET}"
+  fi
   echo ""
   echo -e "  ${BOLD}3.${RESET} Test a backup (dry run):"
   if [ "$PROJECT_COUNT" -gt 0 ]; then
     local first_name
     first_name=$(echo "${PROJECTS[0]}" | head -1 | sed 's/.*name: //')
-    echo -e "     ${CYAN}docker exec backupctl node dist/cli.js run ${first_name} --dry-run${RESET}"
+    if [ "$use_shortcut" = true ]; then
+      echo -e "     ${CYAN}backupctl run ${first_name} --dry-run${RESET}"
+    else
+      echo -e "     ${CYAN}docker exec backupctl node dist/cli.js run ${first_name} --dry-run${RESET}"
+    fi
   else
-    echo -e "     ${CYAN}docker exec backupctl node dist/cli.js run <project> --dry-run${RESET}"
+    if [ "$use_shortcut" = true ]; then
+      echo -e "     ${CYAN}backupctl run <project> --dry-run${RESET}"
+    else
+      echo -e "     ${CYAN}docker exec backupctl node dist/cli.js run <project> --dry-run${RESET}"
+    fi
   fi
   echo ""
   echo -e "  ${BOLD}4.${RESET} Check backup status:"
-  echo -e "     ${CYAN}docker exec backupctl node dist/cli.js status${RESET}"
+  if [ "$use_shortcut" = true ]; then
+    echo -e "     ${CYAN}backupctl status${RESET}"
+  else
+    echo -e "     ${CYAN}docker exec backupctl node dist/cli.js status${RESET}"
+  fi
   echo ""
 
   # Useful commands
   echo -e "  ${BOLD}Useful Commands:${RESET}"
+  if [ "$use_shortcut" = true ]; then
+    echo -e "    ${CYAN}backupctl health${RESET}                    — Health check"
+    echo -e "    ${CYAN}backupctl run <project>${RESET}             — Run backup"
+    echo -e "    ${CYAN}backupctl status${RESET}                    — Backup status"
+    echo -e "    ${CYAN}backupctl-dev health${RESET}                — Dev health check"
+    echo -e "    ${CYAN}backupctl-dev run <project> --dry-run${RESET} — Dev dry run"
+  else
+    echo -e "    ${DIM}docker exec backupctl node dist/cli.js health${RESET}"
+    echo -e "    ${DIM}docker exec backupctl node dist/cli.js run <project>${RESET}"
+    echo -e "    ${DIM}docker exec backupctl node dist/cli.js status${RESET}"
+  fi
+  echo ""
+  echo -e "  ${BOLD}Management:${RESET}"
   echo -e "    ${DIM}scripts/backupctl-manage.sh status${RESET}    — Quick status overview"
   echo -e "    ${DIM}scripts/backupctl-manage.sh logs${RESET}      — Tail container logs"
   echo -e "    ${DIM}scripts/backupctl-manage.sh shell${RESET}     — Shell into container"
   echo -e "    ${DIM}scripts/backupctl-manage.sh deploy${RESET}    — Rebuild and deploy"
   echo ""
-  echo -e "  ${DIM}Documentation: docs/initial/prd.md${RESET}"
+  echo -e "  ${BOLD}Troubleshooting:${RESET}"
+  echo -e "    ${DIM}docs/15-faq.md${RESET}                — FAQ (setup, operations, and more)"
+  echo -e "    ${DIM}docs/12-troubleshooting.md${RESET}       — General troubleshooting"
   echo ""
 }
 
@@ -1414,6 +1577,7 @@ main() {
   step_review
   step_generate
   step_docker
+  step_cli_shortcuts
   step_completion
 }
 

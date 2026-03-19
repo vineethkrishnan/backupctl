@@ -90,10 +90,33 @@ backupctl restic myproject mount /mnt       # browse snapshots via FUSE
 backupctl restic myproject dump latest /path/to/file > out.dump  # extract single file
 ```
 
+## CLI Shortcuts
+
+After running `./scripts/install-cli.sh`, you can use `backupctl` and `backupctl-dev` from any directory:
+
+```bash
+# Production
+backupctl health
+backupctl run myproject --dry-run
+backupctl status myproject --last 5
+
+# Development
+backupctl-dev health
+backupctl-dev config show myproject
+backupctl-dev run myproject --dry-run
+```
+
+Install shortcuts: `./scripts/install-cli.sh` (or `--user` / `--system` flags).
+
 ## Host Scripts
 
 ```bash
 ./scripts/install.sh                            # first-time setup wizard
+./scripts/install-cli.sh                        # install backupctl/backupctl-dev commands
+./scripts/dev.sh up                             # start dev environment
+./scripts/dev.sh cli health                     # dev CLI commands
+./scripts/dev.sh test                           # run tests
+./scripts/dev.sh analyze                        # static analysis
 ./scripts/backupctl-manage.sh deploy             # build + start containers
 ./scripts/backupctl-manage.sh deploy --rebuild   # force rebuild + restart
 ./scripts/backupctl-manage.sh update             # pull + rebuild + restart
@@ -114,7 +137,7 @@ docker compose down -v               # stop + remove volumes
 docker compose ps                    # check container status
 docker compose logs -f backupctl     # follow application logs
 
-# Execute commands inside the container
+# Without CLI shortcuts — execute commands inside the container
 docker exec backupctl node dist/cli.js health
 docker exec backupctl node dist/cli.js run myproject --dry-run
 docker exec backupctl node dist/cli.js status
@@ -160,6 +183,10 @@ docker exec backupctl gpg --import /app/gpg-keys/backup-key.pub.gpg
 # System-wide health
 backupctl health
 
+# Verbose mode — shows bootstrap, DB connections, debug logs
+backupctl -v health
+backupctl --verbose run myproject --dry-run
+
 # Validate config
 backupctl config validate
 
@@ -199,7 +226,7 @@ docker exec backupctl rm /data/backups/myproject/.lock
 | `/data/backups/.fallback-audit/fallback.jsonl` | JSONL fallback audit entries |
 | `/data/backups/.logs/` | Winston log files (daily rotation) |
 | `/app/config/projects.yml` | Project configuration |
-| `/root/.ssh/` | SSH keys for restic SFTP |
+| `/home/node/.ssh/` | SSH keys for restic SFTP |
 | `/app/gpg-keys/` | GPG public/private keys |
 
 ## File Locations (Host)

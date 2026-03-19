@@ -135,6 +135,7 @@ An interactive loop that builds `config/projects.yml` one project at a time.
   Add a project? [Y/n]: Y
 
   Project name: locaboo
+  Docker network (empty = host/default): locaboo_locaboo-network
   Database type (postgres|mysql|mongodb): postgres
   Database host: postgres-locaboo
   Database port [5432]:
@@ -173,7 +174,7 @@ Generates `.env` and `config/projects.yml` from all collected values.
 Optionally builds the Docker image, starts containers, runs migrations, initializes restic repos, and runs a health check.
 
 ```
-[10/10] Build and deploy
+[11/13] Docker Setup
   Build and start containers now? [Y/n]: Y
 
   Building Docker image... done.
@@ -186,9 +187,41 @@ Optionally builds the Docker image, starts containers, runs migrations, initiali
     ✓ Restic (locaboo): accessible
     ✓ Disk: 42 GB free (threshold: 5 GB)
     ✓ SSH: connected
+```
 
-  === backupctl is ready ===
-  Run your first backup:  docker exec backupctl node dist/cli.js run locaboo --dry-run
+### 11. CLI Shortcuts
+
+Installs `backupctl` and `backupctl-dev` wrapper commands so you can run CLI commands from any directory without the `docker exec` prefix.
+
+```
+[12/13] CLI Shortcuts
+  Install CLI shortcuts? [Y/n]: Y
+
+  Install location:
+    1) ~/.local/bin  (user only, no sudo)
+    2) /usr/local/bin  (system-wide, requires sudo)
+
+  Choose [1]: 1
+
+  ✔ Installed backupctl → ~/.local/bin/backupctl
+  ✔ Installed backupctl-dev → ~/.local/bin/backupctl-dev
+```
+
+After installation:
+
+```bash
+backupctl health                       # instead of: docker exec backupctl node dist/cli.js health
+backupctl run locaboo --dry-run        # instead of: docker exec backupctl node dist/cli.js run locaboo --dry-run
+backupctl-dev health                   # instead of: scripts/dev.sh cli health
+```
+
+You can also install shortcuts separately at any time:
+
+```bash
+./scripts/install-cli.sh               # interactive
+./scripts/install-cli.sh --user        # install to ~/.local/bin
+./scripts/install-cli.sh --system      # install to /usr/local/bin (sudo)
+./scripts/install-cli.sh --uninstall   # remove both commands
 ```
 
 ## Option B: Manual Setup
@@ -243,6 +276,7 @@ projects:
   - name: locaboo
     enabled: true
     cron: "0 2 * * *"
+    docker_network: locaboo_locaboo-network  # optional — Docker network where DB lives
 
     database:
       type: postgres

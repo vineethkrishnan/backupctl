@@ -2,6 +2,7 @@ import { Repository } from 'typeorm';
 import { v4 as uuidv4 } from 'uuid';
 
 import { TypeormAuditLogRepository } from '@domain/audit/infrastructure/persistence/typeorm/typeorm-audit-log.repository';
+import { BackupLogMapper } from '@domain/audit/infrastructure/persistence/typeorm/mappers/backup-log.mapper';
 import { BackupLogRecord } from '@domain/audit/infrastructure/persistence/typeorm/schema/backup-log.record';
 import { BackupStage } from '@domain/backup/domain/value-objects/backup-stage.enum';
 import { BackupStatus } from '@domain/backup/domain/value-objects/backup-status.enum';
@@ -111,7 +112,7 @@ describe('TypeormAuditLogRepository (integration)', () => {
 
   beforeEach(() => {
     repository = createMockRepository();
-    adapter = new TypeormAuditLogRepository(repository);
+    adapter = new TypeormAuditLogRepository(repository, new BackupLogMapper());
   });
 
   describe('startRun', () => {

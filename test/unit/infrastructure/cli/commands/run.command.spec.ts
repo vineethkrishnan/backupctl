@@ -129,4 +129,85 @@ describe('RunCommand', () => {
       expect.stringContaining('project name is required'),
     );
   });
+
+  it('should set exit code 4 on dry run with failed checks', async () => {
+    runBackup.getDryRunReport.mockResolvedValue({
+      projectName: 'test',
+      checks: [
+        { name: 'Config loaded', passed: true, message: 'OK' },
+        { name: 'Restic repo', passed: false, message: 'Connection refused' },
+      ],
+      allPassed: false,
+    });
+
+    await command.run(['test'], { dryRun: true });
+
+    expect(process.exitCode).toBe(4);
+    expect(console.log).toHaveBeenCalledWith(expect.stringContaining('1 check(s) failed'));
+  });
+
+  it('should print dump details when dumpResult exists', async () => {
+    const { DumpResult } = require('@domain/backup/domain/value-objects/dump-result.model');
+    const { SyncResult } = require('@domain/backup/domain/value-objects/sync-result.model');
+    runBackup.execute.mockResolvedValue([
+      buildResult({
+        dumpResult: new DumpResult('/dump.gz', 1024, 500),
+        syncResult: new SyncResult('snap-123', 5, 2, 2048, 300),
+      }),
+    ]);
+
+    await command.run(['test'], {});
+
+    expect(console.log).toHaveBeenCalledWith(expect.stringContaining('Dump:'));
+    expect(console.log).toHaveBeenCalledWith(expect.stringContaining('Snapshot: snap-123'));
+  });
+
+  it('should print error details when backup has error info', async () => {
+    runBackup.execute.mockResolvedValue([
+      buildResult({
+        status: BackupStatus.Failed,
+        errorMessage: 'pg_dump timeout',
+        errorStage: BackupStage.Dump,
+        retryCount: 3,
+      }),
+    ]);
+
+    await command.run(['test'], {});
+
+    expect(console.log).toHaveBeenCalledWith(expect.stringContaining('pg_dump timeout'));
+    expect(console.log).toHaveBeenCalledWith(expect.stringContaining('Stage:'));
+  });
+
+  it('should handle generic (non-lock) errors with exit code 1', async () => {
+    runBackup.execute.mockRejectedValue(new Error('Unexpected crash'));
+
+    await command.run(['test'], {});
+
+    expect(process.exitCode).toBe(1);
+    expect(console.error).toHaveBeenCalledWith(expect.stringContaining('Unexpected crash'));
+  });
+
+  it('should print all checks passed message on dry run success', async () => {
+    runBackup.getDryRunReport.mockResolvedValue({
+      projectName: 'test',
+      checks: [{ name: 'Config loaded', passed: true, message: 'OK' }],
+      allPassed: true,
+    });
+
+    await command.run(['test'], { dryRun: true });
+
+    expect(process.exitCode).toBeUndefined();
+    expect(console.log).toHaveBeenCalledWith(expect.stringContaining('All checks passed'));
+  });
+
+  it('should set no exit code when --all succeeds for all projects', async () => {
+    runBackup.execute.mockResolvedValue([
+      buildResult({ projectName: 'a', status: BackupStatus.Success }),
+      buildResult({ projectName: 'b', status: BackupStatus.Success }),
+    ]);
+
+    await command.run([], { all: true });
+
+    expect(process.exitCode).toBeUndefined();
+  });
 });

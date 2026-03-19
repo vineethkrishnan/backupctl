@@ -1,18 +1,20 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import * as fs from 'fs';
 import * as path from 'path';
+import { randomUUID } from 'crypto';
 
 import { BackupLockPort } from '@domain/backup/application/ports/backup-lock.port';
 import { DumpEncryptorPort } from '@domain/backup/application/ports/dump-encryptor.port';
+import { GpgKeyManagerPort } from '@domain/backup/application/ports/gpg-key-manager.port';
 import { HookExecutorPort } from '@domain/backup/application/ports/hook-executor.port';
 import { LocalCleanupPort } from '@domain/backup/application/ports/local-cleanup.port';
-import { RemoteStoragePort } from '@domain/backup/application/ports/remote-storage.port';
+import { RemoteStorageFactory } from '@domain/backup/application/ports/remote-storage-factory.port';
 import { AuditLogPort } from '@domain/audit/application/ports/audit-log.port';
 import { FallbackWriterPort } from '@domain/audit/application/ports/fallback-writer.port';
 import { NotifierPort } from '@domain/notification/application/ports/notifier.port';
 import { ConfigLoaderPort } from '@domain/config/application/ports/config-loader.port';
 import { ClockPort } from '@common/clock/clock.port';
+import { FileSystemPort } from '@common/filesystem/filesystem.port';
 import { ProjectConfig } from '@domain/config/domain/project-config.model';
 import { BackupResult } from '@domain/backup/domain/backup-result.model';
 import { BackupStage } from '@domain/backup/domain/value-objects/backup-stage.enum';
@@ -24,7 +26,7 @@ import { PruneResult } from '@domain/backup/domain/value-objects/prune-result.mo
 import { SyncResult } from '@domain/backup/domain/value-objects/sync-result.model';
 import { evaluateRetry } from '@domain/backup/domain/policies/retry.policy';
 import { DumperRegistry } from '@domain/backup/application/registries/dumper.registry';
-import { NotifierRegistry } from '@domain/backup/application/registries/notifier.registry';
+import { NotifierRegistry } from '@domain/notification/application/registries/notifier.registry';
 
 import {
   CONFIG_LOADER_PORT,
@@ -35,17 +37,14 @@ import {
   FALLBACK_WRITER_PORT,
   CLOCK_PORT,
   DUMP_ENCRYPTOR_PORT,
+  FILESYSTEM_PORT,
+  GPG_KEY_MANAGER_PORT,
   HOOK_EXECUTOR_PORT,
   LOCAL_CLEANUP_PORT,
   REMOTE_STORAGE_FACTORY,
 } from '@common/di/injection-tokens';
-import { safeExecFile } from '@common/helpers/child-process.util';
 
 import { RunBackupCommand } from './run-backup.command';
-
-export interface RemoteStorageFactory {
-  createStorage(config: ProjectConfig): RemoteStoragePort;
-}
 
 export interface DryRunCheck {
   readonly name: string;
@@ -78,6 +77,8 @@ export class RunBackupUseCase {
     @Inject(HOOK_EXECUTOR_PORT) private readonly hookExecutor: HookExecutorPort,
     @Inject(LOCAL_CLEANUP_PORT) private readonly localCleanup: LocalCleanupPort,
     @Inject(REMOTE_STORAGE_FACTORY) private readonly storageFactory: RemoteStorageFactory,
+    @Inject(FILESYSTEM_PORT) private readonly filesystem: FileSystemPort,
+    @Inject(GPG_KEY_MANAGER_PORT) private readonly gpgKeyManager: GpgKeyManagerPort,
     configService: ConfigService,
   ) {
     this.maxRetries = configService.get<number>('BACKUP_RETRY_COUNT', 3);
@@ -117,6 +118,12 @@ export class RunBackupUseCase {
         retryCount: 0,
         durationMs: 0,
       });
+      return [result];
+    }
+
+    if (command.lockHeldExternally) {
+      const config = this.configLoader.getProject(projectName);
+      const result = await this.executeBackup(config);
       return [result];
     }
 
@@ -177,11 +184,10 @@ export class RunBackupUseCase {
       return { projectName, checks, allPassed: false };
     }
 
-    try {
-      this.dumperRegistry.resolve(config.database.type);
+    if (this.dumperRegistry.has(config.database.type)) {
       checks.push({ name: 'Database dumper', passed: true, message: `Adapter found for database type: ${config.database.type}` });
-    } catch (error) {
-      checks.push({ name: 'Database dumper', passed: false, message: (error as Error).message });
+    } else {
+      checks.push({ name: 'Database dumper', passed: false, message: `No database dumper registered for type: ${config.database.type}` });
     }
 
     try {
@@ -193,7 +199,7 @@ export class RunBackupUseCase {
     }
 
     try {
-      const storage = this.storageFactory.createStorage(config);
+      const storage = this.storageFactory.create(config);
       await storage.listSnapshots();
       checks.push({ name: 'Restic repo', passed: true, message: `Repository accessible at ${config.restic.repositoryPath}` });
     } catch (error) {
@@ -202,9 +208,8 @@ export class RunBackupUseCase {
 
     try {
       const outputDir = path.join(this.baseDir, config.name);
-      const diskCheckDir = fs.existsSync(outputDir) ? outputDir : this.baseDir;
-      const stats = fs.statfsSync(diskCheckDir);
-      const freeGb = (stats.bsize * stats.bavail) / (1024 * 1024 * 1024);
+      const diskCheckDir = this.filesystem.exists(outputDir) ? outputDir : this.baseDir;
+      const freeGb = this.filesystem.diskFreeGb(diskCheckDir);
       const minFreeGb = 5;
       if (freeGb >= minFreeGb) {
         checks.push({ name: 'Disk space', passed: true, message: `${freeGb.toFixed(1)} GB free (minimum: ${minFreeGb} GB)` });
@@ -216,12 +221,14 @@ export class RunBackupUseCase {
     }
 
     if (config.hasEncryption()) {
+      const encryption = config.encryption;
+      if (!encryption) throw new Error('Encryption config required');
       try {
-        const { stdout } = await safeExecFile('gpg', ['--list-keys', config.encryption!.recipient], { timeout: 10000 });
-        if (stdout.length > 0) {
-          checks.push({ name: 'GPG key', passed: true, message: `Key found for recipient: ${config.encryption!.recipient}` });
+        const hasGpgKey = await this.gpgKeyManager.hasKey(encryption.recipient);
+        if (hasGpgKey) {
+          checks.push({ name: 'GPG key', passed: true, message: `Key found for recipient: ${encryption.recipient}` });
         } else {
-          checks.push({ name: 'GPG key', passed: false, message: `No key found for recipient: ${config.encryption!.recipient}` });
+          checks.push({ name: 'GPG key', passed: false, message: `No key found for recipient: ${encryption.recipient}` });
         }
       } catch (error) {
         checks.push({ name: 'GPG key', passed: false, message: `GPG key not found: ${(error as Error).message}` });
@@ -229,7 +236,7 @@ export class RunBackupUseCase {
     }
 
     if (config.hasAssets()) {
-      const missingPaths = config.assets.paths.filter((p) => !fs.existsSync(p));
+      const missingPaths = config.assets.paths.filter((p) => !this.filesystem.exists(p));
       if (missingPaths.length === 0) {
         checks.push({ name: 'Asset paths', passed: true, message: `All ${config.assets.paths.length} asset path(s) exist` });
       } else {
@@ -245,23 +252,33 @@ export class RunBackupUseCase {
     const startedAt = this.clock.now();
     const timestamp = this.clock.timestamp();
 
-    const dumper = this.dumperRegistry.resolve(config.database.type);
+    const dumper = this.dumperRegistry.create(config.database.type, config);
     const notifier = this.resolveNotifier(config);
-    const storage = this.storageFactory.createStorage(config);
+    const storage = this.storageFactory.create(config);
     const outputDir = path.join(this.baseDir, config.name);
-    const runId = await this.auditLog.startRun(config.name);
+
+    // Audit DB outage must not block backups — fall back to a local UUID
+    let runId: string;
+    try {
+      runId = await this.auditLog.startRun(config.name);
+    } catch (error) {
+      runId = randomUUID();
+      this.logger.error(`Audit startRun failed, using local runId ${runId}: ${String(error)}`);
+    }
 
     let timeoutHandle: ReturnType<typeof setTimeout> | undefined;
     if (config.hasTimeout()) {
+      const timeoutMinutes = config.timeoutMinutes;
+      if (timeoutMinutes == null) throw new Error('Timeout config required');
       timeoutHandle = setTimeout(
         () => {
           notifier
-            .notifyWarning(config.name, `Backup exceeded ${config.timeoutMinutes} minute timeout`)
+            .notifyWarning(config.name, `Backup exceeded ${timeoutMinutes} minute timeout`)
             .catch((warningError) => {
-              this.logger.error(`Timeout warning notification failed: ${warningError}`);
+              this.logger.error(`Timeout warning notification failed: ${String(warningError)}`);
             });
         },
-        config.timeoutMinutes! * 60 * 1000,
+        timeoutMinutes * 60 * 1000,
       );
     }
 
@@ -277,13 +294,19 @@ export class RunBackupUseCase {
     let status = BackupStatus.Success;
 
     try {
-      await this.executeStage(BackupStage.NotifyStarted, runId, async () => {
-        await notifier.notifyStarted(config.name);
-      });
+      // Notification failure must not block the backup — log and continue
+      try {
+        await this.executeStage(BackupStage.NotifyStarted, runId, async () => {
+          await notifier.notifyStarted(config.name);
+        });
+      } catch (notifyError) {
+        this.logger.error(`Start notification failed, continuing backup: ${String(notifyError)}`);
+      }
 
-      if (config.hasHooks() && config.hooks!.preBackup) {
+      const preBackup = config.hooks?.preBackup;
+      if (config.hasHooks() && preBackup) {
         await this.executeStage(BackupStage.PreHook, runId, async () => {
-          await this.hookExecutor.execute(config.hooks!.preBackup!);
+          await this.hookExecutor.execute(preBackup);
         });
       }
 
@@ -295,27 +318,33 @@ export class RunBackupUseCase {
       );
 
       if (config.hasVerification()) {
+        if (!dumpResult) throw new BackupStageError(BackupStage.Verify, new Error('No dump result available'), false);
+        const verifyPath = dumpResult.filePath;
         await this.executeRetryableStage<boolean>(
           BackupStage.Verify,
           runId,
-          () => dumper.verify(dumpResult!.filePath),
+          () => dumper.verify(verifyPath),
           (retries) => { totalRetries += retries; },
         );
         verified = true;
       }
 
       if (config.hasEncryption()) {
+        const encryption = config.encryption;
+        if (!encryption) throw new Error('Encryption config required');
+        if (!dumpResult) throw new BackupStageError(BackupStage.Encrypt, new Error('No dump result available'), false);
+        const encryptPath = dumpResult.filePath;
         const encryptedPath = await this.executeRetryableStage<string>(
           BackupStage.Encrypt,
           runId,
-          () => this.encryptor.encrypt(dumpResult!.filePath),
+          () => this.encryptor.encrypt(encryptPath, encryption.recipient),
           (retries) => { totalRetries += retries; },
         );
-        dumpResult = new DumpResult(encryptedPath, dumpResult!.sizeBytes, dumpResult!.durationMs);
+        dumpResult = new DumpResult(encryptedPath, dumpResult.sizeBytes, dumpResult.durationMs);
         encrypted = true;
       }
 
-      const syncPaths = this.buildSyncPaths(dumpResult!.filePath, config, notifier);
+      const syncPaths = this.buildSyncPaths(dumpResult.filePath, config, notifier);
       syncResult = await this.executeRetryableStage<SyncResult>(
         BackupStage.Sync,
         runId,
@@ -341,9 +370,10 @@ export class RunBackupUseCase {
         (retries) => { totalRetries += retries; },
       );
 
-      if (config.hasHooks() && config.hooks!.postBackup) {
+      const postBackup = config.hooks?.postBackup;
+      if (config.hasHooks() && postBackup) {
         await this.executeStage(BackupStage.PostHook, runId, async () => {
-          await this.hookExecutor.execute(config.hooks!.postBackup!);
+          await this.hookExecutor.execute(postBackup);
         });
       }
     } catch (error) {
@@ -444,8 +474,12 @@ export class RunBackupUseCase {
     try {
       await this.auditLog.finishRun(runId, result);
     } catch (error) {
-      this.logger.error(`Audit finalization failed, writing to fallback: ${error}`);
-      await this.fallbackWriter.writeAuditFallback(result);
+      this.logger.error(`Audit finalization failed, writing to fallback: ${String(error)}`);
+      try {
+        await this.fallbackWriter.writeAuditFallback(result);
+      } catch (fallbackError) {
+        this.logger.error(`Audit fallback also failed — result lost for runId ${runId}: ${String(fallbackError)}`);
+      }
     }
   }
 
@@ -468,11 +502,15 @@ export class RunBackupUseCase {
         );
       }
     } catch (error) {
-      this.logger.error(`Notification failed, writing to fallback: ${error}`);
-      await this.fallbackWriter.writeNotificationFallback(
-        result.status === BackupStatus.Success ? 'success' : 'failure',
-        { projectName, result },
-      );
+      this.logger.error(`Notification failed, writing to fallback: ${String(error)}`);
+      try {
+        await this.fallbackWriter.writeNotificationFallback(
+          result.status === BackupStatus.Success ? 'success' : 'failure',
+          { projectName, result },
+        );
+      } catch (fallbackError) {
+        this.logger.error(`Notification fallback also failed for ${projectName}: ${String(fallbackError)}`);
+      }
     }
   }
 
@@ -490,14 +528,14 @@ export class RunBackupUseCase {
 
     if (config.hasAssets()) {
       for (const assetPath of config.assets.paths) {
-        if (fs.existsSync(assetPath)) {
+        if (this.filesystem.exists(assetPath)) {
           syncPaths.push(assetPath);
         } else {
           this.logger.warn(`Asset path not found, skipping: ${assetPath}`);
           notifier
             .notifyWarning(config.name, `Missing asset path: ${assetPath}`)
             .catch((warningError) => {
-              this.logger.error(`Warning notification failed: ${warningError}`);
+              this.logger.error(`Warning notification failed: ${String(warningError)}`);
             });
         }
       }

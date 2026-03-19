@@ -7,13 +7,13 @@ import { formatDuration } from '@common/helpers/format.util';
   description: 'Check health of all backupctl components',
 })
 export class HealthCommand extends CommandRunner {
-  constructor(private readonly checkHealth: CheckHealthUseCase) {
+  constructor(private readonly healthUseCase: CheckHealthUseCase) {
     super();
   }
 
   async run(_params: string[]): Promise<void> {
     try {
-      const result = await this.checkHealth.checkHealth();
+      const result = await this.healthUseCase.execute();
       const isHealthy = result.isHealthy();
 
       console.log(isHealthy ? 'System healthy' : 'System unhealthy');

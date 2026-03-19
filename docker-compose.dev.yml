@@ -8,14 +8,22 @@ services:
     environment:
       AUDIT_DB_HOST: backupctl-audit-db
       NODE_ENV: development
+      # Relay: socat on Mac host bridges IPv4:2323 → IPv6:Hetzner:23
+      # Required because ISP blocks port 23 on IPv4 and Colima VM has no IPv6
+      HETZNER_SSH_HOST: host.docker.internal
+      HETZNER_SSH_PORT: "2323"
     ports:
       - '${APP_PORT:-3100}:${APP_PORT:-3100}'
     volumes:
       - ./src:/app/src
       - ./config:/app/config:ro
       - ./test:/app/test
-      - ./ssh-keys:/root/.ssh:ro
+      - ./ssh-keys:/home/node/.ssh:ro
       - ./gpg-keys:/app/gpg-keys:ro
+      - ./eslint.config.mjs:/app/eslint.config.mjs:ro
+      - ./knip.json:/app/knip.json:ro
+      - ./.jscpd.json:/app/.jscpd.json:ro
+      - ./tmp:/data/backups
     networks:
       - backupctl-network
     depends_on:
@@ -37,14 +45,40 @@ services:
     networks:
       - backupctl-network
     healthcheck:
-      test: ['CMD-SHELL', 'pg_isready -U ${AUDIT_DB_USER:-audit_user} -d ${AUDIT_DB_NAME:-backup_audit}']
+      test:
+        [
+          'CMD-SHELL',
+          'pg_isready -U ${AUDIT_DB_USER:-audit_user} -d ${AUDIT_DB_NAME:-backup_audit}',
+        ]
       interval: 5s
       timeout: 3s
       retries: 5
     restart: unless-stopped
 
+  pgadmin:
+    container_name: backupctl-pgadmin
+    image: dpage/pgadmin4:latest
+    environment:
+      PGADMIN_DEFAULT_EMAIL: vineeth.nk@locaboo.com
+      PGADMIN_DEFAULT_PASSWORD: admin
+      PGADMIN_LISTEN_PORT: 5050
+      PGADMIN_CONFIG_SERVER_MODE: 'False'
+      PGADMIN_CONFIG_MASTER_PASSWORD_REQUIRED: 'False'
+    ports:
+      - '${PGADMIN_PORT:-5050}:5050'
+    volumes:
+      - backupctl-pgadmin-data:/var/lib/pgadmin
+      - ./config/pgadmin-servers.json:/pgadmin4/servers.json:ro
+    networks:
+      - backupctl-network
+    depends_on:
+      backupctl-audit-db:
+        condition: service_healthy
+    restart: unless-stopped
+
 volumes:
   backupctl-audit-data:
+  backupctl-pgadmin-data:
 
 networks:
   backupctl-network:

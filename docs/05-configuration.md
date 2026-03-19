@@ -34,7 +34,8 @@ Configuration changes are never hot-reloaded. After modifying either file, run `
 |----------|---------|-------------|
 | `HETZNER_SSH_HOST` | — | **Required.** Storage box hostname (e.g., `u123456.your-storagebox.de`) |
 | `HETZNER_SSH_USER` | — | **Required.** Storage box SSH user (e.g., `u123456`) |
-| `HETZNER_SSH_KEY_PATH` | `/root/.ssh/id_rsa` | Path to SSH private key inside the container |
+| `HETZNER_SSH_PORT` | `23` | SSH port for the storage box |
+| `HETZNER_SSH_KEY_PATH` | `/home/node/.ssh/id_ed25519` | Path to SSH private key inside the container |
 
 ### Restic
 
@@ -113,6 +114,7 @@ The file defines an array of projects under the `projects` key. Each project has
 | `enabled` | boolean | no | `true` | Whether this project is active. Disabled projects are skipped by the scheduler and `run --all` |
 | `cron` | string | yes | — | 5-field cron expression defining the backup schedule |
 | `timeout_minutes` | number | no | — | If set, a warning notification fires when the backup exceeds this duration. The backup continues running |
+| `docker_network` | string | no | — | Docker network name where this project's database is reachable. On startup, backupctl auto-connects to this network. If omitted, the database is assumed reachable via the host or an already-connected network |
 
 ### Database
 
@@ -313,6 +315,7 @@ projects:
     enabled: true
     cron: "0 0 * * *"
     timeout_minutes: 30
+    docker_network: locaboo_locaboo-network
 
     database:
       type: postgres

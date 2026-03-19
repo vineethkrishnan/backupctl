@@ -1,0 +1,15 @@
+{
+  "$schema": "https://unpkg.com/knip@latest/schema.json",
+  "entry": [
+    "src/main.ts",
+    "src/cli.ts",
+    "src/db/datasource.ts",
+    "src/db/migrations/*.ts",
+    "src/config/typeorm.config.ts"
+  ],
+  "project": ["src/**/*.ts"],
+  "ignoreDependencies": [
+    "cron"
+  ],
+  "ignoreExportsUsedInFile": true
+}

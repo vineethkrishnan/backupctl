@@ -23,12 +23,18 @@ describe('FileBackupLockAdapter', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+
+    // Default: make constants available
+    (fs.constants as Record<string, number>).O_CREAT = 0o100;
+    (fs.constants as Record<string, number>).O_EXCL = 0o200;
+    (fs.constants as Record<string, number>).O_WRONLY = 0o1;
+
     adapter = new FileBackupLockAdapter(createConfigService());
   });
 
   describe('acquire', () => {
-    it('should create lock file and return true when not locked', async () => {
-      mockFs.existsSync.mockReturnValue(false);
+    it('should create lock file atomically and return true when not locked', async () => {
+      mockFs.openSync.mockReturnValue(42);
 
       const result = await adapter.acquire('myproject');
 
@@ -36,20 +42,37 @@ describe('FileBackupLockAdapter', () => {
       expect(mockFs.mkdirSync).toHaveBeenCalledWith('/data/backups/myproject', {
         recursive: true,
       });
-      expect(mockFs.writeFileSync).toHaveBeenCalledWith(
+      expect(mockFs.openSync).toHaveBeenCalledWith(
         lockPath,
-        expect.any(String),
-        'utf-8',
+        fs.constants.O_CREAT | fs.constants.O_EXCL | fs.constants.O_WRONLY,
       );
+      expect(mockFs.writeSync).toHaveBeenCalledWith(42, expect.any(String));
+      expect(mockFs.closeSync).toHaveBeenCalledWith(42);
     });
 
-    it('should return false when lock already exists', async () => {
-      mockFs.existsSync.mockReturnValue(true);
+    it('should return false when lock already exists (O_EXCL fails)', async () => {
+      mockFs.openSync.mockImplementation(() => {
+        const err = new Error('EEXIST: file already exists') as NodeJS.ErrnoException;
+        err.code = 'EEXIST';
+        throw err;
+      });
 
       const result = await adapter.acquire('myproject');
 
       expect(result).toBe(false);
-      expect(mockFs.writeFileSync).not.toHaveBeenCalled();
+      expect(mockFs.writeSync).not.toHaveBeenCalled();
+    });
+
+    it('should still acquire lock and close fd when writeSync fails', async () => {
+      mockFs.openSync.mockReturnValueOnce(99);
+      mockFs.writeSync.mockImplementationOnce(() => {
+        throw new Error('disk full');
+      });
+
+      const result = await adapter.acquire('myproject');
+
+      expect(result).toBe(true);
+      expect(mockFs.closeSync).toHaveBeenCalledWith(99);
     });
   });
 
@@ -86,24 +109,27 @@ describe('FileBackupLockAdapter', () => {
 
   describe('acquireOrQueue', () => {
     it('should acquire immediately when not locked', async () => {
-      mockFs.existsSync.mockReturnValue(false);
+      mockFs.openSync.mockReturnValue(1);
 
       await adapter.acquireOrQueue('myproject');
 
-      expect(mockFs.writeFileSync).toHaveBeenCalledTimes(1);
+      expect(mockFs.openSync).toHaveBeenCalledTimes(1);
     });
 
     it('should poll until lock is released then acquire', async () => {
       let callCount = 0;
-      mockFs.existsSync.mockImplementation(() => {
+      mockFs.openSync.mockImplementation(() => {
         callCount++;
-        // First two calls: locked. Third call: unlocked.
-        return callCount <= 2;
+        if (callCount <= 2) {
+          const err = new Error('EEXIST') as NodeJS.ErrnoException;
+          err.code = 'EEXIST';
+          throw err;
+        }
+        return 1;
       });
 
       await adapter.acquireOrQueue('myproject');
 
-      expect(mockFs.writeFileSync).toHaveBeenCalledTimes(1);
       expect(callCount).toBe(3);
     }, 10000);
   });

@@ -23,8 +23,8 @@ import { HealthCheckResult } from '@domain/audit/domain/health-check-result.mode
 import { SnapshotInfo } from '@domain/backup/domain/value-objects/snapshot-info.model';
 import { ProjectConfig } from '@domain/config/domain/project-config.model';
 import { RetentionPolicy } from '@domain/config/domain/retention-policy.model';
-import { GpgKeyManager } from '@domain/backup/infrastructure/adapters/encryptors/gpg-key-manager';
-import { CONFIG_LOADER_PORT } from '@common/di/injection-tokens';
+import { GpgKeyManagerPort } from '@domain/backup/application/ports/gpg-key-manager.port';
+import { CONFIG_LOADER_PORT, GPG_KEY_MANAGER_PORT } from '@common/di/injection-tokens';
 
 jest.setTimeout(30000);
 
@@ -87,7 +87,7 @@ describe('CLI commands (integration)', () => {
   let mockHealthCheck: jest.Mocked<CheckHealthUseCase>;
   let mockSnapshotManagement: jest.Mocked<ListSnapshotsUseCase>;
   let mockConfigLoader: jest.Mocked<ConfigLoaderPort>;
-  let mockGpgKeyManager: jest.Mocked<GpgKeyManager>;
+  let mockGpgKeyManager: jest.Mocked<GpgKeyManagerPort>;
 
   beforeEach(async () => {
     mockOrchestrator = {
@@ -96,7 +96,7 @@ describe('CLI commands (integration)', () => {
     } as unknown as jest.Mocked<RunBackupUseCase>;
 
     mockHealthCheck = {
-      checkHealth: jest.fn(),
+      execute: jest.fn(),
     } as unknown as jest.Mocked<CheckHealthUseCase>;
 
     mockSnapshotManagement = {
@@ -112,8 +112,10 @@ describe('CLI commands (integration)', () => {
 
     mockGpgKeyManager = {
       importKey: jest.fn().mockResolvedValue(undefined),
-      importKeysFromDir: jest.fn().mockResolvedValue(undefined),
-    } as unknown as jest.Mocked<GpgKeyManager>;
+      importAllFromDirectory: jest.fn().mockResolvedValue([]),
+      listKeys: jest.fn().mockResolvedValue(''),
+      hasKey: jest.fn().mockResolvedValue(true),
+    } as jest.Mocked<GpgKeyManagerPort>;
 
     process.exitCode = undefined;
     jest.spyOn(console, 'log').mockImplementation();
@@ -134,7 +136,7 @@ describe('CLI commands (integration)', () => {
         { provide: CheckHealthUseCase, useValue: mockHealthCheck },
         { provide: ListSnapshotsUseCase, useValue: mockSnapshotManagement },
         { provide: CONFIG_LOADER_PORT, useValue: mockConfigLoader },
-        { provide: GpgKeyManager, useValue: mockGpgKeyManager },
+        { provide: GPG_KEY_MANAGER_PORT, useValue: mockGpgKeyManager },
       ],
     }).compile();
   });
@@ -181,18 +183,18 @@ describe('CLI commands (integration)', () => {
 
   describe('health command', () => {
     it('should call health check and display results', async () => {
-      mockHealthCheck.checkHealth.mockResolvedValue(
+      mockHealthCheck.execute.mockResolvedValue(
         new HealthCheckResult(true, true, 50, true, true, true, 3600),
       );
 
       await CommandTestFactory.run(commandModule, ['health']);
 
-      expect(mockHealthCheck.checkHealth).toHaveBeenCalled();
+      expect(mockHealthCheck.execute).toHaveBeenCalled();
       expect(console.log).toHaveBeenCalledWith('System healthy');
     });
 
     it('should report unhealthy when audit DB is down', async () => {
-      mockHealthCheck.checkHealth.mockResolvedValue(
+      mockHealthCheck.execute.mockResolvedValue(
         new HealthCheckResult(false, true, 50, true, true, true, 3600),
       );
 

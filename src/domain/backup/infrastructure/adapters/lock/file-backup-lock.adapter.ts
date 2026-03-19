@@ -16,18 +16,29 @@ export class FileBackupLockAdapter implements BackupLockPort {
     this.baseDir = configService.get<string>('BACKUP_BASE_DIR', '/data/backups');
   }
 
-  async acquire(projectName: string): Promise<boolean> {
+  acquire(projectName: string): Promise<boolean> {
     const lockPath = this.lockFilePath(projectName);
-
-    if (fs.existsSync(lockPath)) {
-      return false;
-    }
-
     const projectDir = path.dirname(lockPath);
     fs.mkdirSync(projectDir, { recursive: true });
-    fs.writeFileSync(lockPath, new Date().toISOString(), 'utf-8');
 
-    return true;
+    // Atomic lock: O_CREAT | O_EXCL fails if file already exists — race-safe
+    let fd: number;
+    try {
+      fd = fs.openSync(lockPath, fs.constants.O_CREAT | fs.constants.O_EXCL | fs.constants.O_WRONLY);
+    } catch {
+      return Promise.resolve(false);
+    }
+
+    // Timestamp is informational — lock is the file's existence, not its content
+    try {
+      fs.writeSync(fd, new Date().toISOString());
+    } catch {
+      // Non-critical: lock file was already created by O_EXCL
+    } finally {
+      fs.closeSync(fd);
+    }
+
+    return Promise.resolve(true);
   }
 
   async acquireOrQueue(projectName: string): Promise<void> {
@@ -36,7 +47,7 @@ export class FileBackupLockAdapter implements BackupLockPort {
     }
   }
 
-  async release(projectName: string): Promise<void> {
+  release(projectName: string): Promise<void> {
     const lockPath = this.lockFilePath(projectName);
 
     try {
@@ -44,6 +55,7 @@ export class FileBackupLockAdapter implements BackupLockPort {
     } catch {
       // Lock file already removed — safe to ignore
     }
+    return Promise.resolve();
   }
 
   isLocked(projectName: string): boolean {

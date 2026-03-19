@@ -1,4 +1,5 @@
 import {
+  ConfigCommand,
   ConfigValidateSubCommand,
   ConfigShowSubCommand,
   ConfigReloadSubCommand,
@@ -197,5 +198,19 @@ describe('ConfigImportGpgKeySubCommand', () => {
     await command.run(['/keys/bad.gpg']);
 
     expect(process.exitCode).toBe(1);
+  });
+});
+
+describe('ConfigCommand', () => {
+  it('should print usage message', async () => {
+    jest.spyOn(console, 'log').mockImplementation();
+    const cmd = new ConfigCommand();
+
+    await cmd.run([]);
+
+    expect(console.log).toHaveBeenCalledWith(
+      expect.stringContaining('Usage: backupctl config'),
+    );
+    jest.restoreAllMocks();
   });
 });

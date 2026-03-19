@@ -12,23 +12,25 @@
 | 4  | [Installation](04-installation.md) | Setup wizard, Docker deployment, first-run verification |
 | 5  | [Configuration](05-configuration.md) | Project YAML format, `.env` globals, config resolution, examples |
 | 6  | [CLI Reference](06-cli-reference.md) | All 14 commands with flags, arguments, exit codes, and examples |
-| 7  | [Bash Scripts](07-bash-scripts.md) | Host-side `deploy.sh` and `backupctl-manage.sh` usage |
+| 7  | [Bash Scripts](07-bash-scripts.md) | Host-side scripts: `install.sh`, `dev.sh`, `backupctl-manage.sh` |
 | 8  | [Backup Flow](08-backup-flow.md) | The 11-step orchestration pipeline in detail |
 | 9  | [Restore Guide](09-restore-guide.md) | Snapshot browsing, file restore, database import, `--guide` mode |
 | 10 | [Cheatsheet](10-cheatsheet.md) | Quick-reference commands for daily operations |
 | 11 | [Adding Adapters](11-adding-adapters.md) | How to add new database dumpers, notifiers, or storage backends |
 | 12 | [Troubleshooting](12-troubleshooting.md) | Common errors, diagnostics, recovery procedures |
-| 13 | [Development](13-development.md) | Docker dev environment, hot reload, local setup, testing |
+| 13 | [Development](13-development.md) | Docker dev environment, networking, socat relay, testing, static analysis |
 | 14 | [Migrations](14-migrations.md) | TypeORM migration commands, patterns, and troubleshooting |
+| 15 | [FAQ](15-faq.md) | Setup issues, Docker networking, ISP port blocking, SSH/GPG/restic fixes |
 
 ## Quick Links
 
-- **First-time setup** — [Installation](04-installation.md)
-- **Configure a project** — [Configuration](05-configuration.md)
+- **First-time production setup** — [Installation](04-installation.md) + [FAQ](15-faq.md)
+- **Development setup** — [Development Guide](13-development.md) (Docker, networking, socat relay, testing)
+- **Configure a project** — [Configuration](05-configuration.md) (YAML format, docker_network, all fields)
 - **Run a backup** — [CLI Reference → `run`](06-cli-reference.md)
 - **Restore from snapshot** — [Restore Guide](09-restore-guide.md)
 - **Daily commands** — [Cheatsheet](10-cheatsheet.md)
-- **Development** — [Dev environment & testing](13-development.md)
+- **Host scripts** — [Bash Scripts](07-bash-scripts.md) (`dev.sh`, `install.sh`, `backupctl-manage.sh`)
 - **Database migrations** — [TypeORM migration guide](14-migrations.md)
 
 ## Getting Help

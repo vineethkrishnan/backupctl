@@ -6,6 +6,7 @@ import { GetFailedLogsUseCase } from './application/use-cases/get-failed-logs/ge
 import { RecoverStartupUseCase } from './application/use-cases/recover-startup/recover-startup.use-case';
 
 import { TypeormAuditLogRepository } from './infrastructure/persistence/typeorm/typeorm-audit-log.repository';
+import { BackupLogMapper } from './infrastructure/persistence/typeorm/mappers/backup-log.mapper';
 import { JsonlFallbackWriterAdapter } from './infrastructure/persistence/fallback/jsonl-fallback-writer.adapter';
 import { BackupLogRecord } from './infrastructure/persistence/typeorm/schema/backup-log.record';
 
@@ -23,6 +24,9 @@ import { AUDIT_LOG_PORT, FALLBACK_WRITER_PORT } from '@common/di/injection-token
     GetBackupStatusUseCase,
     GetFailedLogsUseCase,
     RecoverStartupUseCase,
+
+    // Mappers
+    BackupLogMapper,
 
     // Port bindings
     { provide: AUDIT_LOG_PORT, useClass: TypeormAuditLogRepository },

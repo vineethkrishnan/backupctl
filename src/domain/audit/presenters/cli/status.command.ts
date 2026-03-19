@@ -2,6 +2,7 @@ import { Command, CommandRunner, Option } from 'nest-commander';
 import { GetBackupStatusUseCase } from '@domain/audit/application/use-cases/get-backup-status/get-backup-status.use-case';
 import { GetBackupStatusQuery } from '@domain/audit/application/use-cases/get-backup-status/get-backup-status.query';
 import { BackupResult } from '@domain/backup/domain/backup-result.model';
+import { BackupStatus } from '@domain/backup/domain/value-objects/backup-status.enum';
 import { formatDuration } from '@common/helpers/format.util';
 
 interface StatusOptions { last?: number; }
@@ -36,7 +37,7 @@ export class StatusCommand extends CommandRunner {
     console.log('─'.repeat(80));
 
     for (const result of results) {
-      const icon = result.status === 'success' ? '✓' : '✗';
+      const icon = result.status === BackupStatus.Success ? '✓' : '✗';
       console.log(
         `${icon} ${result.projectName.padEnd(18)}` +
           `${result.status.padEnd(12)}` +

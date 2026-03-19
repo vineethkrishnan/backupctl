@@ -1,6 +1,3 @@
-export const DATABASE_DUMPER_PORT = Symbol('DATABASE_DUMPER_PORT');
-export const REMOTE_STORAGE_PORT = Symbol('REMOTE_STORAGE_PORT');
-export const NOTIFIER_PORT = Symbol('NOTIFIER_PORT');
 export const LOCAL_CLEANUP_PORT = Symbol('LOCAL_CLEANUP_PORT');
 export const DUMP_ENCRYPTOR_PORT = Symbol('DUMP_ENCRYPTOR_PORT');
 export const HOOK_EXECUTOR_PORT = Symbol('HOOK_EXECUTOR_PORT');
@@ -9,6 +6,9 @@ export const FALLBACK_WRITER_PORT = Symbol('FALLBACK_WRITER_PORT');
 export const BACKUP_LOCK_PORT = Symbol('BACKUP_LOCK_PORT');
 export const CONFIG_LOADER_PORT = Symbol('CONFIG_LOADER_PORT');
 export const CLOCK_PORT = Symbol('CLOCK_PORT');
+export const FILESYSTEM_PORT = Symbol('FILESYSTEM_PORT');
+export const SYSTEM_HEALTH_PORT = Symbol('SYSTEM_HEALTH_PORT');
+export const GPG_KEY_MANAGER_PORT = Symbol('GPG_KEY_MANAGER_PORT');
 export const DUMPER_REGISTRY = Symbol('DUMPER_REGISTRY');
 export const NOTIFIER_REGISTRY = Symbol('NOTIFIER_REGISTRY');
 export const REMOTE_STORAGE_FACTORY = Symbol('REMOTE_STORAGE_FACTORY');

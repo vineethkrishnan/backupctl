@@ -4,6 +4,7 @@ import { GetBackupStatusQuery } from '@domain/audit/application/use-cases/get-ba
 import { GetFailedLogsUseCase } from '@domain/audit/application/use-cases/get-failed-logs/get-failed-logs.use-case';
 import { GetFailedLogsQuery } from '@domain/audit/application/use-cases/get-failed-logs/get-failed-logs.query';
 import { BackupResult } from '@domain/backup/domain/backup-result.model';
+import { BackupStatus } from '@domain/backup/domain/value-objects/backup-status.enum';
 import { formatDuration } from '@common/helpers/format.util';
 
 interface LogsOptions { last?: number; failed?: boolean; }
@@ -50,7 +51,7 @@ export class LogsCommand extends CommandRunner {
   }
 
   private printEntry(result: BackupResult): void {
-    const icon = result.status === 'success' ? '✓' : '✗';
+    const icon = result.status === BackupStatus.Success ? '✓' : '✗';
     const duration = formatDuration(result.durationMs);
 
     console.log(

@@ -10,7 +10,7 @@ PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 COMPOSE_FILE="$PROJECT_DIR/docker-compose.dev.yml"
 CONTAINER="backupctl-dev"
 DB_CONTAINER="backupctl-audit-db"
-DATASOURCE="src/domain/audit/infrastructure/persistence/typeorm/data-source.ts"
+DATASOURCE="src/db/datasource.ts"
 TYPEORM="npx ts-node -r tsconfig-paths/register ./node_modules/typeorm/cli.js"
 
 cd "$PROJECT_DIR"
@@ -45,6 +45,36 @@ require_running() {
   fi
 }
 
+# Connect the backupctl container to each project's docker_network (if specified).
+# Projects without docker_network are assumed reachable via the host.
+connect_project_networks() {
+  local config_file="$PROJECT_DIR/config/projects.yml"
+  [ -f "$config_file" ] || return 0
+
+  local networks
+  networks=$(grep 'docker_network:' "$config_file" 2>/dev/null \
+    | awk '{print $2}' | tr -d '"' | tr -d "'") || return 0
+
+  for network in $networks; do
+    [ -z "$network" ] && continue
+
+    if ! docker network ls --format '{{.Name}}' | grep -q "^${network}$"; then
+      warn "Docker network '$network' not found — skipping"
+      continue
+    fi
+
+    # Skip if already connected
+    if docker inspect "$CONTAINER" --format '{{json .NetworkSettings.Networks}}' 2>/dev/null \
+        | grep -q "\"${network}\""; then
+      continue
+    fi
+
+    docker network connect "$network" "$CONTAINER" 2>/dev/null \
+      && ok "Connected to network: $network" \
+      || warn "Failed to connect to network: $network"
+  done
+}
+
 # ════════════════════════════════════════════════════════════
 # Commands
 # ════════════════════════════════════════════════════════════
@@ -62,11 +92,20 @@ cmd_up() {
   fi
 
   dc up --build -d
+  connect_project_networks
   echo ""
   ok "Dev environment started"
+  echo ""
+  echo -e "  ${BOLD}Services${RESET}"
   info "App:      http://localhost:${APP_PORT:-3100}"
+  info "pgAdmin:  http://localhost:${PGADMIN_PORT:-5050}"
   info "Audit DB: localhost:${AUDIT_DB_PORT:-5432}"
+  echo ""
+  echo -e "  ${BOLD}Commands${RESET}"
   info "Logs:     $0 logs"
+  info "CLI:      $0 cli <command>"
+  info "Shell:    $0 shell"
+  info "Stop:     $0 down"
 }
 
 # ── down: Stop dev environment ───────────────────────────────
@@ -83,6 +122,7 @@ cmd_restart() {
   echo -e "${BOLD}Restarting dev environment...${RESET}"
   dc down
   dc up --build -d
+  connect_project_networks
   echo ""
   ok "Dev environment restarted"
 }
@@ -117,6 +157,12 @@ cmd_status() {
     ok "Audit DB:       ${GREEN}running${RESET}"
   else
     err "Audit DB:       ${RED}stopped${RESET}"
+  fi
+
+  if is_running "backupctl-pgadmin"; then
+    ok "pgAdmin:        ${GREEN}running${RESET}  http://localhost:${PGADMIN_PORT:-5050}"
+  else
+    err "pgAdmin:        ${RED}stopped${RESET}"
   fi
 
   echo ""
@@ -181,6 +227,48 @@ cmd_lint() {
   else
     docker exec "$CONTAINER" npm run lint:check
   fi
+}
+
+# ── analyze: Run full static analysis ────────────────────────
+
+cmd_analyze() {
+  require_running
+  local target="${1:-all}"
+
+  echo -e "${BOLD}Running static analysis...${RESET}"
+  echo ""
+
+  case "$target" in
+    dead-code)
+      echo -e "  ${BOLD}Dead code detection (knip)${RESET}"
+      docker exec "$CONTAINER" npm run lint:dead-code
+      ;;
+    duplicates)
+      echo -e "  ${BOLD}Code duplication (jscpd)${RESET}"
+      docker exec "$CONTAINER" npm run lint:duplicates
+      ;;
+    strict)
+      echo -e "  ${BOLD}Strict type-safety (eslint)${RESET}"
+      docker exec "$CONTAINER" npm run lint:strict
+      ;;
+    all)
+      echo -e "  ${BOLD}[1/3] ESLint + type-safety${RESET}"
+      docker exec "$CONTAINER" npm run lint:check || true
+      echo ""
+      echo -e "  ${BOLD}[2/3] Dead code detection (knip)${RESET}"
+      docker exec "$CONTAINER" npm run lint:dead-code || true
+      echo ""
+      echo -e "  ${BOLD}[3/3] Code duplication (jscpd)${RESET}"
+      docker exec "$CONTAINER" npm run lint:duplicates || true
+      echo ""
+      ok "Analysis complete"
+      ;;
+    *)
+      err "Unknown target: $target"
+      info "Usage: $0 analyze [dead-code|duplicates|strict|all]"
+      exit 1
+      ;;
+  esac
 }
 
 # ── reset: Destroy volumes and recreate ──────────────────────
@@ -261,10 +349,10 @@ cmd_migrate_generate() {
   echo -e "${BOLD}Generating migration: ${name}${RESET}"
   docker exec "$CONTAINER" $TYPEORM migration:generate \
     -d "$DATASOURCE" \
-    "src/domain/audit/infrastructure/persistence/typeorm/migrations/${name}"
+    "src/db/migrations/${name}"
   echo ""
   ok "Migration generated"
-  info "Review the file in src/domain/audit/infrastructure/persistence/typeorm/migrations/"
+  info "Review the file in src/db/migrations/"
 }
 
 # ── migrate:create: Create empty migration ───────────────────
@@ -281,7 +369,7 @@ cmd_migrate_create() {
   require_running
   echo -e "${BOLD}Creating empty migration: ${name}${RESET}"
   docker exec "$CONTAINER" $TYPEORM migration:create \
-    "src/domain/audit/infrastructure/persistence/typeorm/migrations/${name}"
+    "src/db/migrations/${name}"
   echo ""
   ok "Empty migration created"
   info "Fill in the up() and down() methods"
@@ -308,6 +396,7 @@ usage() {
   echo -e "  ${CYAN}cli${RESET} <command> [args]      Run backupctl CLI command"
   echo -e "  ${CYAN}test${RESET} [watch|cov|e2e]      Run tests"
   echo -e "  ${CYAN}lint${RESET} [fix]                Run linter (fix = autofix)"
+  echo -e "  ${CYAN}analyze${RESET} [target]          Static analysis (dead-code|duplicates|strict|all)"
   echo ""
   echo -e "${BOLD}Database${RESET}"
   echo -e "  ${CYAN}db:shell${RESET}                  Open psql shell to audit database"
@@ -326,6 +415,8 @@ usage() {
   echo -e "  ${DIM}$0 test watch${RESET}                           # Tests in watch mode"
   echo -e "  ${DIM}$0 migrate:generate AddTagsColumn${RESET}       # Generate migration"
   echo -e "  ${DIM}$0 migrate:show${RESET}                         # Check migration status"
+  echo -e "  ${DIM}$0 analyze${RESET}                               # Full static analysis"
+  echo -e "  ${DIM}$0 analyze dead-code${RESET}                    # Find unused exports/files"
   echo -e "  ${DIM}$0 db:shell${RESET}                             # Open psql"
   echo -e "  ${DIM}$0 reset${RESET}                                # Fresh database"
   echo ""
@@ -342,11 +433,13 @@ if [ -f "$PROJECT_DIR/.env" ]; then
   AUDIT_DB_PORT=$(grep -E '^AUDIT_DB_PORT=' "$PROJECT_DIR/.env" 2>/dev/null | cut -d= -f2 || echo "5432")
   AUDIT_DB_USER=$(grep -E '^AUDIT_DB_USER=' "$PROJECT_DIR/.env" 2>/dev/null | cut -d= -f2 || echo "audit_user")
   AUDIT_DB_NAME=$(grep -E '^AUDIT_DB_NAME=' "$PROJECT_DIR/.env" 2>/dev/null | cut -d= -f2 || echo "backup_audit")
+  PGADMIN_PORT=$(grep -E '^PGADMIN_PORT=' "$PROJECT_DIR/.env" 2>/dev/null | cut -d= -f2 || echo "5050")
 fi
 APP_PORT="${APP_PORT:-3100}"
 AUDIT_DB_PORT="${AUDIT_DB_PORT:-5432}"
 AUDIT_DB_USER="${AUDIT_DB_USER:-audit_user}"
 AUDIT_DB_NAME="${AUDIT_DB_NAME:-backup_audit}"
+PGADMIN_PORT="${PGADMIN_PORT:-5050}"
 
 COMMAND="${1:-}"
 shift 2>/dev/null || true
@@ -362,6 +455,7 @@ case "$COMMAND" in
   cli)               cmd_cli "$@" ;;
   test)              cmd_test "$@" ;;
   lint)              cmd_lint "$@" ;;
+  analyze)           cmd_analyze "$@" ;;
   db:shell)          cmd_db_shell ;;
   migrate:run)       cmd_migrate_run ;;
   migrate:revert)    cmd_migrate_revert ;;

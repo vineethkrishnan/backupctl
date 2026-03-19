@@ -7,7 +7,15 @@ const config: Config = {
   transform: {
     '^.+\\.ts$': 'ts-jest',
   },
-  collectCoverageFrom: ['src/**/*.ts', '!src/**/*.module.ts', '!src/main.ts', '!src/cli.ts'],
+  collectCoverageFrom: [
+    'src/**/*.ts',
+    '!src/**/*.module.ts',
+    '!src/main.ts',
+    '!src/cli.ts',
+    '!src/config/typeorm.config.ts',
+    '!src/common/helpers/dev-banner.util.ts',
+    '!src/db/**',
+  ],
   coverageDirectory: './coverage',
   testEnvironment: 'node',
   moduleNameMapper: {

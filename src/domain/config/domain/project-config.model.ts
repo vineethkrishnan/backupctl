@@ -5,6 +5,7 @@ export interface ProjectConfigParams {
   readonly enabled: boolean;
   readonly cron: string;
   readonly timeoutMinutes: number | null;
+  readonly dockerNetwork?: string | null;
   readonly database: {
     readonly type: string;
     readonly host: string;
@@ -32,6 +33,7 @@ export class ProjectConfig {
   readonly enabled: boolean;
   readonly cron: string;
   readonly timeoutMinutes: number | null;
+  readonly dockerNetwork: string | null;
   readonly database: {
     readonly type: string;
     readonly host: string;
@@ -62,6 +64,7 @@ export class ProjectConfig {
     this.enabled = params.enabled;
     this.cron = params.cron;
     this.timeoutMinutes = params.timeoutMinutes;
+    this.dockerNetwork = params.dockerNetwork ?? null;
     this.database = params.database;
     this.compression = params.compression;
     this.assets = params.assets;
@@ -74,7 +77,7 @@ export class ProjectConfig {
   }
 
   hasEncryption(): boolean {
-    return this.encryption != null && this.encryption.enabled;
+    return (this.encryption?.enabled) ?? false;
   }
 
   hasHooks(): boolean {

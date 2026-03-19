@@ -3,11 +3,11 @@ import { CheckHealthUseCase } from '@domain/health/application/use-cases/check-h
 
 @Controller('health')
 export class HealthController {
-  constructor(private readonly checkHealth: CheckHealthUseCase) {}
+  constructor(private readonly healthUseCase: CheckHealthUseCase) {}
 
   @Get()
   async check() {
-    const result = await this.checkHealth.checkHealth();
+    const result = await this.healthUseCase.execute();
 
     return {
       status: result.isHealthy() ? 'healthy' : 'unhealthy',

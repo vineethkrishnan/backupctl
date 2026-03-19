@@ -68,10 +68,10 @@ Startup recovery also auto-unlocks restic repos on container start.
 docker exec backupctl ssh -T -o ConnectTimeout=5 user@storage-box.example.com
 
 # Check known_hosts
-docker exec backupctl cat /root/.ssh/known_hosts
+docker exec backupctl cat /home/node/.ssh/known_hosts
 
 # Check key permissions
-docker exec backupctl ls -la /root/.ssh/
+docker exec backupctl ls -la /home/node/.ssh/
 ```
 
 **Fix:**
@@ -81,14 +81,14 @@ docker exec backupctl ls -la /root/.ssh/
 2. **Host key verification failed** — the storage box's host key has changed or is not in `known_hosts`. Add it:
 
 ```bash
-docker exec backupctl ssh-keyscan -H storage-box.example.com >> /root/.ssh/known_hosts
+docker exec backupctl ssh-keyscan -H storage-box.example.com >> /home/node/.ssh/known_hosts
 ```
 
 3. **Permission denied** — verify your SSH key is correctly mounted and has the right permissions:
 
 ```bash
 # Keys must be readable only by owner
-docker exec backupctl chmod 600 /root/.ssh/id_*
+docker exec backupctl chmod 600 /home/node/.ssh/id_*
 ```
 
 4. **Key not mounted** — check that `ssh-keys/` is correctly mounted in `docker-compose.yml` and contains the private key.
@@ -130,7 +130,7 @@ docker exec backupctl npx typeorm migration:run -d dist/infrastructure/persisten
 
 ## GPG Key Not Found
 
-**Symptom:** Backup fails at the encrypt stage with "No public key" or "unusable public key." The project has `encryption.enabled: true` in its config.
+**Symptom:** Backup fails at the encrypt stage with "No public key", "unusable public key", or "There is no assurance this key belongs to the named user." The project has `encryption.enabled: true` in its config.
 
 **Diagnosis:**
 
@@ -164,6 +164,13 @@ docker exec backupctl gpg --import /app/gpg-keys/backup-key.pub.gpg
 3. **Wrong recipient** — check that the `encryption.gpg_recipient` value in your project config matches the UID or email on the GPG key.
 
 4. **Key expired** — generate a new key or extend the expiration date, then re-import.
+
+5. **"Unusable public key" / trust error** — backupctl uses `--trust-model always` to bypass GPG's interactive trust requirement. If you see trust-related errors, rebuild the container to pick up the latest code:
+
+```bash
+scripts/dev.sh restart          # dev
+docker compose up -d --build    # production
+```
 
 ## Config Validation Errors
 
@@ -438,6 +445,7 @@ If the issue is specific to a backup stage, consult [Backup Flow](08-backup-flow
 
 ## What's Next
 
+- **Setup FAQ** — [FAQ](15-faq.md) for Hetzner Storage Box, SSH, GPG, and restic init problems.
 - **Quick commands** — [Cheatsheet](10-cheatsheet.md) for copy-paste diagnostics and daily operations.
 - **Full command syntax** — [CLI Reference](06-cli-reference.md) for all flags and options.
 - **Understand the flow** — [Backup Flow](08-backup-flow.md) for the 11-step pipeline and where failures can occur.

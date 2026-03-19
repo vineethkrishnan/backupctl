@@ -1,305 +1,494 @@
-# Architecture
+# Architecture & Naming Conventions
 
 ## Overview
 
-backupctl follows **hexagonal architecture** (Ports & Adapters) with three layers and a shared utility layer:
+backupctl follows **hexagonal architecture** (Ports & Adapters) with **vertical-slice** module organization. Each domain module is fully self-contained — it owns its own `domain/`, `application/`, `infrastructure/`, and `presenters/` layers. No module leaks internals to another.
 
-- **Domain** — pure TypeScript business logic with zero framework dependencies
-- **Application** — use case orchestration that coordinates domain ports
-- **Infrastructure** — all external-facing code: adapters, persistence, CLI, HTTP, scheduler
-- **Shared** — cross-cutting utilities and dependency injection tokens
+The core principle: **business logic never depends on infrastructure**. The domain defines _ports_ (outbound interfaces), and the infrastructure provides _adapters_ (implementations). Presenters (CLI, HTTP) are _driving_ adapters that call into the application layer.
 
-The core principle is that business logic never depends on infrastructure. The domain defines _ports_ (interfaces) that describe what it needs, and the infrastructure provides _adapters_ (implementations) that fulfill those contracts. This makes the domain testable in isolation and the infrastructure swappable without touching business rules.
+---
 
 ## Dependency Flow
 
 ```
-infrastructure/ ──→ application/ ──→ domain/
+presenters/ ──→ application/ ──→ domain/
+                     ↑
+              infrastructure/
 ```
 
-Dependencies flow **inward only**. Infrastructure depends on application and domain. Application depends on domain. Domain depends on nothing outside itself. The shared layer is an exception — it can be imported by any layer, but contains only pure utilities and DI token definitions.
+Each layer imports **only from the layers to its right**. `common/` is the sole exception — imported by any layer.
 
-This is never reversed. Domain code never imports from `application/` or `infrastructure/`. Application code never imports from `infrastructure/`.
+| Layer | Can import from | Never imports from |
+|-------|----------------|--------------------|
+| `domain/` | Nothing (pure TS) | `application/`, `infrastructure/`, `presenters/` |
+| `application/` | Own `domain/`, other modules' `application/ports/` | `infrastructure/`, `presenters/` |
+| `infrastructure/` | `application/ports/`, `domain/`, external libs | `presenters/` |
+| `presenters/` | `application/use-cases/`, `domain/` | `infrastructure/` |
+| `common/` | Nothing (self-contained utilities) | — |
 
-## Layer Rules
+### Cross-Module Imports
 
-### Domain Layer — `src/domain/`
+Modules may only import another module's **`application/ports/`** or **`domain/`** — never its `infrastructure/` or `presenters/`.
 
-The domain layer is **pure TypeScript**. It has zero framework imports — no `@nestjs/*`, no `typeorm`, no decorators of any kind. It contains:
+---
 
-- **Ports** — interfaces that define contracts for external capabilities (database dumping, remote storage, notifications, etc.)
-- **Models** — immutable value objects that represent domain concepts (project configuration, backup results, retention policies)
-- **Policies** — pure functions that encode business rules (retry evaluation with exponential backoff)
-
-The domain is organized by **subdomain**, each owning its own ports and models:
-
-```
-src/domain/
-├── backup/       # Core backup subdomain
-│   ├── ports/
-│   ├── models/
-│   └── policies/
-├── audit/        # Audit trail subdomain
-│   ├── ports/
-│   └── models/
-├── config/       # Configuration subdomain
-│   ├── ports/
-│   └── models/
-├── notification/  # Notification subdomain
-│   └── ports/
-└── shared/       # Cross-domain
-    └── ports/
-```
-
-Nothing in the domain knows about NestJS modules, TypeORM entities, HTTP controllers, or CLI commands. If you can't express it without importing an external library, it doesn't belong here.
-
-### Application Layer — `src/application/`
-
-The application layer imports **only from `domain/`**. It orchestrates use cases by coordinating domain ports:
-
-- **BackupOrchestratorService** — drives the 11-step backup flow, calling ports in sequence with retry logic, timeout monitoring, and fallback handling
-- **DumperRegistry** — resolves the correct `DatabaseDumperPort` adapter based on project config database type
-- **NotifierRegistry** — resolves the correct `NotifierPort` adapter based on project config notification type
-- **AuditQueryService** — queries the audit log for status and history
-- **StartupRecoveryService** — crash recovery on `onModuleInit`: orphan marking, lock cleanup, fallback replay, restic unlock, GPG import
-- **HealthCheckService** — validates audit DB, restic repos, disk space, SSH connectivity
-- **SnapshotManagementService** — lists and manages restic snapshots
-- **CacheManagementService** — manages restic cache per project
-
-The orchestrator is an _application service_, not a domain object. It coordinates ports but contains no business rules of its own — those live in domain policies.
-
-### Infrastructure Layer — `src/infrastructure/`
-
-The infrastructure layer imports `domain/` (to implement ports) and external libraries. It is split into four categories:
-
-**Adapters (driven / outbound)** — `adapters/`
-
-Implement domain ports using external tools and libraries:
-
-| Directory | Implements | External dependency |
-|-----------|-----------|---------------------|
-| `dumpers/` | `DatabaseDumperPort` | `pg_dump`, `mysqldump`, `mongodump` |
-| `storage/` | `RemoteStoragePort` | `restic` CLI |
-| `notifiers/` | `NotifierPort` | Axios (Slack/Webhook), Nodemailer (Email) |
-| `encryptors/` | `DumpEncryptorPort` | `gpg` CLI |
-| `cleanup/` | `LocalCleanupPort` | Node.js `fs` |
-| `hooks/` | `HookExecutorPort` | `child_process.execFile` |
-| `config/` | `ConfigLoaderPort` | `js-yaml` + `@nestjs/config` |
-| `clock/` | `ClockPort` | `Date` + timezone |
-
-**Persistence (driven / outbound)** — `persistence/`
-
-| Directory | Implements | External dependency |
-|-----------|-----------|---------------------|
-| `audit/` | `AuditLogPort` | TypeORM + PostgreSQL |
-| `fallback/` | `FallbackWriterPort` | Node.js `fs` (JSONL) |
-| `lock/` | `BackupLockPort` | Node.js `fs` (file lock) |
-
-**CLI (driving / inbound)** — `cli/`
-
-14 nest-commander commands that parse arguments, call application services, and return structured exit codes (0–5).
-
-**HTTP (driving / inbound)** — `http/`
-
-Health and status controllers for monitoring. Minimal surface — backupctl is CLI-first.
-
-**Scheduler (driving / inbound)** — `scheduler/`
-
-Dynamic cron registration from project YAML configs using `@nestjs/schedule`. Acquires the per-project lock before triggering a backup run.
-
-### Shared — `src/shared/`
-
-Cross-cutting concerns imported by any layer:
-
-- **`injection-tokens.ts`** — Symbol-based DI tokens for all ports
-- **`child-process.util.ts`** — safe `execFile` wrapper with timeout and error handling
-- **`format.util.ts`** — byte formatting, duration formatting, timestamp formatting
-
-## Full Project Structure
+## Project Structure
 
 ```
 src/
-├── domain/
-│   ├── backup/
-│   │   ├── ports/
-│   │   │   ├── database-dumper.port.ts
-│   │   │   ├── remote-storage.port.ts
-│   │   │   ├── dump-encryptor.port.ts
-│   │   │   ├── local-cleanup.port.ts
-│   │   │   ├── hook-executor.port.ts
-│   │   │   └── backup-lock.port.ts
-│   │   ├── models/
-│   │   └── policies/
-│   │       └── retry.policy.ts
-│   ├── audit/
-│   │   ├── ports/
-│   │   │   ├── audit-log.port.ts
-│   │   │   └── fallback-writer.port.ts
-│   │   └── models/
-│   ├── config/
-│   │   ├── ports/
-│   │   │   └── config-loader.port.ts
-│   │   └── models/
-│   │       ├── project-config.model.ts
-│   │       └── retention-policy.model.ts
-│   ├── notification/
-│   │   └── ports/
-│   │       └── notifier.port.ts
-│   └── shared/
-│       └── ports/
-│           └── clock.port.ts
+├── domain/                                    # All domain modules (vertical slices)
+│   ├── backup/                                # Core backup module
+│   │   ├── domain/                            # Pure TS — ZERO framework imports
+│   │   │   ├── backup-result.model.ts
+│   │   │   ├── backup-stage-error.ts
+│   │   │   ├── value-objects/
+│   │   │   │   ├── backup-stage.enum.ts
+│   │   │   │   ├── backup-status.enum.ts
+│   │   │   │   ├── dump-result.model.ts
+│   │   │   │   ├── sync-result.model.ts
+│   │   │   │   ├── prune-result.model.ts
+│   │   │   │   ├── cleanup-result.model.ts
+│   │   │   │   ├── cache-info.model.ts
+│   │   │   │   └── snapshot-info.model.ts
+│   │   │   └── policies/
+│   │   │       └── retry.policy.ts            # Pure function — no framework
+│   │   ├── application/
+│   │   │   ├── ports/                         # Outbound interfaces
+│   │   │   │   ├── database-dumper.port.ts
+│   │   │   │   ├── remote-storage.port.ts
+│   │   │   │   ├── remote-storage-factory.port.ts
+│   │   │   │   ├── dump-encryptor.port.ts
+│   │   │   │   ├── local-cleanup.port.ts
+│   │   │   │   ├── hook-executor.port.ts
+│   │   │   │   └── backup-lock.port.ts
+│   │   │   ├── use-cases/                     # One dir per action
+│   │   │   │   ├── run-backup/
+│   │   │   │   │   ├── run-backup.command.ts
+│   │   │   │   │   └── run-backup.use-case.ts
+│   │   │   │   ├── restore-backup/
+│   │   │   │   ├── prune-backup/
+│   │   │   │   ├── list-snapshots/
+│   │   │   │   ├── get-cache-info/
+│   │   │   │   ├── get-restore-guide/
+│   │   │   │   └── clear-cache/
+│   │   │   └── registries/
+│   │   │       ├── dumper.registry.ts
+│   │   │       └── notifier.registry.ts
+│   │   ├── infrastructure/
+│   │   │   ├── adapters/
+│   │   │   │   ├── dumpers/                   # postgres, mysql, mongo
+│   │   │   │   ├── storage/                   # restic + factory
+│   │   │   │   ├── encryptors/                # gpg
+│   │   │   │   ├── cleanup/                   # file cleanup
+│   │   │   │   ├── hooks/                     # shell hooks
+│   │   │   │   └── lock/                      # file-based .lock
+│   │   │   └── scheduler/
+│   │   │       └── dynamic-scheduler.service.ts
+│   │   ├── presenters/
+│   │   │   └── cli/
+│   │   │       ├── run.command.ts
+│   │   │       ├── restore.command.ts
+│   │   │       ├── snapshots.command.ts
+│   │   │       ├── prune.command.ts
+│   │   │       ├── cache.command.ts
+│   │   │       └── restic.command.ts
+│   │   └── backup.module.ts
+│   │
+│   ├── audit/                                 # Audit trail module
+│   │   ├── domain/
+│   │   │   └── health-check-result.model.ts
+│   │   ├── application/
+│   │   │   ├── ports/
+│   │   │   │   ├── audit-log.port.ts
+│   │   │   │   └── fallback-writer.port.ts
+│   │   │   └── use-cases/
+│   │   │       ├── get-backup-status/
+│   │   │       ├── get-failed-logs/
+│   │   │       └── recover-startup/
+│   │   ├── infrastructure/
+│   │   │   └── persistence/
+│   │   │       ├── typeorm/
+│   │   │       │   ├── schema/
+│   │   │       │   │   └── backup-log.record.ts
+│   │   │       │   ├── mappers/
+│   │   │       │   │   └── backup-log.mapper.ts
+│   │   │       │   └── typeorm-audit-log.repository.ts
+│   │   │       └── fallback/
+│   │   │           └── jsonl-fallback-writer.adapter.ts
+│   │   ├── presenters/
+│   │   │   ├── cli/
+│   │   │   │   ├── status.command.ts
+│   │   │   │   └── logs.command.ts
+│   │   │   └── http/
+│   │   │       └── status.controller.ts
+│   │   └── audit.module.ts
+│   │
+│   ├── config/                                # Configuration module
+│   │   ├── domain/
+│   │   │   ├── project-config.model.ts
+│   │   │   └── retention-policy.model.ts
+│   │   ├── application/
+│   │   │   └── ports/
+│   │   │       └── config-loader.port.ts
+│   │   ├── infrastructure/
+│   │   │   └── yaml-config-loader.adapter.ts
+│   │   ├── presenters/
+│   │   │   └── cli/
+│   │   │       └── config.command.ts
+│   │   └── config.module.ts
+│   │
+│   ├── notification/                          # Notification module
+│   │   ├── application/
+│   │   │   └── ports/
+│   │   │       └── notifier.port.ts
+│   │   ├── infrastructure/
+│   │   │   ├── slack-notifier.adapter.ts
+│   │   │   ├── email-notifier.adapter.ts
+│   │   │   ├── webhook-notifier.adapter.ts
+│   │   │   └── notifier-bootstrap.service.ts
+│   │   └── notification.module.ts
+│   │
+│   └── health/                                # Health check module
+│       ├── application/
+│       │   └── use-cases/
+│       │       └── check-health/
+│       │           └── check-health.use-case.ts
+│       ├── presenters/
+│       │   ├── cli/
+│       │   │   └── health.command.ts
+│       │   └── http/
+│       │       └── health.controller.ts
+│       └── health.module.ts
 │
-├── application/
-│   ├── backup/
-│   │   ├── backup-orchestrator.service.ts
-│   │   ├── cache-management.service.ts
-│   │   └── registries/
-│   │       ├── dumper.registry.ts
-│   │       └── notifier.registry.ts
-│   ├── audit/
-│   │   ├── audit-query.service.ts
-│   │   └── startup-recovery.service.ts
-│   ├── health/
-│   │   └── health-check.service.ts
-│   ├── snapshot/
-│   │   └── snapshot-management.service.ts
-│   └── application.module.ts
+├── common/                                    # Cross-cutting (imported by any layer)
+│   ├── di/
+│   │   └── injection-tokens.ts                # All Symbol-based DI tokens
+│   ├── clock/
+│   │   ├── clock.port.ts
+│   │   └── system-clock.adapter.ts
+│   ├── helpers/
+│   │   ├── child-process.util.ts              # Safe execFile wrapper
+│   │   ├── format.util.ts                     # Byte/duration formatting
+│   │   └── dev-banner.util.ts                 # Dev startup banner
+│   └── shared-infra.module.ts                 # Global providers (clock, lock, storage)
 │
-├── infrastructure/
-│   ├── adapters/
-│   │   ├── dumpers/
-│   │   ├── storage/
-│   │   ├── notifiers/
-│   │   ├── encryptors/
-│   │   ├── cleanup/
-│   │   ├── hooks/
-│   │   ├── config/
-│   │   └── clock/
-│   ├── persistence/
-│   │   ├── audit/
-│   │   ├── fallback/
-│   │   └── lock/
-│   ├── cli/
-│   ├── http/
-│   ├── scheduler/
-│   └── infrastructure.module.ts
+├── config/
+│   └── typeorm.config.ts                      # Env-aware TypeORM config
 │
-├── shared/
-│   ├── injection-tokens.ts
-│   ├── child-process.util.ts
-│   └── format.util.ts
+├── db/
+│   ├── datasource.ts                          # Standalone DataSource for CLI
+│   └── migrations/                            # All TypeORM migrations
 │
-├── app.module.ts
-├── main.ts
-└── cli.ts
+├── app/
+│   └── app.module.ts                          # Root module
+├── main.ts                                    # HTTP entry point
+└── cli.ts                                     # CLI entry point
 ```
 
-## Domain Subdomains
+### Path Aliases
 
-### backup/
+```
+@domain/*  → src/domain/*
+@common/*  → src/common/*
+```
 
-The core subdomain. Defines ports for every external capability the backup flow needs:
+---
 
-| Port | Responsibility |
-|------|---------------|
-| `DatabaseDumperPort` | Dump and verify a database. Methods: `dump()`, `verify()` |
-| `RemoteStoragePort` | Sync files to remote storage, prune old snapshots. Methods: `sync(paths, options)`, `prune()`, `unlock()` |
-| `DumpEncryptorPort` | Encrypt a dump file with GPG. Methods: `encrypt()` |
-| `LocalCleanupPort` | Remove local dump files after sync. Methods: `cleanup()` |
-| `HookExecutorPort` | Run pre/post backup shell commands. Methods: `execute(hook)` |
-| `BackupLockPort` | Per-project file-based locking. Methods: `acquire()`, `release()`, `isLocked()`, `removeStale()` |
+## Layer Rules
 
-Models include `BackupResult`, `BackupStage`, `DumpResult`, `SyncResult`, `PruneResult`, and related value objects. The `retry.policy.ts` is a pure function that evaluates whether a failed stage should be retried based on stage type and attempt count, with exponential backoff delay calculation.
+### `domain/` — Pure TypeScript
 
-### audit/
+Zero framework imports. No `@nestjs/*`, no `typeorm`, no decorators. Contains:
 
-Tracks every backup run with real-time stage progress:
+- **Models** — immutable value objects with readonly fields and constructor params
+- **Value objects** — enums, small typed data carriers (`DumpResult`, `SyncResult`)
+- **Policies** — pure functions encoding business rules (`evaluateRetry`)
+- **Errors** — typed domain errors (`BackupStageError`)
 
-| Port | Responsibility |
-|------|---------------|
-| `AuditLogPort` | Insert a run record, update stage progress, finalize with result. Methods: `startRun()`, `trackProgress()`, `finishRun()` |
-| `FallbackWriterPort` | Append-only JSONL file for when the audit DB is unavailable. Methods: `append()`, `readAll()`, `clear()` |
+Domain models use `has*()` accessor methods for feature checks:
 
-The insert+update pattern (`startRun` → `trackProgress` at each step → `finishRun`) provides real-time visibility into running backups and enables crash detection — any record left in "started" status after a restart is an orphan.
+```typescript
+projectConfig.hasEncryption()
+projectConfig.hasTimeout()
+projectConfig.hasHooks()
+```
 
-### config/
+### `application/` — Orchestration
 
-Loads and validates project configuration:
+Contains **use cases**, **ports** (outbound interfaces), and **registries** (dynamic adapter resolution).
 
-| Port | Responsibility |
-|------|---------------|
-| `ConfigLoaderPort` | Load project configs from YAML, resolve `${VAR}` references from `.env`. Methods: `loadAll()`, `loadProject()`, `reload()` |
+- **Use cases** have a single `execute(command|query)` method
+- **Commands** are for write operations, **Queries** for reads — both are plain data carriers
+- **Ports** define what external capabilities the module needs
+- **Registries** resolve the correct adapter at runtime by type key
 
-Models include `ProjectConfig` (database connection, schedule, retention, encryption, hooks, notification, timeout) and `RetentionPolicy` (daily, weekly, monthly, yearly counts). Both are immutable value objects with accessor methods like `hasEncryption()`, `hasTimeout()`, `hasPreHook()`.
+### `infrastructure/` — Adapters
 
-### notification/
+Implements ports with real tools. Split into:
 
-Sends notifications across configured channels:
+- **`adapters/`** — outbound adapters (shell commands, APIs, file system)
+- **`persistence/`** — database access (TypeORM repository, JSONL fallback, file lock)
+- **`scheduler/`** — dynamic cron registration
 
-| Port | Responsibility |
-|------|---------------|
-| `NotifierPort` | Send lifecycle notifications. Methods: `notifyStarted()`, `notifySuccess()`, `notifyFailure()`, `notifyWarning()`, `notifyDailySummary()` |
+**TypeORM infrastructure follows the schema/mapper/repository pattern:**
 
-The `notifyWarning(project, message)` method is a generic escape hatch for non-fatal issues like timeout warnings, missing asset paths, or low disk space.
+```
+infrastructure/persistence/typeorm/
+├── schema/
+│   └── backup-log.record.ts        # TypeORM entity (DB shape)
+├── mappers/
+│   └── backup-log.mapper.ts        # Record ↔ Domain translation
+└── typeorm-audit-log.repository.ts  # Clean repository (query + persist)
+```
 
-### shared/
+- **Record** (`*.record.ts`) — pure TypeORM entity with decorators. Maps 1:1 to the database table. The source of truth for schema — migrations are generated from record changes.
+- **Mapper** (`*.mapper.ts`) — `@Injectable()` service with `toDomain(record)` and `toPartialRecord(domainModel)`. Handles type conversions (`bigint` ↔ `number`, `string` ↔ `enum`).
+- **Repository** — injects the TypeORM `Repository<Record>` and the mapper. Only does querying and persisting — no inline mapping logic.
 
-Cross-domain utilities:
+### `presenters/` — Driving Adapters
 
-| Port | Responsibility |
-|------|---------------|
-| `ClockPort` | Return the current timestamp in the configured timezone. Methods: `now()` |
+Inbound adapters that accept user input and call use cases:
 
-The `ClockPort` abstraction enables deterministic testing — tests inject a mock clock that returns fixed timestamps instead of relying on `Date.now()`.
+- **`cli/`** — nest-commander commands. Map CLI args → Command/Query → UseCase.execute()
+- **`http/`** — NestJS controllers. Map HTTP request → UseCase.execute() → response
 
-## Key Design Decisions
+Presenters are thin — no business logic, only argument parsing and response formatting.
 
-| Decision | Rationale |
-|----------|-----------|
-| Domain subdomains (`backup/`, `audit/`, `config/`, `notification/`) | Each owns its ports + models. Scales without cross-contamination. |
-| Orchestrator in `application/`, not `domain/` | Coordinates ports — application service, not domain logic. |
-| `DumperRegistry` + `NotifierRegistry` | Dynamic adapter resolution by project config type. |
-| File-based `.lock` per project | Survives crashes, visible on disk, cleaned on startup recovery. |
-| `AuditLogPort` insert+update pattern | Real-time progress visibility + crash detection via orphaned records. |
-| `FallbackWriterPort` in JSONL format | Append-only, replayed on startup. Backup success is never lost to infra failure. |
-| `notifyWarning(project, message)` | Generic warning method for timeouts, missing assets, disk space. |
-| `RemoteStoragePort.sync(paths, options)` | Options object `{ tags, snapshotMode }` for tagging + mode. |
-| `ClockPort` | Deterministic testing with injectable time. |
-| Compression always on | No toggle. Each dumper uses the best compression method per DB type. |
-| Explicit TypeORM migrations | No `synchronize: true`. Safe for production schema changes. |
-| Winston with log rotation | JSON format for prod, pretty-print for dev. `winston-daily-rotate-file`. |
-| CLI exit codes 0–5 | Standardized for scripting: 0=success, 1=failure, 2=locked, 3=config, 4=connectivity, 5=partial. |
-| `BACKUP_BASE_DIR` env var | Configurable base directory, default `/data/backups`. |
-| `TIMEZONE` env var | Default `Europe/Berlin`. Used in file names, audit timestamps, notifications, logs. |
-| Webhook JSON + markdown | Payload: `{ event, project, text (markdown), data (structured) }`. |
-| `smtp_secure` field | Explicit TLS control for the email notifier, not inferred from port. |
-| `child_process.execFile` over `exec` | No shell injection. All external commands use `execFile` with timeouts. |
+---
+
+## Module Wiring
+
+```
+AppModule (root)
+├── ConfigModule.forRoot({ load: [typeormConfig] })
+├── TypeOrmModule.forRootAsync()       via ConfigService.get('typeorm')
+├── ScheduleModule.forRoot()
+├── WinstonModule.forRootAsync()
+│
+├── SharedInfraModule  [@Global]
+│   ├── CLOCK_PORT         → SystemClockAdapter
+│   ├── BACKUP_LOCK_PORT   → FileBackupLockAdapter
+│   └── REMOTE_STORAGE_FACTORY → ResticStorageFactory
+│
+├── ConfigAppModule    [@Global]
+│   └── CONFIG_LOADER_PORT → YamlConfigLoaderAdapter
+│
+├── AuditModule
+│   ├── AUDIT_LOG_PORT     → TypeormAuditLogRepository
+│   ├── FALLBACK_WRITER_PORT → JsonlFallbackWriterAdapter
+│   └── BackupLogMapper
+│
+├── BackupModule       [imports AuditModule]
+│   ├── DUMP_ENCRYPTOR_PORT  → GpgEncryptorAdapter
+│   ├── LOCAL_CLEANUP_PORT   → FileCleanupAdapter
+│   ├── HOOK_EXECUTOR_PORT   → ShellHookExecutorAdapter
+│   ├── DUMPER_REGISTRY      → DumperRegistry
+│   └── NOTIFIER_REGISTRY    → NotifierRegistry
+│
+├── NotificationModule
+│   └── NotifierBootstrapService (registers adapters at startup)
+│
+└── HealthModule       [imports AuditModule]
+```
+
+All DI tokens are **Symbol-based**, defined in `common/di/injection-tokens.ts`.
+
+---
+
+## Dependency Injection
+
+### Symbol Tokens
+
+Every port binding uses a Symbol token, never a class reference:
+
+```typescript
+// common/di/injection-tokens.ts
+export const DATABASE_DUMPER_PORT = Symbol('DATABASE_DUMPER_PORT');
+export const AUDIT_LOG_PORT = Symbol('AUDIT_LOG_PORT');
+// ...
+
+// Module binding
+{ provide: AUDIT_LOG_PORT, useClass: TypeormAuditLogRepository }
+
+// Use case injection
+constructor(@Inject(AUDIT_LOG_PORT) private readonly auditLog: AuditLogPort) {}
+```
+
+### Registries
+
+`DumperRegistry` and `NotifierRegistry` resolve adapters **dynamically** at runtime by type key:
+
+```typescript
+const dumper = dumperRegistry.resolve(projectConfig.database.type);  // 'postgres' → PostgresDumpAdapter
+const notifier = notifierRegistry.resolve(notificationConfig.type);  // 'slack' → SlackNotifierAdapter
+```
+
+---
+
+## Domain Modules
+
+### backup/ — Core Backup Module
+
+The main module. Orchestrates the 11-step backup flow.
+
+**Ports:**
+
+| Port | Methods |
+|------|---------|
+| `DatabaseDumperPort` | `dump()`, `verify()` |
+| `RemoteStoragePort` | `sync()`, `prune()`, `listSnapshots()`, `restore()`, `exec()`, `getCacheInfo()`, `clearCache()`, `unlock()` |
+| `RemoteStorageFactory` | `create(config)` → `RemoteStoragePort` |
+| `DumpEncryptorPort` | `encrypt()`, `decrypt()` |
+| `LocalCleanupPort` | `cleanup()` |
+| `HookExecutorPort` | `execute()` |
+| `BackupLockPort` | `acquire()`, `acquireOrQueue()`, `release()`, `isLocked()` |
+
+**Use Cases:**
+
+| Use Case | Input | Output |
+|----------|-------|--------|
+| `RunBackupUseCase` | `RunBackupCommand` | `BackupResult[]` |
+| `RestoreBackupUseCase` | `RestoreBackupCommand` | `void` |
+| `PruneBackupUseCase` | `PruneBackupCommand` | `PruneResult[]` |
+| `ListSnapshotsUseCase` | `ListSnapshotsQuery` | `SnapshotInfo[]` |
+| `GetCacheInfoUseCase` | `GetCacheInfoQuery` | `CacheInfo` |
+| `ClearCacheUseCase` | `ClearCacheCommand` | `void` |
+| `GetRestoreGuideUseCase` | `GetRestoreGuideQuery` | `string` |
+
+**Adapters:**
+
+| Adapter | Implements | External Tool |
+|---------|------------|---------------|
+| `PostgresDumpAdapter` | `DatabaseDumperPort` | `pg_dump` / `pg_restore` |
+| `MysqlDumpAdapter` | `DatabaseDumperPort` | `mysqldump` |
+| `MongoDumpAdapter` | `DatabaseDumperPort` | `mongodump` |
+| `ResticStorageAdapter` | `RemoteStoragePort` | `restic` CLI |
+| `ResticStorageFactory` | `RemoteStorageFactory` | creates configured `ResticStorageAdapter` |
+| `GpgEncryptorAdapter` | `DumpEncryptorPort` | `gpg` CLI |
+| `FileCleanupAdapter` | `LocalCleanupPort` | Node.js `fs` |
+| `ShellHookExecutorAdapter` | `HookExecutorPort` | `child_process.execFile` |
+| `FileBackupLockAdapter` | `BackupLockPort` | Node.js `fs` (`.lock` files) |
+
+### audit/ — Audit Trail Module
+
+Tracks every backup run with real-time stage progress.
+
+**Ports:**
+
+| Port | Methods |
+|------|---------|
+| `AuditLogPort` | `startRun()`, `trackProgress()`, `finishRun()`, `findByProject()`, `findFailed()`, `findSince()`, `findOrphaned()` |
+| `FallbackWriterPort` | `writeAuditFallback()`, `writeNotificationFallback()`, `readPendingEntries()`, `clearReplayed()` |
+
+**Use Cases:**
+
+| Use Case | Purpose |
+|----------|---------|
+| `GetBackupStatusUseCase` | Query backup history per project |
+| `GetFailedLogsUseCase` | Query failed backup logs |
+| `RecoverStartupUseCase` | Crash recovery on boot (orphan marking, lock cleanup, fallback replay, restic unlock, GPG import) |
+
+### config/ — Configuration Module
+
+**Port:** `ConfigLoaderPort` — `loadAll()`, `getProject()`, `validate()`, `reload()`
+
+**Models:** `ProjectConfig` (immutable, with `has*()` accessors), `RetentionPolicy`
+
+### notification/ — Notification Module
+
+**Port:** `NotifierPort` — `notifyStarted()`, `notifySuccess()`, `notifyFailure()`, `notifyWarning()`, `notifyDailySummary()`
+
+**Adapters:** `SlackNotifierAdapter`, `EmailNotifierAdapter`, `WebhookNotifierAdapter`
+
+### health/ — Health Check Module
+
+**Use Case:** `CheckHealthUseCase` — checks audit DB, disk space, SSH, restic repos
+
+---
+
+## Error Handling
+
+### BackupStageError
+
+The primary domain error. Carries:
+
+- `stage` — which backup step failed (typed `BackupStage` enum)
+- `originalError` — the underlying error
+- `isRetryable` — whether this stage supports retry
+
+### Retryable vs Non-Retryable Stages
+
+| Retryable (steps 3–8) | Non-Retryable |
+|------------------------|---------------|
+| Dump, Verify, Encrypt, Sync, Prune, Cleanup | PreHook, PostHook, Audit, Notify |
+
+The retry policy (`evaluateRetry`) is a **pure function** with exponential backoff.
+
+### Failure Isolation
+
+Audit and notification failures are **never** backup failures. If `AuditLogPort.finishRun()` fails, the result is written to `FallbackWriterPort`. The backup is still reported as successful.
+
+### Shell Command Safety
+
+All external commands use `child_process.execFile` (never `exec`) with timeouts. No shell injection.
+
+---
 
 ## Naming Conventions
 
-### File naming
+### Files & Folders
 
-| Suffix | Layer | Purpose |
-|--------|-------|---------|
-| `*.port.ts` | Domain | Interface defining an external capability |
-| `*.model.ts` | Domain | Immutable value object |
-| `*.policy.ts` | Domain | Pure function encoding a business rule |
-| `*.service.ts` | Application | Use case orchestration |
-| `*.registry.ts` | Application | Dynamic adapter resolution |
-| `*.adapter.ts` | Infrastructure | Concrete implementation of a domain port |
-| `*.entity.ts` | Infrastructure | TypeORM database entity |
-| `*.command.ts` | Infrastructure | nest-commander CLI command |
-| `*.controller.ts` | Infrastructure | NestJS HTTP controller |
-| `*.enum.ts` | Any | Enumeration type |
+All **kebab-case**. Files include a type suffix:
 
-### TypeScript conventions
+| Suffix | Layer | Purpose | Example |
+|--------|-------|---------|---------|
+| `.model.ts` | domain | Immutable value object | `backup-result.model.ts` |
+| `.enum.ts` | domain | Enumeration | `backup-stage.enum.ts` |
+| `.policy.ts` | domain | Pure business rule function | `retry.policy.ts` |
+| `.port.ts` | application | Outbound interface | `database-dumper.port.ts` |
+| `.use-case.ts` | application | Use case orchestration | `run-backup.use-case.ts` |
+| `.command.ts` | application | CQRS write input | `run-backup.command.ts` |
+| `.query.ts` | application | CQRS read input | `list-snapshots.query.ts` |
+| `.registry.ts` | application | Dynamic adapter resolver | `dumper.registry.ts` |
+| `.adapter.ts` | infrastructure | Port implementation | `postgres-dump.adapter.ts` |
+| `.record.ts` | infrastructure | TypeORM entity (DB shape) | `backup-log.record.ts` |
+| `.mapper.ts` | infrastructure | Record ↔ Domain translation | `backup-log.mapper.ts` |
+| `.repository.ts` | infrastructure | Database access | `typeorm-audit-log.repository.ts` |
+| `.service.ts` | infrastructure | Infrastructure service | `dynamic-scheduler.service.ts` |
+| `.command.ts` | presenters/cli | nest-commander CLI command | `run.command.ts` |
+| `.controller.ts` | presenters/http | NestJS HTTP controller | `health.controller.ts` |
+| `.module.ts` | any | NestJS module barrel | `backup.module.ts` |
+
+### Classes
+
+All **PascalCase** with type suffix matching the file suffix:
+
+| Pattern | Example |
+|---------|---------|
+| `{Action}{Entity}UseCase` | `RunBackupUseCase`, `GetBackupStatusUseCase` |
+| `{Action}{Entity}Command` | `RunBackupCommand`, `ClearCacheCommand` |
+| `{Action}{Entity}Query` | `ListSnapshotsQuery`, `GetCacheInfoQuery` |
+| `{Entity}{Action}Port` | `DatabaseDumperPort`, `AuditLogPort` |
+| `{Technology}{Entity}Adapter` | `PostgresDumpAdapter`, `SlackNotifierAdapter` |
+| `{Technology}{Entity}Repository` | `TypeormAuditLogRepository` |
+| `{Entity}Record` | `BackupLogRecord` |
+| `{Entity}Mapper` | `BackupLogMapper` |
+| `{Entity}Registry` | `DumperRegistry`, `NotifierRegistry` |
+| `{Entity}Result` | `BackupResult`, `DumpResult`, `SyncResult` |
+| `{Entity}Config` | `ProjectConfig` |
+| `{Entity}Error` | `BackupStageError` |
+
+### TypeScript Conventions
 
 - **No `any`** — use `unknown` when the type is genuinely unknown
-- **No abbreviations** — `acc`, `obj`, `val`, `arr`, `tmp`, `res`, `data` are all banned. Use intent-revealing names like `projectConfig`, `dumpFilePath`, `retentionDays`
-- **Boolean prefixes** — `is`, `has`, `can`, `should` (e.g., `isRetryable`, `hasEncryption`)
-- **Collection naming** — plural nouns with explicit loop variables (e.g., `for (const project of projects)`)
-- **Early return** — prefer early return over nested `if/else` chains
-- **Comments** — explain _why_, not obvious _what_. Use Laravel-style section headers:
+- **No abbreviations** — `acc`, `obj`, `val`, `arr`, `tmp`, `res`, `data` are banned. Use `projectConfig`, `dumpFilePath`, `retentionDays`
+- **Boolean prefixes** — `is`, `has`, `can`, `should` (`isRetryable`, `hasEncryption`)
+- **Collections** — plural nouns with explicit loop variables (`for (const project of projects)`)
+- **Early return** — prefer early return over nested `if/else`
+- **Readonly** — domain models use `readonly` fields with constructor params
+- **No barrel exports** — import directly from the file, not from `index.ts`
+
+### Comments (Laravel-style section headers)
 
 ```typescript
 // Resolve project configuration
@@ -311,55 +500,54 @@ The `ClockPort` abstraction enables deterministic testing — tests inject a moc
 // Dump database
 ```
 
-## Error Handling
+Explain **why**, not obvious **what**. No comments on self-evident code.
 
-### BackupStageError
+### DI Token Naming
 
-The primary domain error type. Carries three properties:
-
-- `stage` — which step of the backup flow failed (typed enum)
-- `originalError` — the underlying error
-- `isRetryable` — whether this stage supports retry
-
-### Retryable vs non-retryable stages
-
-| Retryable (steps 3–8) | Non-retryable |
-|------------------------|---------------|
-| Dump | PreHook |
-| Verify | PostHook |
-| Encrypt | Audit |
-| Sync | Notify |
-| Prune | |
-| Cleanup | |
-
-The retry policy is a pure function in `domain/backup/policies/retry.policy.ts`. It takes the stage, attempt count, and max retries, and returns whether to retry and the backoff delay.
-
-### Failure isolation
-
-Audit and notification failures are **not** backup failures. If `AuditLogPort.finishRun()` fails, the result is written to `FallbackWriterPort` and the backup is still considered successful. If `NotifierPort.notifySuccess()` fails, the failure is logged but does not change the backup result. This ensures that infrastructure issues in secondary systems never cause a successful backup to be reported as failed.
-
-### Shell command safety
-
-All external commands (`pg_dump`, `restic`, `gpg`, etc.) are executed via `child_process.execFile`, never `child_process.exec`. This prevents shell injection attacks. Every command has a configurable timeout.
-
-## Dependency Injection
-
-All domain ports are bound to their infrastructure adapters through **Symbol-based injection tokens** defined in `src/shared/injection-tokens.ts`:
+All SCREAMING_SNAKE_CASE with `_PORT`, `_REGISTRY`, or `_FACTORY` suffix:
 
 ```typescript
-export const DATABASE_DUMPER_PORT = Symbol('DatabaseDumperPort');
-export const REMOTE_STORAGE_PORT = Symbol('RemoteStoragePort');
-export const DUMP_ENCRYPTOR_PORT = Symbol('DumpEncryptorPort');
-export const AUDIT_LOG_PORT = Symbol('AuditLogPort');
-// ... all ports
+DATABASE_DUMPER_PORT
+REMOTE_STORAGE_FACTORY
+DUMPER_REGISTRY
 ```
 
-The `InfrastructureModule` binds concrete adapters to these tokens. Application services receive ports via constructor injection using `@Inject(TOKEN)`. This keeps the application layer unaware of which concrete adapter is in use — it only knows the port interface.
+---
 
-Registries (`DumperRegistry`, `NotifierRegistry`) take this one step further by resolving adapters _dynamically_ at runtime based on the project's configured database type or notification type.
+## Migrations
 
-## What's Next
+Schema-driven. The `*.record.ts` file is the source of truth:
 
-- **Full requirements spec** — [Requirements](03-requirements.md) lists host prerequisites and supported platforms.
-- **Configuration deep dive** — [Configuration](05-configuration.md) covers the YAML format, `.env` resolution, and per-project overrides.
-- **Extend backupctl** — [Adding Adapters](11-adding-adapters.md) walks through implementing a new database dumper or notification channel.
+```
+1. Modify record schema   →  *.record.ts
+2. Generate migration     →  scripts/dev.sh migrate:generate <Name>
+3. Review generated file  →  src/db/migrations/
+4. Run migration          →  scripts/dev.sh migrate:run
+5. Update mapper          →  *.mapper.ts (if needed)
+```
+
+- `migrationsRun: false` — always manual
+- `synchronize: false` — always manual
+- Use `migrate:create` only for data migrations or custom SQL
+
+See [Migration Guide](14-migrations.md) for full details.
+
+---
+
+## Key Design Decisions
+
+| Decision | Rationale |
+|----------|-----------|
+| Vertical-slice modules | Each module self-contained. No cross-module infrastructure leaks |
+| Use cases with Command/Query pattern | Single `execute()` method. Presenters map args → Command/Query → UseCase |
+| Ports in `application/` not `domain/` | Ports define outbound contracts; application owns the orchestration interface |
+| Symbol-based DI tokens | Decouples from class references. Clean `@Inject(TOKEN)` pattern |
+| Registries for dynamic resolution | Dumpers and notifiers resolved by config type at runtime |
+| File-based `.lock` per project | Survives crashes, visible on disk, cleaned on startup recovery |
+| Schema/Mapper/Repository pattern | Record ↔ Domain translation in dedicated mapper. Repository stays clean |
+| Schema-driven migrations | Record is source of truth. `generate` diffs against DB. Never hand-write schema changes |
+| `FallbackWriterPort` (JSONL) | Append-only. Backup success never lost to audit DB failure |
+| `ClockPort` in `common/` | Shared across modules. Enables deterministic testing |
+| `execFile` over `exec` | No shell injection. All external commands via safe wrapper |
+| Compression always on | No toggle. Each dumper uses best method per DB type |
+| CLI exit codes 0–5 | `0`=success, `1`=failure, `2`=locked, `3`=config, `4`=connectivity, `5`=partial |

@@ -1,14 +1,16 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
 
-import { RunBackupUseCase, RemoteStorageFactory } from '@domain/backup/application/use-cases/run-backup/run-backup.use-case';
+import { RunBackupUseCase } from '@domain/backup/application/use-cases/run-backup/run-backup.use-case';
+import { RemoteStorageFactory } from '@domain/backup/application/ports/remote-storage-factory.port';
 import { RunBackupCommand } from '@domain/backup/application/use-cases/run-backup/run-backup.command';
 import { DumperRegistry } from '@domain/backup/application/registries/dumper.registry';
-import { NotifierRegistry } from '@domain/backup/application/registries/notifier.registry';
+import { NotifierRegistry } from '@domain/notification/application/registries/notifier.registry';
 
 import { BackupLockPort } from '@domain/backup/application/ports/backup-lock.port';
 import { DatabaseDumperPort } from '@domain/backup/application/ports/database-dumper.port';
 import { DumpEncryptorPort } from '@domain/backup/application/ports/dump-encryptor.port';
+import { GpgKeyManagerPort } from '@domain/backup/application/ports/gpg-key-manager.port';
 import { HookExecutorPort } from '@domain/backup/application/ports/hook-executor.port';
 import { LocalCleanupPort } from '@domain/backup/application/ports/local-cleanup.port';
 import { RemoteStoragePort } from '@domain/backup/application/ports/remote-storage.port';
@@ -17,6 +19,7 @@ import { FallbackWriterPort } from '@domain/audit/application/ports/fallback-wri
 import { NotifierPort } from '@domain/notification/application/ports/notifier.port';
 import { ConfigLoaderPort } from '@domain/config/application/ports/config-loader.port';
 import { ClockPort } from '@common/clock/clock.port';
+import { FileSystemPort } from '@common/filesystem/filesystem.port';
 import { ProjectConfig } from '@domain/config/domain/project-config.model';
 import { RetentionPolicy } from '@domain/config/domain/retention-policy.model';
 import { BackupStage } from '@domain/backup/domain/value-objects/backup-stage.enum';
@@ -35,18 +38,12 @@ import {
   FALLBACK_WRITER_PORT,
   CLOCK_PORT,
   DUMP_ENCRYPTOR_PORT,
+  FILESYSTEM_PORT,
+  GPG_KEY_MANAGER_PORT,
   HOOK_EXECUTOR_PORT,
   LOCAL_CLEANUP_PORT,
   REMOTE_STORAGE_FACTORY,
 } from '@common/di/injection-tokens';
-
-// ── Mock fs module ─────────────────────────────────────────────────────
-
-jest.mock('fs', () => ({
-  existsSync: jest.fn().mockReturnValue(true),
-  readdirSync: jest.fn().mockReturnValue([]),
-  statfsSync: jest.fn().mockReturnValue({ bsize: 4096, bavail: 5 * 1024 * 1024 * 1024 / 4096 }),
-}));
 
 // ── Test helpers ───────────────────────────────────────────────────────
 
@@ -146,6 +143,24 @@ function createMockLocalCleanup(): jest.Mocked<LocalCleanupPort> {
   };
 }
 
+function createMockFilesystem(): jest.Mocked<FileSystemPort> {
+  return {
+    exists: jest.fn().mockReturnValue(true),
+    diskFreeGb: jest.fn().mockReturnValue(20),
+    listDirectory: jest.fn().mockReturnValue([]),
+    removeFile: jest.fn(),
+  };
+}
+
+function createMockGpgKeyManager(): jest.Mocked<GpgKeyManagerPort> {
+  return {
+    importKey: jest.fn().mockResolvedValue(undefined),
+    importAllFromDirectory: jest.fn().mockResolvedValue([]),
+    listKeys: jest.fn().mockResolvedValue(''),
+    hasKey: jest.fn().mockResolvedValue(true),
+  };
+}
+
 function buildProjectConfig(overrides: Partial<ConstructorParameters<typeof ProjectConfig>[0]> = {}): ProjectConfig {
   return new ProjectConfig({
     name: 'test-project',
@@ -193,6 +208,8 @@ describe('RunBackupUseCase', () => {
   let mockHookExecutor: jest.Mocked<HookExecutorPort>;
   let mockLocalCleanup: jest.Mocked<LocalCleanupPort>;
   let mockStorageFactory: jest.Mocked<RemoteStorageFactory>;
+  let mockFilesystem: jest.Mocked<FileSystemPort>;
+  let mockGpgKeyManager: jest.Mocked<GpgKeyManagerPort>;
   let mockDumperRegistry: DumperRegistry;
   let mockNotifierRegistry: NotifierRegistry;
 
@@ -215,8 +232,11 @@ describe('RunBackupUseCase', () => {
     mockLocalCleanup = createMockLocalCleanup();
 
     mockStorageFactory = {
-      createStorage: jest.fn().mockReturnValue(mockStorage),
+      create: jest.fn().mockReturnValue(mockStorage),
     };
+
+    mockFilesystem = createMockFilesystem();
+    mockGpgKeyManager = createMockGpgKeyManager();
 
     // Set up default resolved values
     mockBackupLock.acquire.mockResolvedValue(true);
@@ -231,9 +251,9 @@ describe('RunBackupUseCase', () => {
     mockEncryptor.encrypt.mockResolvedValue('/data/backups/test-project/dump.sql.gz.gpg');
 
     mockDumperRegistry = new DumperRegistry();
-    mockDumperRegistry.register('postgres', mockDumper);
-    mockDumperRegistry.register('mysql', mockDumper);
-    mockDumperRegistry.register('mongodb', mockDumper);
+    mockDumperRegistry.register('postgres', () => mockDumper);
+    mockDumperRegistry.register('mysql', () => mockDumper);
+    mockDumperRegistry.register('mongodb', () => mockDumper);
 
     mockNotifierRegistry = new NotifierRegistry();
     mockNotifierRegistry.register('slack', mockNotifier);
@@ -252,6 +272,8 @@ describe('RunBackupUseCase', () => {
         { provide: HOOK_EXECUTOR_PORT, useValue: mockHookExecutor },
         { provide: LOCAL_CLEANUP_PORT, useValue: mockLocalCleanup },
         { provide: REMOTE_STORAGE_FACTORY, useValue: mockStorageFactory },
+        { provide: FILESYSTEM_PORT, useValue: mockFilesystem },
+        { provide: GPG_KEY_MANAGER_PORT, useValue: mockGpgKeyManager },
         {
           provide: ConfigService,
           useValue: {
@@ -475,7 +497,7 @@ describe('RunBackupUseCase', () => {
 
       expect(results[0].status).toBe(BackupStatus.Success);
       expect(results[0].encrypted).toBe(true);
-      expect(mockEncryptor.encrypt).toHaveBeenCalledWith(defaultDumpResult.filePath);
+      expect(mockEncryptor.encrypt).toHaveBeenCalledWith(defaultDumpResult.filePath, 'admin@test.com');
     });
 
     it('skips verification when not configured', async () => {
@@ -591,7 +613,7 @@ describe('RunBackupUseCase', () => {
 
       await service.execute(new RunBackupCommand({ projectName: 'test-project' }));
 
-      expect(mockStorageFactory.createStorage).toHaveBeenCalledWith(config);
+      expect(mockStorageFactory.create).toHaveBeenCalledWith(config);
     });
 
     it('syncs with correct tags and snapshot mode', async () => {
@@ -610,8 +632,7 @@ describe('RunBackupUseCase', () => {
     });
 
     it('warns about missing asset paths and excludes them from sync', async () => {
-      const fs = require('fs');
-      fs.existsSync
+      mockFilesystem.exists
         .mockReturnValueOnce(true) // first asset exists
         .mockReturnValueOnce(false); // second asset missing
 
@@ -700,6 +721,117 @@ describe('RunBackupUseCase', () => {
       expect(results[0].status).toBe(BackupStatus.Failed);
       expect(results[0].errorMessage).toContain('already in progress');
       expect(results[1].status).toBe(BackupStatus.Success);
+    });
+  });
+
+  // ── lockHeldExternally ──────────────────────────────────────────────
+
+  describe('lockHeldExternally', () => {
+    it('skips lock acquire/release when lockHeldExternally is true', async () => {
+      const config = buildProjectConfig();
+      mockConfigLoader.getProject.mockReturnValue(config);
+
+      const results = await service.execute(
+        new RunBackupCommand({ projectName: 'test-project', lockHeldExternally: true }),
+      );
+
+      expect(results[0].status).toBe(BackupStatus.Success);
+      expect(mockBackupLock.acquire).not.toHaveBeenCalled();
+      expect(mockBackupLock.release).not.toHaveBeenCalled();
+    });
+  });
+
+  // ── execute edge cases ──────────────────────────────────────────────
+
+  describe('execute edge cases', () => {
+    it('throws when projectName is missing and isAll is false', async () => {
+      await expect(
+        service.execute(new RunBackupCommand({})),
+      ).rejects.toThrow('Project name is required when not using --all');
+    });
+
+    it('dry run reports failure for config not found', async () => {
+      mockConfigLoader.getProject.mockImplementation(() => {
+        throw new Error('Project "missing" not found');
+      });
+
+      const report = await service.getDryRunReport('missing');
+
+      expect(report.allPassed).toBe(false);
+      expect(report.checks[0].name).toBe('Config loaded');
+      expect(report.checks[0].passed).toBe(false);
+    });
+
+    it('dry run returns failed BackupResult when checks fail', async () => {
+      mockConfigLoader.getProject.mockImplementation(() => {
+        throw new Error('Config error');
+      });
+
+      const results = await service.execute(
+        new RunBackupCommand({ projectName: 'bad', isDryRun: true }),
+      );
+
+      expect(results[0].status).toBe(BackupStatus.Failed);
+      expect(results[0].errorMessage).toContain('Config error');
+      expect(results[0].runId).toBe('dry-run');
+    });
+
+    it('dry run checks GPG key when encryption is configured', async () => {
+      const config = buildProjectConfig({
+        encryption: { enabled: true, type: 'gpg', recipient: 'backup@test.com' },
+      });
+      mockConfigLoader.getProject.mockReturnValue(config);
+      mockStorage.listSnapshots.mockResolvedValue([]);
+
+      const report = await service.getDryRunReport('test-project');
+
+      const gpgCheck = report.checks.find((c) => c.name === 'GPG key');
+      expect(gpgCheck).toBeDefined();
+    });
+
+    it('dry run checks asset paths when assets configured', async () => {
+      const config = buildProjectConfig({
+        assets: { paths: ['/data/uploads'] },
+      });
+      mockConfigLoader.getProject.mockReturnValue(config);
+      mockStorage.listSnapshots.mockResolvedValue([]);
+
+      const report = await service.getDryRunReport('test-project');
+
+      const assetCheck = report.checks.find((c) => c.name === 'Asset paths');
+      expect(assetCheck).toBeDefined();
+    });
+
+    it('writes notification fallback when failure notification fails', async () => {
+      const config = buildProjectConfig();
+      mockConfigLoader.getProject.mockReturnValue(config);
+      mockDumper.dump.mockRejectedValue(new Error('dump crash'));
+      mockNotifier.notifyFailure.mockRejectedValue(new Error('Slack down'));
+
+      const results = await service.execute(
+        new RunBackupCommand({ projectName: 'test-project' }),
+      );
+
+      expect(results[0].status).toBe(BackupStatus.Failed);
+      expect(mockFallbackWriter.writeNotificationFallback).toHaveBeenCalledWith(
+        'failure',
+        expect.objectContaining({ projectName: 'test-project' }),
+      );
+    });
+
+    it('captures non-BackupStageError errors with null errorStage', async () => {
+      const config = buildProjectConfig();
+      mockConfigLoader.getProject.mockReturnValue(config);
+      // Fail on Dump stage's trackProgress (second call), not NotifyStarted (first)
+      mockAuditLog.trackProgress
+        .mockResolvedValueOnce(undefined)
+        .mockRejectedValueOnce(new Error('unexpected'));
+
+      const results = await service.execute(
+        new RunBackupCommand({ projectName: 'test-project' }),
+      );
+
+      expect(results[0].status).toBe(BackupStatus.Failed);
     });
   });
 });

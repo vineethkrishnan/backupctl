@@ -8,7 +8,7 @@ describe('HealthController', () => {
 
   beforeEach(() => {
     checkHealth = {
-      checkHealth: jest.fn(),
+      execute: jest.fn(),
     } as unknown as jest.Mocked<CheckHealthUseCase>;
 
     controller = new HealthController(checkHealth);
@@ -16,7 +16,7 @@ describe('HealthController', () => {
 
   it('should return healthy status when all checks pass', async () => {
     const healthyResult = new HealthCheckResult(true, true, 50, true, true, true, 3600);
-    checkHealth.checkHealth.mockResolvedValue(healthyResult);
+    checkHealth.execute.mockResolvedValue(healthyResult);
 
     const response = await controller.check();
 
@@ -32,7 +32,7 @@ describe('HealthController', () => {
 
   it('should return unhealthy status when audit DB is down', async () => {
     const unhealthyResult = new HealthCheckResult(false, true, 50, true, true, true, 3600);
-    checkHealth.checkHealth.mockResolvedValue(unhealthyResult);
+    checkHealth.execute.mockResolvedValue(unhealthyResult);
 
     const response = await controller.check();
 
@@ -42,7 +42,7 @@ describe('HealthController', () => {
 
   it('should return unhealthy status when disk space is low', async () => {
     const unhealthyResult = new HealthCheckResult(true, false, 1, true, true, true, 3600);
-    checkHealth.checkHealth.mockResolvedValue(unhealthyResult);
+    checkHealth.execute.mockResolvedValue(unhealthyResult);
 
     const response = await controller.check();
 
@@ -53,7 +53,7 @@ describe('HealthController', () => {
 
   it('should return unhealthy status when SSH is disconnected', async () => {
     const unhealthyResult = new HealthCheckResult(true, true, 50, false, false, true, 3600);
-    checkHealth.checkHealth.mockResolvedValue(unhealthyResult);
+    checkHealth.execute.mockResolvedValue(unhealthyResult);
 
     const response = await controller.check();
 
@@ -64,7 +64,7 @@ describe('HealthController', () => {
 
   it('should match expected response shape', async () => {
     const result = new HealthCheckResult(true, true, 25, true, true, true, 120);
-    checkHealth.checkHealth.mockResolvedValue(result);
+    checkHealth.execute.mockResolvedValue(result);
 
     const response = await controller.check();
 

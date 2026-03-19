@@ -1,16 +1,20 @@
 # Bash Scripts
 
-backupctl ships with three host-side scripts for installation, deployment, and ongoing management. These scripts run on the Docker host machine — not inside the container. They wrap Docker and Docker Compose commands with validation, health checks, and interactive prompts.
+backupctl ships with host-side scripts for installation, development, deployment, and ongoing management. These scripts run on the Docker host machine — not inside the container. They wrap Docker and Docker Compose commands with validation, health checks, and interactive prompts.
 
 ## Overview
 
 | Script | Purpose | When to use |
 |--------|---------|-------------|
 | `scripts/install.sh` | Interactive first-time setup wizard | Initial deployment on a fresh server |
-| `scripts/deploy.sh` | Build and deploy containers | CI/CD pipelines, automated deployments |
-| `scripts/backupctl-manage.sh` | Day-to-day management | Operations, debugging, updates |
+| `scripts/dev.sh` | Development environment manager | Local development, testing, migrations |
+| `scripts/backupctl-manage.sh` | Production management | Operations, deployment, debugging, updates |
 
 All scripts are designed to be run from the project root directory.
+
+### Docker Network Auto-Connect
+
+Both `dev.sh` and `backupctl-manage.sh` automatically connect the backupctl container to Docker networks declared in `config/projects.yml` via the `docker_network` field. This happens on `up`, `restart`, `deploy`, and `update` commands. See [Configuration](05-configuration.md) for details on the `docker_network` field.
 
 ---
 
@@ -134,64 +138,85 @@ Setup complete! Run "backupctl health" to verify.
 
 ---
 
-## scripts/deploy.sh
+## scripts/install-cli.sh
 
-Minimal build-and-deploy script suitable for CI/CD pipelines. Validates configuration, builds the Docker image, starts containers, and runs a health check.
-
-### What It Does
-
-1. **Validate config** — if the container is already running, executes `backupctl config validate` before building. Aborts on validation errors.
-2. **Build Docker image** — runs `docker compose build` to build the backupctl image
-3. **Start containers** — runs `docker compose up -d` to start (or restart) containers in detached mode
-4. **Run health check** — waits for the container to be ready, then executes `backupctl health` to verify all dependencies are reachable
+Installs `backupctl` and `backupctl-dev` as wrapper scripts so you can run CLI commands from any directory without the `docker exec` prefix.
 
 ### Usage
 
 ```bash
-./scripts/deploy.sh
+./scripts/install-cli.sh              # interactive — choose user or system install
+./scripts/install-cli.sh --user       # install to ~/.local/bin (no sudo)
+./scripts/install-cli.sh --system     # install to /usr/local/bin (requires sudo)
+./scripts/install-cli.sh --uninstall  # remove both commands
 ```
 
-### Example Output
+### What It Creates
 
-```
-$ ./scripts/deploy.sh
+| Command | Delegates to | Container |
+|---------|-------------|-----------|
+| `backupctl` | `docker exec backupctl node dist/cli.js` | Production |
+| `backupctl-dev` | `docker exec backupctl-dev npx ts-node src/cli.ts` | Development |
 
-=== backupctl deploy ===
-
-[1/4] Validating configuration...
-  ✅ 3 project(s) valid
-
-[2/4] Building Docker image...
-  Building backupctl ... done
-  Building backupctl-audit-db ... done
-
-[3/4] Starting containers...
-  Container backupctl-audit-db started
-  Container backupctl started
-
-[4/4] Running health check...
-  Waiting for container to be ready...
-  ✅ Audit DB — Connected
-  ✅ Disk space — 42.0 GB free
-  ✅ SSH — Connected
-  ✅ Restic repos — All 3 accessible
-
-Deploy complete.
-```
-
-### CI/CD Integration
-
-The script exits with code `0` on success and `1` on any failure, making it suitable for CI/CD pipelines:
+After installation:
 
 ```bash
-ssh deploy@server 'cd /opt/backupctl && ./scripts/deploy.sh'
+backupctl health                       # production
+backupctl run locaboo --dry-run
+backupctl-dev health                   # development
+backupctl-dev config show locaboo
+```
+
+The wrapper scripts check if the target container is running and give a helpful error with start instructions if not.
+
+---
+
+## scripts/dev.sh
+
+Development environment manager. Single entry point for starting/stopping the dev Docker environment, running CLI commands, tests, linting, static analysis, and TypeORM migrations.
+
+See the full [Development Guide](13-development.md) for detailed usage.
+
+### Quick Reference
+
+| Command | Description |
+|---------|-------------|
+| `dev.sh up` | Start dev environment (build + hot reload) |
+| `dev.sh down` | Stop dev environment |
+| `dev.sh restart` | Rebuild and restart |
+| `dev.sh status` | Container status + health check |
+| `dev.sh logs [db]` | Tail logs |
+| `dev.sh shell` | Shell into dev container |
+| `dev.sh reset` | Destroy volumes and recreate (fresh DB) |
+| `dev.sh cli <cmd>` | Run backupctl CLI command |
+| `dev.sh test [watch\|cov\|e2e]` | Run tests |
+| `dev.sh lint [fix]` | Run linter |
+| `dev.sh analyze [target]` | Static analysis: `dead-code`, `duplicates`, `strict`, `all` |
+| `dev.sh db:shell` | Open psql to audit DB |
+| `dev.sh migrate:run` | Run pending migrations |
+| `dev.sh migrate:revert` | Revert last migration |
+| `dev.sh migrate:show` | Show migration status |
+| `dev.sh migrate:generate <Name>` | Generate migration from entity diff |
+| `dev.sh migrate:create <Name>` | Create empty migration |
+
+### Network Auto-Connect
+
+On `up` and `restart`, `dev.sh` reads `docker_network` from each project in `config/projects.yml` and runs `docker network connect` to ensure the dev container can reach each project's database.
+
+### Static Analysis
+
+```bash
+scripts/dev.sh analyze                # All checks (ESLint + knip + jscpd)
+scripts/dev.sh analyze dead-code      # Unused exports/files (knip)
+scripts/dev.sh analyze duplicates     # Copy-paste detection (jscpd)
+scripts/dev.sh analyze strict         # Strict type-safety (eslint)
 ```
 
 ---
 
 ## scripts/backupctl-manage.sh
 
-Comprehensive management script for day-to-day operations. Wraps common Docker, container, and backupctl commands into a single interface.
+Production management script for deployment and day-to-day operations. Handles setup, deploy, update, and diagnostics.
 
 ### Usage
 
@@ -366,19 +391,22 @@ Next scheduled:
 | Scenario | Script |
 |----------|--------|
 | First-time installation on a new server | `scripts/install.sh` |
-| CI/CD automated deployment | `scripts/deploy.sh` |
-| Manual deploy after config change | `backupctl-manage.sh deploy` |
-| Force rebuild after Dockerfile change | `backupctl-manage.sh deploy --rebuild` |
-| Apply code updates from git | `backupctl-manage.sh update` |
-| Check if environment is ready | `backupctl-manage.sh check` |
-| Debug a container issue | `backupctl-manage.sh shell` |
-| Monitor disk usage | `backupctl-manage.sh backup-dir` |
-| Quick operational overview | `backupctl-manage.sh status` |
-| Watch live logs | `backupctl-manage.sh logs` |
+| Start dev environment (hot reload) | `scripts/dev.sh up` |
+| Run tests, lint, static analysis | `scripts/dev.sh test` / `lint` / `analyze` |
+| Run CLI commands in dev | `scripts/dev.sh cli <cmd>` |
+| TypeORM migrations | `scripts/dev.sh migrate:run` |
+| Production deploy after config change | `backupctl-manage.sh deploy` |
+| Force production rebuild | `backupctl-manage.sh deploy --rebuild` |
+| Apply code updates (prod) | `backupctl-manage.sh update` |
+| Check prod prerequisites | `backupctl-manage.sh check` |
+| Debug production container | `backupctl-manage.sh shell` |
+| Monitor disk usage (prod) | `backupctl-manage.sh backup-dir` |
+| Quick operational overview (prod) | `backupctl-manage.sh status` |
+| Watch production logs | `backupctl-manage.sh logs` |
 
 ### Typical Workflow
 
-**First-time setup:**
+**First-time setup (production):**
 
 ```bash
 git clone <repo> /opt/backupctl
@@ -386,7 +414,17 @@ cd /opt/backupctl
 ./scripts/install.sh
 ```
 
-**Day-to-day operations:**
+**Development:**
+
+```bash
+scripts/dev.sh up                        # start dev environment
+scripts/dev.sh cli health                # health check
+scripts/dev.sh cli run myproject --dry-run
+scripts/dev.sh test                      # run tests
+scripts/dev.sh analyze                   # full static analysis
+```
+
+**Production operations:**
 
 ```bash
 ./scripts/backupctl-manage.sh status     # check health
@@ -395,7 +433,7 @@ cd /opt/backupctl
 ./scripts/backupctl-manage.sh backup-dir # monitor disk
 ```
 
-**Deploying updates:**
+**Deploying production updates:**
 
 ```bash
 cd /opt/backupctl

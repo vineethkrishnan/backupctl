@@ -1,16 +1,29 @@
 import * as fs from 'fs';
 import * as path from 'path';
 
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { GpgKeyManagerPort } from '@domain/backup/application/ports/gpg-key-manager.port';
 import { safeExecFile } from '@common/helpers/child-process.util';
 
 @Injectable()
-export class GpgKeyManager {
+export class GpgKeyManager implements GpgKeyManagerPort, OnModuleInit {
+  private readonly logger = new Logger(GpgKeyManager.name);
   private readonly gpgKeysDir: string;
 
   constructor(configService: ConfigService) {
     this.gpgKeysDir = configService.get<string>('GPG_KEYS_DIR', '/gpg-keys');
+  }
+
+  async onModuleInit(): Promise<void> {
+    try {
+      const imported = await this.importAllFromDirectory();
+      if (imported.length > 0) {
+        this.logger.log(`Auto-imported ${imported.length} GPG key(s) from ${this.gpgKeysDir}`);
+      }
+    } catch (error) {
+      this.logger.warn(`Failed to auto-import GPG keys: ${(error as Error).message}`);
+    }
   }
 
   async importKey(filePath: string): Promise<void> {
@@ -42,5 +55,14 @@ export class GpgKeyManager {
       '--list-keys', '--keyid-format', 'long',
     ]);
     return stdout;
+  }
+
+  async hasKey(recipient: string): Promise<boolean> {
+    try {
+      const { stdout } = await safeExecFile('gpg', ['--list-keys', recipient], { timeout: 10000 });
+      return stdout.length > 0;
+    } catch {
+      return false;
+    }
   }
 }
