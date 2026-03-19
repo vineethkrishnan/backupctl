@@ -1,8 +1,8 @@
 import * as fs from 'fs';
 import * as yaml from 'js-yaml';
 import { ConfigService } from '@nestjs/config';
-import { YamlConfigLoaderAdapter } from '@infrastructure/adapters/config/yaml-config-loader.adapter';
-import { ProjectConfig } from '@domain/config/models/project-config.model';
+import { YamlConfigLoaderAdapter } from '@domain/config/infrastructure/yaml-config-loader.adapter';
+import { ProjectConfig } from '@domain/config/domain/project-config.model';
 
 jest.mock('fs');
 

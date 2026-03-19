@@ -1,10 +1,10 @@
-import { GpgEncryptorAdapter } from '@infrastructure/adapters/encryptors/gpg-encryptor.adapter';
+import { GpgEncryptorAdapter } from '@domain/backup/infrastructure/adapters/encryptors/gpg-encryptor.adapter';
 
-jest.mock('@shared/child-process.util', () => ({
+jest.mock('@common/helpers/child-process.util', () => ({
   safeExecFile: jest.fn().mockResolvedValue({ stdout: '', stderr: '' }),
 }));
 
-import { safeExecFile } from '@shared/child-process.util';
+import { safeExecFile } from '@common/helpers/child-process.util';
 
 const mockSafeExecFile = safeExecFile as jest.MockedFunction<typeof safeExecFile>;
 

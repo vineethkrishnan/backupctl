@@ -1,4 +1,4 @@
-import { RetentionPolicy } from '../../../../../src/domain/config/models/retention-policy.model';
+import { RetentionPolicy } from '@domain/config/domain/retention-policy.model';
 
 describe('RetentionPolicy', () => {
   it('should accept valid values where all are >= 0', () => {

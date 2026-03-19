@@ -1,13 +1,13 @@
 import { SchedulerRegistry } from '@nestjs/schedule';
 import { ConfigService } from '@nestjs/config';
-import { DynamicSchedulerService } from '@infrastructure/scheduler/dynamic-scheduler.service';
-import { BackupOrchestratorService } from '@application/backup/backup-orchestrator.service';
-import { NotifierRegistry } from '@application/backup/registries/notifier.registry';
-import { AuditQueryService } from '@application/audit/audit-query.service';
-import { BackupLockPort } from '@domain/backup/ports/backup-lock.port';
-import { ConfigLoaderPort } from '@domain/config/ports/config-loader.port';
-import { ProjectConfig } from '@domain/config/models/project-config.model';
-import { RetentionPolicy } from '@domain/config/models/retention-policy.model';
+import { DynamicSchedulerService } from '@domain/backup/infrastructure/scheduler/dynamic-scheduler.service';
+import { RunBackupUseCase } from '@domain/backup/application/use-cases/run-backup/run-backup.use-case';
+import { NotifierRegistry } from '@domain/backup/application/registries/notifier.registry';
+import { GetBackupStatusUseCase } from '@domain/audit/application/use-cases/get-backup-status/get-backup-status.use-case';
+import { BackupLockPort } from '@domain/backup/application/ports/backup-lock.port';
+import { ConfigLoaderPort } from '@domain/config/application/ports/config-loader.port';
+import { ProjectConfig } from '@domain/config/domain/project-config.model';
+import { RetentionPolicy } from '@domain/config/domain/retention-policy.model';
 
 function createProjectConfig(overrides: Partial<{ name: string; cron: string; enabled: boolean }> = {}): ProjectConfig {
   return new ProjectConfig({
@@ -42,10 +42,10 @@ describe('DynamicSchedulerService', () => {
   let service: DynamicSchedulerService;
   let schedulerRegistry: jest.Mocked<SchedulerRegistry>;
   let configLoader: jest.Mocked<ConfigLoaderPort>;
-  let backupOrchestrator: jest.Mocked<BackupOrchestratorService>;
+  let runBackup: jest.Mocked<RunBackupUseCase>;
   let backupLock: jest.Mocked<BackupLockPort>;
   let notifierRegistry: jest.Mocked<NotifierRegistry>;
-  let auditQueryService: jest.Mocked<AuditQueryService>;
+  let getBackupStatus: jest.Mocked<GetBackupStatusUseCase>;
   let configService: jest.Mocked<ConfigService>;
   const registeredJobs: { stop: () => void }[] = [];
 
@@ -67,10 +67,10 @@ describe('DynamicSchedulerService', () => {
       reload: jest.fn(),
     } as jest.Mocked<ConfigLoaderPort>;
 
-    backupOrchestrator = {
+    runBackup = {
       runBackup: jest.fn(),
       runAllBackups: jest.fn(),
-    } as unknown as jest.Mocked<BackupOrchestratorService>;
+    } as unknown as jest.Mocked<RunBackupUseCase>;
 
     backupLock = {
       acquire: jest.fn(),
@@ -85,10 +85,9 @@ describe('DynamicSchedulerService', () => {
       getRegisteredTypes: jest.fn().mockReturnValue([]),
     } as unknown as jest.Mocked<NotifierRegistry>;
 
-    auditQueryService = {
-      getStatus: jest.fn().mockResolvedValue([]),
-      getFailedLogs: jest.fn(),
-    } as unknown as jest.Mocked<AuditQueryService>;
+    getBackupStatus = {
+      execute: jest.fn().mockResolvedValue([]),
+    } as unknown as jest.Mocked<GetBackupStatusUseCase>;
 
     configService = {
       get: jest.fn().mockReturnValue('0 7 * * *'),
@@ -97,10 +96,10 @@ describe('DynamicSchedulerService', () => {
     service = new DynamicSchedulerService(
       schedulerRegistry,
       configLoader,
-      backupOrchestrator,
+      runBackup,
       backupLock,
       notifierRegistry,
-      auditQueryService,
+      getBackupStatus,
       configService,
     );
   });

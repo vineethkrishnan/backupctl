@@ -18,6 +18,8 @@
 | 10 | [Cheatsheet](10-cheatsheet.md) | Quick-reference commands for daily operations |
 | 11 | [Adding Adapters](11-adding-adapters.md) | How to add new database dumpers, notifiers, or storage backends |
 | 12 | [Troubleshooting](12-troubleshooting.md) | Common errors, diagnostics, recovery procedures |
+| 13 | [Development](13-development.md) | Docker dev environment, hot reload, local setup, testing |
+| 14 | [Migrations](14-migrations.md) | TypeORM migration commands, patterns, and troubleshooting |
 
 ## Quick Links
 
@@ -26,6 +28,8 @@
 - **Run a backup** — [CLI Reference → `run`](06-cli-reference.md)
 - **Restore from snapshot** — [Restore Guide](09-restore-guide.md)
 - **Daily commands** — [Cheatsheet](10-cheatsheet.md)
+- **Development** — [Dev environment & testing](13-development.md)
+- **Database migrations** — [TypeORM migration guide](14-migrations.md)
 
 ## Getting Help
 

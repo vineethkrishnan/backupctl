@@ -1,5 +1,5 @@
-import { ProjectConfig, ProjectConfigParams } from '../../../../../src/domain/config/models/project-config.model';
-import { RetentionPolicy } from '../../../../../src/domain/config/models/retention-policy.model';
+import { ProjectConfig, ProjectConfigParams } from '@domain/config/domain/project-config.model';
+import { RetentionPolicy } from '@domain/config/domain/retention-policy.model';
 
 function buildParams(overrides: Partial<ProjectConfigParams> = {}): ProjectConfigParams {
   return {

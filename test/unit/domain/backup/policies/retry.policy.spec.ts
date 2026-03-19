@@ -1,5 +1,5 @@
-import { BackupStage } from '@domain/backup/models/backup-stage.enum';
-import { evaluateRetry } from '@domain/backup/policies/retry.policy';
+import { BackupStage } from '@domain/backup/domain/value-objects/backup-stage.enum';
+import { evaluateRetry } from '@domain/backup/domain/policies/retry.policy';
 
 describe('evaluateRetry', () => {
   describe('retryable stages', () => {

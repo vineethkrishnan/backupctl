@@ -4,31 +4,32 @@ import * as os from 'os';
 import { Test, TestingModule } from '@nestjs/testing';
 import { ConfigModule } from '@nestjs/config';
 
-import { BackupOrchestratorService } from '@application/backup/backup-orchestrator.service';
-import { DumperRegistry } from '@application/backup/registries/dumper.registry';
-import { NotifierRegistry } from '@application/backup/registries/notifier.registry';
+import { RunBackupUseCase } from '@domain/backup/application/use-cases/run-backup/run-backup.use-case';
+import { RunBackupCommand } from '@domain/backup/application/use-cases/run-backup/run-backup.command';
+import { DumperRegistry } from '@domain/backup/application/registries/dumper.registry';
+import { NotifierRegistry } from '@domain/backup/application/registries/notifier.registry';
 
-import { ProjectConfig } from '@domain/config/models/project-config.model';
-import { ConfigLoaderPort, ValidationResult } from '@domain/config/ports/config-loader.port';
-import { DatabaseDumperPort } from '@domain/backup/ports/database-dumper.port';
-import { RemoteStoragePort } from '@domain/backup/ports/remote-storage.port';
-import { NotifierPort } from '@domain/notification/ports/notifier.port';
-import { AuditLogPort } from '@domain/audit/ports/audit-log.port';
-import { FallbackWriterPort, FallbackEntry } from '@domain/audit/ports/fallback-writer.port';
-import { BackupLockPort } from '@domain/backup/ports/backup-lock.port';
-import { ClockPort } from '@domain/shared/ports/clock.port';
-import { DumpEncryptorPort } from '@domain/backup/ports/dump-encryptor.port';
-import { HookExecutorPort } from '@domain/backup/ports/hook-executor.port';
-import { LocalCleanupPort } from '@domain/backup/ports/local-cleanup.port';
-import { BackupResult } from '@domain/backup/models/backup-result.model';
-import { BackupStage } from '@domain/backup/models/backup-stage.enum';
-import { BackupStatus } from '@domain/backup/models/backup-status.enum';
-import { DumpResult } from '@domain/backup/models/dump-result.model';
-import { SyncResult } from '@domain/backup/models/sync-result.model';
-import { PruneResult } from '@domain/backup/models/prune-result.model';
-import { CleanupResult } from '@domain/backup/models/cleanup-result.model';
-import { RetentionPolicy } from '@domain/config/models/retention-policy.model';
-import { CacheInfo } from '@domain/backup/models/cache-info.model';
+import { ProjectConfig } from '@domain/config/domain/project-config.model';
+import { ConfigLoaderPort, ValidationResult } from '@domain/config/application/ports/config-loader.port';
+import { DatabaseDumperPort } from '@domain/backup/application/ports/database-dumper.port';
+import { RemoteStoragePort } from '@domain/backup/application/ports/remote-storage.port';
+import { NotifierPort } from '@domain/notification/application/ports/notifier.port';
+import { AuditLogPort } from '@domain/audit/application/ports/audit-log.port';
+import { FallbackWriterPort, FallbackEntry } from '@domain/audit/application/ports/fallback-writer.port';
+import { BackupLockPort } from '@domain/backup/application/ports/backup-lock.port';
+import { ClockPort } from '@common/clock/clock.port';
+import { DumpEncryptorPort } from '@domain/backup/application/ports/dump-encryptor.port';
+import { HookExecutorPort } from '@domain/backup/application/ports/hook-executor.port';
+import { LocalCleanupPort } from '@domain/backup/application/ports/local-cleanup.port';
+import { BackupResult } from '@domain/backup/domain/backup-result.model';
+import { BackupStage } from '@domain/backup/domain/value-objects/backup-stage.enum';
+import { BackupStatus } from '@domain/backup/domain/value-objects/backup-status.enum';
+import { DumpResult } from '@domain/backup/domain/value-objects/dump-result.model';
+import { SyncResult } from '@domain/backup/domain/value-objects/sync-result.model';
+import { PruneResult } from '@domain/backup/domain/value-objects/prune-result.model';
+import { CleanupResult } from '@domain/backup/domain/value-objects/cleanup-result.model';
+import { RetentionPolicy } from '@domain/config/domain/retention-policy.model';
+import { CacheInfo } from '@domain/backup/domain/value-objects/cache-info.model';
 
 import {
   CONFIG_LOADER_PORT,
@@ -42,7 +43,7 @@ import {
   HOOK_EXECUTOR_PORT,
   LOCAL_CLEANUP_PORT,
   REMOTE_STORAGE_FACTORY,
-} from '@shared/injection-tokens';
+} from '@common/di/injection-tokens';
 
 jest.setTimeout(30000);
 
@@ -197,9 +198,9 @@ class TestFileBackupLock implements BackupLockPort {
 
 // ── Test setup ──────────────────────────────────────────────────────────
 
-describe('BackupOrchestratorService (integration flow)', () => {
+describe('RunBackupUseCase (integration flow)', () => {
   let moduleRef: TestingModule;
-  let orchestrator: BackupOrchestratorService;
+  let orchestrator: RunBackupUseCase;
   let tempDir: string;
 
   // Mock ports
@@ -281,7 +282,7 @@ describe('BackupOrchestratorService (integration flow)', () => {
     moduleRef = await Test.createTestingModule({
       imports: [ConfigModule.forRoot({ isGlobal: true })],
       providers: [
-        BackupOrchestratorService,
+        RunBackupUseCase,
         { provide: CONFIG_LOADER_PORT, useValue: configLoader },
         { provide: DUMPER_REGISTRY, useValue: dumperRegistry },
         { provide: NOTIFIER_REGISTRY, useValue: notifierRegistry },
@@ -296,7 +297,7 @@ describe('BackupOrchestratorService (integration flow)', () => {
       ],
     }).compile();
 
-    orchestrator = moduleRef.get(BackupOrchestratorService);
+    orchestrator = moduleRef.get(RunBackupUseCase);
   });
 
   afterEach(async () => {
@@ -309,7 +310,7 @@ describe('BackupOrchestratorService (integration flow)', () => {
   // ── Happy path ──────────────────────────────────────────────────────
 
   it('should complete full backup flow: dump → sync → prune → cleanup → audit → notify', async () => {
-    const result = await orchestrator.runBackup('locaboo');
+    const [result] = await orchestrator.execute(new RunBackupCommand({ projectName: 'locaboo' }));
 
     expect(result.status).toBe(BackupStatus.Success);
     expect(result.projectName).toBe('locaboo');
@@ -340,7 +341,7 @@ describe('BackupOrchestratorService (integration flow)', () => {
     // Manually acquire the lock
     await backupLock.acquire('locaboo');
 
-    await expect(orchestrator.runBackup('locaboo')).rejects.toThrow(
+    await expect(orchestrator.execute(new RunBackupCommand({ projectName: 'locaboo' }))).rejects.toThrow(
       'Backup already in progress for locaboo',
     );
 
@@ -351,16 +352,11 @@ describe('BackupOrchestratorService (integration flow)', () => {
   // ── Dry run ────────────────────────────────────────────────────────
 
   it('should not execute backup steps during dry run', async () => {
-    const report = await orchestrator.executeDryRun('locaboo');
+    const [result] = await orchestrator.execute(new RunBackupCommand({ projectName: 'locaboo', isDryRun: true }));
 
-    expect(report.projectName).toBe('locaboo');
-    expect(report.checks.length).toBeGreaterThan(0);
-
-    const configCheck = report.checks.find((c) => c.name === 'Config loaded');
-    expect(configCheck?.passed).toBe(true);
-
-    const dumperCheck = report.checks.find((c) => c.name === 'Database dumper');
-    expect(dumperCheck?.passed).toBe(true);
+    expect(result.projectName).toBe('locaboo');
+    expect(result.runId).toBe('dry-run');
+    expect(result.status).toBe(BackupStatus.Success);
 
     expect(mockDumper.dump).not.toHaveBeenCalled();
     expect(mockStorage.sync).not.toHaveBeenCalled();
@@ -381,7 +377,7 @@ describe('BackupOrchestratorService (integration flow)', () => {
       return new DumpResult('/data/backups/locaboo/dump.sql.gz', 1024000, 5000);
     });
 
-    const result = await orchestrator.runBackup('locaboo');
+    const [result] = await orchestrator.execute(new RunBackupCommand({ projectName: 'locaboo' }));
 
     expect(result.status).toBe(BackupStatus.Success);
     // First call + 2 retries = 3 total calls
@@ -394,7 +390,7 @@ describe('BackupOrchestratorService (integration flow)', () => {
   it('should fail after exhausting retries', async () => {
     mockDumper.dump.mockRejectedValue(new Error('pg_dump persistent failure'));
 
-    const result = await orchestrator.runBackup('locaboo');
+    const [result] = await orchestrator.execute(new RunBackupCommand({ projectName: 'locaboo' }));
 
     expect(result.status).toBe(BackupStatus.Failed);
     expect(result.errorStage).toBe(BackupStage.Dump);
@@ -412,7 +408,7 @@ describe('BackupOrchestratorService (integration flow)', () => {
   it('should track progress through audit log stages', async () => {
     const trackSpy = jest.spyOn(auditLog, 'trackProgress');
 
-    await orchestrator.runBackup('locaboo');
+    await orchestrator.execute(new RunBackupCommand({ projectName: 'locaboo' }));
 
     expect(trackSpy).toHaveBeenCalledWith(expect.any(String), BackupStage.NotifyStarted);
     expect(trackSpy).toHaveBeenCalledWith(expect.any(String), BackupStage.Dump);
@@ -424,7 +420,7 @@ describe('BackupOrchestratorService (integration flow)', () => {
   // ── Sync receives correct paths and tags ──────────────────────────
 
   it('should pass dump file path and tags to storage sync', async () => {
-    await orchestrator.runBackup('locaboo');
+    await orchestrator.execute(new RunBackupCommand({ projectName: 'locaboo' }));
 
     expect(mockStorage.sync).toHaveBeenCalledWith(
       ['/data/backups/locaboo/dump.sql.gz'],

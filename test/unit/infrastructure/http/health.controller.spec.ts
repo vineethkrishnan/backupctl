@@ -1,24 +1,24 @@
-import { HealthController } from '@infrastructure/http/health.controller';
-import { HealthCheckService } from '@application/health/health-check.service';
-import { HealthCheckResult } from '@domain/audit/models/health-check-result.model';
+import { HealthController } from '@domain/health/presenters/http/health.controller';
+import { CheckHealthUseCase } from '@domain/health/application/use-cases/check-health/check-health.use-case';
+import { HealthCheckResult } from '@domain/audit/domain/health-check-result.model';
 
 describe('HealthController', () => {
   let controller: HealthController;
-  let healthService: jest.Mocked<HealthCheckService>;
+  let checkHealth: jest.Mocked<CheckHealthUseCase>;
 
   beforeEach(() => {
-    healthService = {
+    checkHealth = {
       checkHealth: jest.fn(),
-    } as unknown as jest.Mocked<HealthCheckService>;
+    } as unknown as jest.Mocked<CheckHealthUseCase>;
 
-    controller = new HealthController(healthService);
+    controller = new HealthController(checkHealth);
   });
 
   it('should return healthy status when all checks pass', async () => {
     const healthyResult = new HealthCheckResult(true, true, 50, true, true, true, 3600);
-    healthService.checkHealth.mockResolvedValue(healthyResult);
+    checkHealth.checkHealth.mockResolvedValue(healthyResult);
 
-    const response = await controller.checkHealth();
+    const response = await controller.check();
 
     expect(response.status).toBe('healthy');
     expect(response.checks.auditDb).toBe(true);
@@ -32,9 +32,9 @@ describe('HealthController', () => {
 
   it('should return unhealthy status when audit DB is down', async () => {
     const unhealthyResult = new HealthCheckResult(false, true, 50, true, true, true, 3600);
-    healthService.checkHealth.mockResolvedValue(unhealthyResult);
+    checkHealth.checkHealth.mockResolvedValue(unhealthyResult);
 
-    const response = await controller.checkHealth();
+    const response = await controller.check();
 
     expect(response.status).toBe('unhealthy');
     expect(response.checks.auditDb).toBe(false);
@@ -42,9 +42,9 @@ describe('HealthController', () => {
 
   it('should return unhealthy status when disk space is low', async () => {
     const unhealthyResult = new HealthCheckResult(true, false, 1, true, true, true, 3600);
-    healthService.checkHealth.mockResolvedValue(unhealthyResult);
+    checkHealth.checkHealth.mockResolvedValue(unhealthyResult);
 
-    const response = await controller.checkHealth();
+    const response = await controller.check();
 
     expect(response.status).toBe('unhealthy');
     expect(response.checks.diskSpace.available).toBe(false);
@@ -53,9 +53,9 @@ describe('HealthController', () => {
 
   it('should return unhealthy status when SSH is disconnected', async () => {
     const unhealthyResult = new HealthCheckResult(true, true, 50, false, false, true, 3600);
-    healthService.checkHealth.mockResolvedValue(unhealthyResult);
+    checkHealth.checkHealth.mockResolvedValue(unhealthyResult);
 
-    const response = await controller.checkHealth();
+    const response = await controller.check();
 
     expect(response.status).toBe('unhealthy');
     expect(response.checks.ssh.connected).toBe(false);
@@ -64,9 +64,9 @@ describe('HealthController', () => {
 
   it('should match expected response shape', async () => {
     const result = new HealthCheckResult(true, true, 25, true, true, true, 120);
-    healthService.checkHealth.mockResolvedValue(result);
+    checkHealth.checkHealth.mockResolvedValue(result);
 
-    const response = await controller.checkHealth();
+    const response = await controller.check();
 
     expect(response).toEqual({
       status: 'healthy',

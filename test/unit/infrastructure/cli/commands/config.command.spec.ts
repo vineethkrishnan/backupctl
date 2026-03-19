@@ -3,11 +3,11 @@ import {
   ConfigShowSubCommand,
   ConfigReloadSubCommand,
   ConfigImportGpgKeySubCommand,
-} from '@infrastructure/cli/commands/config.command';
-import { ConfigLoaderPort } from '@domain/config/ports/config-loader.port';
-import { ProjectConfig } from '@domain/config/models/project-config.model';
-import { RetentionPolicy } from '@domain/config/models/retention-policy.model';
-import { GpgKeyManager } from '@infrastructure/adapters/encryptors/gpg-key-manager';
+} from '@domain/config/presenters/cli/config.command';
+import { ConfigLoaderPort } from '@domain/config/application/ports/config-loader.port';
+import { ProjectConfig } from '@domain/config/domain/project-config.model';
+import { RetentionPolicy } from '@domain/config/domain/retention-policy.model';
+import { GpgKeyManager } from '@domain/backup/infrastructure/adapters/encryptors/gpg-key-manager';
 
 function buildProjectConfig(): ProjectConfig {
   return new ProjectConfig({

@@ -1,30 +1,30 @@
 import { TestingModule } from '@nestjs/testing';
 import { CommandTestFactory } from 'nest-commander-testing';
 
-import { RunCommand } from '@infrastructure/cli/commands/run.command';
-import { HealthCommand } from '@infrastructure/cli/commands/health.command';
-import { SnapshotsCommand } from '@infrastructure/cli/commands/snapshots.command';
+import { RunCommand } from '@domain/backup/presenters/cli/run.command';
+import { HealthCommand } from '@domain/health/presenters/cli/health.command';
+import { SnapshotsCommand } from '@domain/backup/presenters/cli/snapshots.command';
 import {
   ConfigCommand,
   ConfigValidateSubCommand,
   ConfigShowSubCommand,
   ConfigReloadSubCommand,
   ConfigImportGpgKeySubCommand,
-} from '@infrastructure/cli/commands/config.command';
+} from '@domain/config/presenters/cli/config.command';
 
-import { BackupOrchestratorService } from '@application/backup/backup-orchestrator.service';
-import { HealthCheckService } from '@application/health/health-check.service';
-import { SnapshotManagementService } from '@application/snapshot/snapshot-management.service';
-import { ConfigLoaderPort, ValidationResult } from '@domain/config/ports/config-loader.port';
-import { BackupResult } from '@domain/backup/models/backup-result.model';
-import { BackupStage } from '@domain/backup/models/backup-stage.enum';
-import { BackupStatus } from '@domain/backup/models/backup-status.enum';
-import { HealthCheckResult } from '@domain/audit/models/health-check-result.model';
-import { SnapshotInfo } from '@domain/backup/models/snapshot-info.model';
-import { ProjectConfig } from '@domain/config/models/project-config.model';
-import { RetentionPolicy } from '@domain/config/models/retention-policy.model';
-import { GpgKeyManager } from '@infrastructure/adapters/encryptors/gpg-key-manager';
-import { CONFIG_LOADER_PORT } from '@shared/injection-tokens';
+import { RunBackupUseCase } from '@domain/backup/application/use-cases/run-backup/run-backup.use-case';
+import { CheckHealthUseCase } from '@domain/health/application/use-cases/check-health/check-health.use-case';
+import { ListSnapshotsUseCase } from '@domain/backup/application/use-cases/list-snapshots/list-snapshots.use-case';
+import { ConfigLoaderPort, ValidationResult } from '@domain/config/application/ports/config-loader.port';
+import { BackupResult } from '@domain/backup/domain/backup-result.model';
+import { BackupStage } from '@domain/backup/domain/value-objects/backup-stage.enum';
+import { BackupStatus } from '@domain/backup/domain/value-objects/backup-status.enum';
+import { HealthCheckResult } from '@domain/audit/domain/health-check-result.model';
+import { SnapshotInfo } from '@domain/backup/domain/value-objects/snapshot-info.model';
+import { ProjectConfig } from '@domain/config/domain/project-config.model';
+import { RetentionPolicy } from '@domain/config/domain/retention-policy.model';
+import { GpgKeyManager } from '@domain/backup/infrastructure/adapters/encryptors/gpg-key-manager';
+import { CONFIG_LOADER_PORT } from '@common/di/injection-tokens';
 
 jest.setTimeout(30000);
 
@@ -83,29 +83,25 @@ function buildTestConfig(): ProjectConfig {
 describe('CLI commands (integration)', () => {
   let commandModule: TestingModule;
 
-  let mockOrchestrator: jest.Mocked<BackupOrchestratorService>;
-  let mockHealthCheck: jest.Mocked<HealthCheckService>;
-  let mockSnapshotManagement: jest.Mocked<SnapshotManagementService>;
+  let mockOrchestrator: jest.Mocked<RunBackupUseCase>;
+  let mockHealthCheck: jest.Mocked<CheckHealthUseCase>;
+  let mockSnapshotManagement: jest.Mocked<ListSnapshotsUseCase>;
   let mockConfigLoader: jest.Mocked<ConfigLoaderPort>;
   let mockGpgKeyManager: jest.Mocked<GpgKeyManager>;
 
   beforeEach(async () => {
     mockOrchestrator = {
-      runBackup: jest.fn(),
-      runAllBackups: jest.fn(),
-      restoreBackup: jest.fn(),
-      getRestoreGuide: jest.fn(),
-      pruneProject: jest.fn(),
-      pruneAll: jest.fn(),
-    } as unknown as jest.Mocked<BackupOrchestratorService>;
+      execute: jest.fn(),
+      getDryRunReport: jest.fn(),
+    } as unknown as jest.Mocked<RunBackupUseCase>;
 
     mockHealthCheck = {
       checkHealth: jest.fn(),
-    } as unknown as jest.Mocked<HealthCheckService>;
+    } as unknown as jest.Mocked<CheckHealthUseCase>;
 
     mockSnapshotManagement = {
-      listSnapshots: jest.fn(),
-    } as unknown as jest.Mocked<SnapshotManagementService>;
+      execute: jest.fn(),
+    } as unknown as jest.Mocked<ListSnapshotsUseCase>;
 
     mockConfigLoader = {
       loadAll: jest.fn().mockReturnValue([buildTestConfig()]),
@@ -134,9 +130,9 @@ describe('CLI commands (integration)', () => {
         ConfigShowSubCommand,
         ConfigReloadSubCommand,
         ConfigImportGpgKeySubCommand,
-        { provide: BackupOrchestratorService, useValue: mockOrchestrator },
-        { provide: HealthCheckService, useValue: mockHealthCheck },
-        { provide: SnapshotManagementService, useValue: mockSnapshotManagement },
+        { provide: RunBackupUseCase, useValue: mockOrchestrator },
+        { provide: CheckHealthUseCase, useValue: mockHealthCheck },
+        { provide: ListSnapshotsUseCase, useValue: mockSnapshotManagement },
         { provide: CONFIG_LOADER_PORT, useValue: mockConfigLoader },
         { provide: GpgKeyManager, useValue: mockGpgKeyManager },
       ],
@@ -150,23 +146,27 @@ describe('CLI commands (integration)', () => {
 
   describe('run command', () => {
     it('should trigger backup for a named project', async () => {
-      mockOrchestrator.runBackup.mockResolvedValue(buildResult());
+      mockOrchestrator.execute.mockResolvedValue([buildResult()]);
 
       await CommandTestFactory.run(commandModule, ['run', 'locaboo']);
 
-      expect(mockOrchestrator.runBackup).toHaveBeenCalledWith('locaboo');
+      expect(mockOrchestrator.execute).toHaveBeenCalledWith(
+        expect.objectContaining({ projectName: 'locaboo', isAll: false }),
+      );
     });
 
     it('should trigger all backups with --all flag', async () => {
-      mockOrchestrator.runAllBackups.mockResolvedValue([buildResult()]);
+      mockOrchestrator.execute.mockResolvedValue([buildResult()]);
 
       await CommandTestFactory.run(commandModule, ['run', '--all']);
 
-      expect(mockOrchestrator.runAllBackups).toHaveBeenCalled();
+      expect(mockOrchestrator.execute).toHaveBeenCalledWith(
+        expect.objectContaining({ isAll: true }),
+      );
     });
 
-    it('should call executeDryRun for --dry-run flag', async () => {
-      mockOrchestrator.executeDryRun = jest.fn().mockResolvedValue({
+    it('should call getDryRunReport for --dry-run flag', async () => {
+      mockOrchestrator.getDryRunReport.mockResolvedValue({
         projectName: 'locaboo',
         checks: [{ name: 'Config loaded', passed: true, message: 'OK' }],
         allPassed: true,
@@ -174,8 +174,8 @@ describe('CLI commands (integration)', () => {
 
       await CommandTestFactory.run(commandModule, ['run', 'locaboo', '--dry-run']);
 
-      expect(mockOrchestrator.executeDryRun).toHaveBeenCalledWith('locaboo');
-      expect(mockOrchestrator.runBackup).not.toHaveBeenCalled();
+      expect(mockOrchestrator.getDryRunReport).toHaveBeenCalledWith('locaboo');
+      expect(mockOrchestrator.execute).not.toHaveBeenCalled();
     });
   });
 
@@ -224,7 +224,7 @@ describe('CLI commands (integration)', () => {
 
   describe('snapshots command', () => {
     it('should list snapshots for a project', async () => {
-      mockSnapshotManagement.listSnapshots.mockResolvedValue([
+      mockSnapshotManagement.execute.mockResolvedValue([
         new SnapshotInfo(
           'abc123def456',
           '2026-03-18T02:05:00Z',
@@ -237,11 +237,13 @@ describe('CLI commands (integration)', () => {
 
       await CommandTestFactory.run(commandModule, ['snapshots', 'locaboo']);
 
-      expect(mockSnapshotManagement.listSnapshots).toHaveBeenCalledWith('locaboo', undefined);
+      expect(mockSnapshotManagement.execute).toHaveBeenCalledWith(
+        expect.objectContaining({ projectName: 'locaboo' }),
+      );
     });
 
     it('should display message when no snapshots found', async () => {
-      mockSnapshotManagement.listSnapshots.mockResolvedValue([]);
+      mockSnapshotManagement.execute.mockResolvedValue([]);
 
       await CommandTestFactory.run(commandModule, ['snapshots', 'locaboo']);
 

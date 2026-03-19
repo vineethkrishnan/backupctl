@@ -1,13 +1,14 @@
-import { SnapshotManagementService } from '@application/snapshot/snapshot-management.service';
-import { ConfigLoaderPort } from '@domain/config/ports/config-loader.port';
-import { RemoteStorageFactory } from '@domain/backup/ports/remote-storage-factory.port';
-import { RemoteStoragePort } from '@domain/backup/ports/remote-storage.port';
-import { SnapshotInfo } from '@domain/backup/models/snapshot-info.model';
-import { ProjectConfig } from '@domain/config/models/project-config.model';
-import { RetentionPolicy } from '@domain/config/models/retention-policy.model';
+import { ListSnapshotsUseCase } from '@domain/backup/application/use-cases/list-snapshots/list-snapshots.use-case';
+import { ListSnapshotsQuery } from '@domain/backup/application/use-cases/list-snapshots/list-snapshots.query';
+import { ConfigLoaderPort } from '@domain/config/application/ports/config-loader.port';
+import { RemoteStorageFactory } from '@domain/backup/application/ports/remote-storage-factory.port';
+import { RemoteStoragePort } from '@domain/backup/application/ports/remote-storage.port';
+import { SnapshotInfo } from '@domain/backup/domain/value-objects/snapshot-info.model';
+import { ProjectConfig } from '@domain/config/domain/project-config.model';
+import { RetentionPolicy } from '@domain/config/domain/retention-policy.model';
 
-describe('SnapshotManagementService', () => {
-  let service: SnapshotManagementService;
+describe('ListSnapshotsUseCase', () => {
+  let service: ListSnapshotsUseCase;
   let mockStorageFactory: jest.Mocked<RemoteStorageFactory>;
   let mockConfigLoader: jest.Mocked<ConfigLoaderPort>;
   let mockStorage: jest.Mocked<RemoteStoragePort>;
@@ -55,7 +56,7 @@ describe('SnapshotManagementService', () => {
       reload: jest.fn(),
     };
 
-    service = new SnapshotManagementService(mockStorageFactory, mockConfigLoader);
+    service = new ListSnapshotsUseCase(mockStorageFactory, mockConfigLoader);
   });
 
   it('lists snapshots for a project', async () => {
@@ -66,7 +67,7 @@ describe('SnapshotManagementService', () => {
     ];
     mockStorage.listSnapshots.mockResolvedValue(snapshots);
 
-    const result = await service.listSnapshots('test-project');
+    const result = await service.execute(new ListSnapshotsQuery({ projectName: 'test-project' }));
 
     expect(mockConfigLoader.getProject).toHaveBeenCalledWith('test-project');
     expect(mockStorageFactory.create).toHaveBeenCalledWith(projectConfig);
@@ -82,7 +83,7 @@ describe('SnapshotManagementService', () => {
     ];
     mockStorage.listSnapshots.mockResolvedValue(snapshots);
 
-    const result = await service.listSnapshots('test-project', 2);
+    const result = await service.execute(new ListSnapshotsQuery({ projectName: 'test-project', limit: 2 }));
 
     expect(result).toHaveLength(2);
     expect(result[0].id).toBe('snap-1');
@@ -93,7 +94,7 @@ describe('SnapshotManagementService', () => {
     const snapshots = [createSnapshot('snap-1', '2026-03-18T02:00:00Z')];
     mockStorage.listSnapshots.mockResolvedValue(snapshots);
 
-    const result = await service.listSnapshots('test-project');
+    const result = await service.execute(new ListSnapshotsQuery({ projectName: 'test-project' }));
 
     expect(result).toHaveLength(1);
   });

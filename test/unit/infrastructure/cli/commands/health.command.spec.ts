@@ -1,17 +1,17 @@
-import { HealthCommand } from '@infrastructure/cli/commands/health.command';
-import { HealthCheckService } from '@application/health/health-check.service';
-import { HealthCheckResult } from '@domain/audit/models/health-check-result.model';
+import { HealthCommand } from '@domain/health/presenters/cli/health.command';
+import { CheckHealthUseCase } from '@domain/health/application/use-cases/check-health/check-health.use-case';
+import { HealthCheckResult } from '@domain/audit/domain/health-check-result.model';
 
 describe('HealthCommand', () => {
   let command: HealthCommand;
-  let healthCheck: jest.Mocked<HealthCheckService>;
+  let checkHealth: jest.Mocked<CheckHealthUseCase>;
 
   beforeEach(() => {
-    healthCheck = {
+    checkHealth = {
       checkHealth: jest.fn(),
-    } as unknown as jest.Mocked<HealthCheckService>;
+    } as unknown as jest.Mocked<CheckHealthUseCase>;
 
-    command = new HealthCommand(healthCheck);
+    command = new HealthCommand(checkHealth);
     process.exitCode = undefined;
     jest.spyOn(console, 'log').mockImplementation();
     jest.spyOn(console, 'error').mockImplementation();
@@ -23,7 +23,7 @@ describe('HealthCommand', () => {
   });
 
   it('should print healthy status when all checks pass', async () => {
-    healthCheck.checkHealth.mockResolvedValue(
+    checkHealth.checkHealth.mockResolvedValue(
       new HealthCheckResult(true, true, 50, true, true, true, 3600),
     );
 
@@ -34,7 +34,7 @@ describe('HealthCommand', () => {
   });
 
   it('should set exit code 1 when unhealthy', async () => {
-    healthCheck.checkHealth.mockResolvedValue(
+    checkHealth.checkHealth.mockResolvedValue(
       new HealthCheckResult(false, true, 50, true, true, true, 3600),
     );
 
@@ -45,7 +45,7 @@ describe('HealthCommand', () => {
   });
 
   it('should display individual check results', async () => {
-    healthCheck.checkHealth.mockResolvedValue(
+    checkHealth.checkHealth.mockResolvedValue(
       new HealthCheckResult(true, true, 42, true, true, true, 7200),
     );
 
@@ -56,7 +56,7 @@ describe('HealthCommand', () => {
   });
 
   it('should set exit code 1 on error', async () => {
-    healthCheck.checkHealth.mockRejectedValue(new Error('Health check failed'));
+    checkHealth.checkHealth.mockRejectedValue(new Error('Health check failed'));
 
     await command.run([]);
 

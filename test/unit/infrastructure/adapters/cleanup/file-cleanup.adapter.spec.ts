@@ -1,7 +1,7 @@
 import * as fs from 'fs';
 
-import { FileCleanupAdapter } from '@infrastructure/adapters/cleanup/file-cleanup.adapter';
-import { CleanupResult } from '@domain/backup/models/cleanup-result.model';
+import { FileCleanupAdapter } from '@domain/backup/infrastructure/adapters/cleanup/file-cleanup.adapter';
+import { CleanupResult } from '@domain/backup/domain/value-objects/cleanup-result.model';
 
 jest.mock('fs');
 

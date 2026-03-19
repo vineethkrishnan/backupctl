@@ -1,19 +1,19 @@
-import { StartupRecoveryService } from '@application/audit/startup-recovery.service';
-import { AuditLogPort } from '@domain/audit/ports/audit-log.port';
-import { FallbackWriterPort, FallbackEntry } from '@domain/audit/ports/fallback-writer.port';
-import { ConfigLoaderPort } from '@domain/config/ports/config-loader.port';
-import { BackupLockPort } from '@domain/backup/ports/backup-lock.port';
-import { RemoteStorageFactory } from '@domain/backup/ports/remote-storage-factory.port';
-import { RemoteStoragePort } from '@domain/backup/ports/remote-storage.port';
-import { ClockPort } from '@domain/shared/ports/clock.port';
-import { BackupResult } from '@domain/backup/models/backup-result.model';
-import { BackupStatus } from '@domain/backup/models/backup-status.enum';
-import { BackupStage } from '@domain/backup/models/backup-stage.enum';
-import { ProjectConfig } from '@domain/config/models/project-config.model';
-import { RetentionPolicy } from '@domain/config/models/retention-policy.model';
+import { RecoverStartupUseCase } from '@domain/audit/application/use-cases/recover-startup/recover-startup.use-case';
+import { AuditLogPort } from '@domain/audit/application/ports/audit-log.port';
+import { FallbackWriterPort, FallbackEntry } from '@domain/audit/application/ports/fallback-writer.port';
+import { ConfigLoaderPort } from '@domain/config/application/ports/config-loader.port';
+import { BackupLockPort } from '@domain/backup/application/ports/backup-lock.port';
+import { RemoteStorageFactory } from '@domain/backup/application/ports/remote-storage-factory.port';
+import { RemoteStoragePort } from '@domain/backup/application/ports/remote-storage.port';
+import { ClockPort } from '@common/clock/clock.port';
+import { BackupResult } from '@domain/backup/domain/backup-result.model';
+import { BackupStatus } from '@domain/backup/domain/value-objects/backup-status.enum';
+import { BackupStage } from '@domain/backup/domain/value-objects/backup-stage.enum';
+import { ProjectConfig } from '@domain/config/domain/project-config.model';
+import { RetentionPolicy } from '@domain/config/domain/retention-policy.model';
 
-describe('StartupRecoveryService', () => {
-  let service: StartupRecoveryService;
+describe('RecoverStartupUseCase', () => {
+  let service: RecoverStartupUseCase;
   let mockAuditLog: jest.Mocked<AuditLogPort>;
   let mockFallbackWriter: jest.Mocked<FallbackWriterPort>;
   let mockConfigLoader: jest.Mocked<ConfigLoaderPort>;
@@ -114,7 +114,7 @@ describe('StartupRecoveryService', () => {
       timestamp: jest.fn().mockReturnValue('2026-03-18T10:00:00Z'),
     };
 
-    service = new StartupRecoveryService(
+    service = new RecoverStartupUseCase(
       mockAuditLog,
       mockFallbackWriter,
       mockConfigLoader,

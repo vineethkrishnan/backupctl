@@ -1,14 +1,14 @@
 import { Repository } from 'typeorm';
 
-import { TypeormAuditLogAdapter } from '@infrastructure/persistence/audit/typeorm-audit-log.adapter';
-import { BackupLogEntity } from '@infrastructure/persistence/audit/entities/backup-log.entity';
-import { BackupResult } from '@domain/backup/models/backup-result.model';
-import { BackupStage } from '@domain/backup/models/backup-stage.enum';
-import { BackupStatus } from '@domain/backup/models/backup-status.enum';
-import { DumpResult } from '@domain/backup/models/dump-result.model';
-import { SyncResult } from '@domain/backup/models/sync-result.model';
-import { PruneResult } from '@domain/backup/models/prune-result.model';
-import { CleanupResult } from '@domain/backup/models/cleanup-result.model';
+import { TypeormAuditLogRepository } from '@domain/audit/infrastructure/persistence/typeorm/typeorm-audit-log.repository';
+import { BackupLogRecord } from '@domain/audit/infrastructure/persistence/typeorm/schema/backup-log.record';
+import { BackupResult } from '@domain/backup/domain/backup-result.model';
+import { BackupStage } from '@domain/backup/domain/value-objects/backup-stage.enum';
+import { BackupStatus } from '@domain/backup/domain/value-objects/backup-status.enum';
+import { DumpResult } from '@domain/backup/domain/value-objects/dump-result.model';
+import { SyncResult } from '@domain/backup/domain/value-objects/sync-result.model';
+import { PruneResult } from '@domain/backup/domain/value-objects/prune-result.model';
+import { CleanupResult } from '@domain/backup/domain/value-objects/cleanup-result.model';
 
 jest.mock('uuid', () => ({
   v4: jest.fn(() => 'test-uuid-1234'),
@@ -16,14 +16,14 @@ jest.mock('uuid', () => ({
 
 function createMockRepository() {
   return {
-    create: jest.fn((entity: Partial<BackupLogEntity>) => entity as BackupLogEntity),
+    create: jest.fn((entity: Partial<BackupLogRecord>) => entity as BackupLogRecord),
     save: jest.fn().mockResolvedValue(undefined),
     update: jest.fn().mockResolvedValue(undefined),
     find: jest.fn().mockResolvedValue([]),
   };
 }
 
-function createSampleEntity(overrides: Partial<BackupLogEntity> = {}): BackupLogEntity {
+function createSampleEntity(overrides: Partial<BackupLogRecord> = {}): BackupLogRecord {
   return {
     id: 'run-id-1',
     projectName: 'myproject',
@@ -47,18 +47,18 @@ function createSampleEntity(overrides: Partial<BackupLogEntity> = {}): BackupLog
     durationMs: '300000',
     createdAt: new Date('2026-03-18T10:00:00Z'),
     ...overrides,
-  } as BackupLogEntity;
+  } as BackupLogRecord;
 }
 
-describe('TypeormAuditLogAdapter', () => {
-  let adapter: TypeormAuditLogAdapter;
+describe('TypeormAuditLogRepository', () => {
+  let adapter: TypeormAuditLogRepository;
   let mockRepo: ReturnType<typeof createMockRepository>;
 
   beforeEach(() => {
     jest.clearAllMocks();
     mockRepo = createMockRepository();
-    adapter = new TypeormAuditLogAdapter(
-      mockRepo as unknown as Repository<BackupLogEntity>,
+    adapter = new TypeormAuditLogRepository(
+      mockRepo as unknown as Repository<BackupLogRecord>,
     );
   });
 

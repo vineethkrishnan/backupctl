@@ -1,0 +1,51 @@
+services:
+  backupctl-dev:
+    container_name: backupctl-dev
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    env_file: .env
+    environment:
+      AUDIT_DB_HOST: backupctl-audit-db
+      NODE_ENV: development
+    ports:
+      - '${APP_PORT:-3100}:${APP_PORT:-3100}'
+    volumes:
+      - ./src:/app/src
+      - ./config:/app/config:ro
+      - ./test:/app/test
+      - ./ssh-keys:/root/.ssh:ro
+      - ./gpg-keys:/app/gpg-keys:ro
+    networks:
+      - backupctl-network
+    depends_on:
+      backupctl-audit-db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  backupctl-audit-db:
+    container_name: backupctl-audit-db
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: ${AUDIT_DB_NAME:-backup_audit}
+      POSTGRES_USER: ${AUDIT_DB_USER:-audit_user}
+      POSTGRES_PASSWORD: ${AUDIT_DB_PASSWORD:-audit_secret}
+    ports:
+      - '${AUDIT_DB_PORT:-5432}:5432'
+    volumes:
+      - backupctl-audit-data:/var/lib/postgresql/data
+    networks:
+      - backupctl-network
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${AUDIT_DB_USER:-audit_user} -d ${AUDIT_DB_NAME:-backup_audit}']
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+
+volumes:
+  backupctl-audit-data:
+
+networks:
+  backupctl-network:
+    driver: bridge

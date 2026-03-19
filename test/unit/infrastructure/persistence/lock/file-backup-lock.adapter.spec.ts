@@ -2,7 +2,7 @@ import * as fs from 'fs';
 
 import { ConfigService } from '@nestjs/config';
 
-import { FileBackupLockAdapter } from '@infrastructure/persistence/lock/file-backup-lock.adapter';
+import { FileBackupLockAdapter } from '@domain/backup/infrastructure/adapters/lock/file-backup-lock.adapter';
 
 jest.mock('fs');
 

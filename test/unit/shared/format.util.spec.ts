@@ -1,4 +1,4 @@
-import { formatBytes, formatDuration, formatTimestamp } from '../../../src/shared/format.util';
+import { formatBytes, formatDuration, formatTimestamp } from '@common/helpers/format.util';
 
 describe('formatBytes', () => {
   it('should return "0 B" for zero bytes', () => {

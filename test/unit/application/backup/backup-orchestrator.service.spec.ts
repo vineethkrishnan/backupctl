@@ -1,32 +1,30 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
 
-import { BackupOrchestratorService, RemoteStorageFactory } from
-  '@application/backup/backup-orchestrator.service';
-import { DumperRegistry } from '@application/backup/registries/dumper.registry';
-import { NotifierRegistry } from '@application/backup/registries/notifier.registry';
+import { RunBackupUseCase, RemoteStorageFactory } from '@domain/backup/application/use-cases/run-backup/run-backup.use-case';
+import { RunBackupCommand } from '@domain/backup/application/use-cases/run-backup/run-backup.command';
+import { DumperRegistry } from '@domain/backup/application/registries/dumper.registry';
+import { NotifierRegistry } from '@domain/backup/application/registries/notifier.registry';
 
-import { BackupLockPort } from '@domain/backup/ports/backup-lock.port';
-import { DatabaseDumperPort } from '@domain/backup/ports/database-dumper.port';
-import { DumpEncryptorPort } from '@domain/backup/ports/dump-encryptor.port';
-import { HookExecutorPort } from '@domain/backup/ports/hook-executor.port';
-import { LocalCleanupPort } from '@domain/backup/ports/local-cleanup.port';
-import { RemoteStoragePort } from '@domain/backup/ports/remote-storage.port';
-import { AuditLogPort } from '@domain/audit/ports/audit-log.port';
-import { FallbackWriterPort } from '@domain/audit/ports/fallback-writer.port';
-import { NotifierPort } from '@domain/notification/ports/notifier.port';
-import { ConfigLoaderPort } from '@domain/config/ports/config-loader.port';
-import { ClockPort } from '@domain/shared/ports/clock.port';
-import { ProjectConfig } from '@domain/config/models/project-config.model';
-import { RetentionPolicy } from '@domain/config/models/retention-policy.model';
-import {
-  BackupStage,
-  BackupStatus,
-  CleanupResult,
-  DumpResult,
-  PruneResult,
-  SyncResult,
-} from '@domain/backup/models';
+import { BackupLockPort } from '@domain/backup/application/ports/backup-lock.port';
+import { DatabaseDumperPort } from '@domain/backup/application/ports/database-dumper.port';
+import { DumpEncryptorPort } from '@domain/backup/application/ports/dump-encryptor.port';
+import { HookExecutorPort } from '@domain/backup/application/ports/hook-executor.port';
+import { LocalCleanupPort } from '@domain/backup/application/ports/local-cleanup.port';
+import { RemoteStoragePort } from '@domain/backup/application/ports/remote-storage.port';
+import { AuditLogPort } from '@domain/audit/application/ports/audit-log.port';
+import { FallbackWriterPort } from '@domain/audit/application/ports/fallback-writer.port';
+import { NotifierPort } from '@domain/notification/application/ports/notifier.port';
+import { ConfigLoaderPort } from '@domain/config/application/ports/config-loader.port';
+import { ClockPort } from '@common/clock/clock.port';
+import { ProjectConfig } from '@domain/config/domain/project-config.model';
+import { RetentionPolicy } from '@domain/config/domain/retention-policy.model';
+import { BackupStage } from '@domain/backup/domain/value-objects/backup-stage.enum';
+import { BackupStatus } from '@domain/backup/domain/value-objects/backup-status.enum';
+import { CleanupResult } from '@domain/backup/domain/value-objects/cleanup-result.model';
+import { DumpResult } from '@domain/backup/domain/value-objects/dump-result.model';
+import { PruneResult } from '@domain/backup/domain/value-objects/prune-result.model';
+import { SyncResult } from '@domain/backup/domain/value-objects/sync-result.model';
 
 import {
   CONFIG_LOADER_PORT,
@@ -40,7 +38,7 @@ import {
   HOOK_EXECUTOR_PORT,
   LOCAL_CLEANUP_PORT,
   REMOTE_STORAGE_FACTORY,
-} from '@shared/injection-tokens';
+} from '@common/di/injection-tokens';
 
 // ── Mock fs module ─────────────────────────────────────────────────────
 
@@ -180,8 +178,8 @@ function buildProjectConfig(overrides: Partial<ConstructorParameters<typeof Proj
 
 // ── Test suite ─────────────────────────────────────────────────────────
 
-describe('BackupOrchestratorService', () => {
-  let service: BackupOrchestratorService;
+describe('RunBackupUseCase', () => {
+  let service: RunBackupUseCase;
 
   let mockConfigLoader: jest.Mocked<ConfigLoaderPort>;
   let mockDumper: jest.Mocked<DatabaseDumperPort>;
@@ -242,7 +240,7 @@ describe('BackupOrchestratorService', () => {
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
-        BackupOrchestratorService,
+        RunBackupUseCase,
         { provide: CONFIG_LOADER_PORT, useValue: mockConfigLoader },
         { provide: DUMPER_REGISTRY, useValue: mockDumperRegistry },
         { provide: NOTIFIER_REGISTRY, useValue: mockNotifierRegistry },
@@ -270,16 +268,16 @@ describe('BackupOrchestratorService', () => {
       ],
     }).compile();
 
-    service = module.get<BackupOrchestratorService>(BackupOrchestratorService);
+    service = module.get<RunBackupUseCase>(RunBackupUseCase);
   });
 
   afterEach(() => {
     jest.restoreAllMocks();
   });
 
-  // ── runBackup ──────────────────────────────────────────────────────
+  // ── execute (single project) ────────────────────────────────────────
 
-  describe('runBackup', () => {
+  describe('execute (single project)', () => {
     it('executes all backup stages in correct order for happy path', async () => {
       const config = buildProjectConfig();
       mockConfigLoader.getProject.mockReturnValue(config);
@@ -293,11 +291,12 @@ describe('BackupOrchestratorService', () => {
       mockAuditLog.finishRun.mockImplementation(async () => { callOrder.push('audit'); });
       mockNotifier.notifySuccess.mockImplementation(async () => { callOrder.push('notifySuccess'); });
 
-      const result = await service.runBackup('test-project');
+      const results = await service.execute(new RunBackupCommand({ projectName: 'test-project' }));
 
-      expect(result.status).toBe(BackupStatus.Success);
-      expect(result.projectName).toBe('test-project');
-      expect(result.runId).toBe('run-001');
+      expect(results).toHaveLength(1);
+      expect(results[0].status).toBe(BackupStatus.Success);
+      expect(results[0].projectName).toBe('test-project');
+      expect(results[0].runId).toBe('run-001');
       expect(callOrder).toEqual([
         'notifyStarted',
         'dump',
@@ -313,7 +312,7 @@ describe('BackupOrchestratorService', () => {
       const config = buildProjectConfig();
       mockConfigLoader.getProject.mockReturnValue(config);
 
-      await service.runBackup('test-project');
+      await service.execute(new RunBackupCommand({ projectName: 'test-project' }));
 
       expect(mockBackupLock.acquire).toHaveBeenCalledWith('test-project');
       expect(mockBackupLock.release).toHaveBeenCalledWith('test-project');
@@ -324,9 +323,9 @@ describe('BackupOrchestratorService', () => {
       mockConfigLoader.getProject.mockReturnValue(config);
       mockDumper.dump.mockRejectedValue(new Error('dump crashed'));
 
-      const result = await service.runBackup('test-project');
+      const results = await service.execute(new RunBackupCommand({ projectName: 'test-project' }));
 
-      expect(result.status).toBe(BackupStatus.Failed);
+      expect(results[0].status).toBe(BackupStatus.Failed);
       expect(mockBackupLock.release).toHaveBeenCalledWith('test-project');
     });
 
@@ -335,7 +334,7 @@ describe('BackupOrchestratorService', () => {
       mockConfigLoader.getProject.mockReturnValue(config);
       mockBackupLock.acquire.mockResolvedValue(false);
 
-      await expect(service.runBackup('test-project')).rejects.toThrow(
+      await expect(service.execute(new RunBackupCommand({ projectName: 'test-project' }))).rejects.toThrow(
         'Backup already in progress for test-project',
       );
     });
@@ -345,21 +344,21 @@ describe('BackupOrchestratorService', () => {
       mockConfigLoader.getProject.mockReturnValue(config);
       mockStorage.listSnapshots.mockResolvedValue([]);
 
-      const result = await service.runBackup('test-project', { dryRun: true });
+      const results = await service.execute(new RunBackupCommand({ projectName: 'test-project', isDryRun: true }));
 
-      expect(result.runId).toBe('dry-run');
+      expect(results[0].runId).toBe('dry-run');
       expect(mockDumper.dump).not.toHaveBeenCalled();
       expect(mockStorage.sync).not.toHaveBeenCalled();
       expect(mockAuditLog.startRun).not.toHaveBeenCalled();
       expect(mockNotifier.notifyStarted).not.toHaveBeenCalled();
     });
 
-    it('dry run validates dumper and notifier adapter resolution', async () => {
+    it('dry run validates dumper and notifier adapter resolution via getDryRunReport', async () => {
       const config = buildProjectConfig();
       mockConfigLoader.getProject.mockReturnValue(config);
       mockStorage.listSnapshots.mockResolvedValue([]);
 
-      const report = await service.executeDryRun('test-project');
+      const report = await service.getDryRunReport('test-project');
 
       expect(report.projectName).toBe('test-project');
       const configCheck = report.checks.find((c) => c.name === 'Config loaded');
@@ -375,7 +374,7 @@ describe('BackupOrchestratorService', () => {
       mockConfigLoader.getProject.mockReturnValue(config);
       mockStorage.listSnapshots.mockRejectedValue(new Error('connection refused'));
 
-      const report = await service.executeDryRun('test-project');
+      const report = await service.getDryRunReport('test-project');
 
       const resticCheck = report.checks.find((c) => c.name === 'Restic repo');
       expect(resticCheck?.passed).toBe(false);
@@ -388,7 +387,7 @@ describe('BackupOrchestratorService', () => {
       });
       mockConfigLoader.getProject.mockReturnValue(config);
 
-      const report = await service.executeDryRun('test-project');
+      const report = await service.getDryRunReport('test-project');
 
       const dumperCheck = report.checks.find((c) => c.name === 'Database dumper');
       expect(dumperCheck?.passed).toBe(false);
@@ -398,7 +397,7 @@ describe('BackupOrchestratorService', () => {
       const config = buildProjectConfig();
       mockConfigLoader.getProject.mockReturnValue(config);
 
-      await service.runBackup('test-project');
+      await service.execute(new RunBackupCommand({ projectName: 'test-project' }));
 
       expect(mockAuditLog.trackProgress).toHaveBeenCalledWith('run-001', BackupStage.NotifyStarted);
       expect(mockAuditLog.trackProgress).toHaveBeenCalledWith('run-001', BackupStage.Dump);
@@ -416,11 +415,11 @@ describe('BackupOrchestratorService', () => {
         .mockRejectedValueOnce(new Error('connection lost'))
         .mockResolvedValueOnce(defaultDumpResult);
 
-      const result = await service.runBackup('test-project');
+      const results = await service.execute(new RunBackupCommand({ projectName: 'test-project' }));
 
-      expect(result.status).toBe(BackupStatus.Success);
+      expect(results[0].status).toBe(BackupStatus.Success);
       expect(mockDumper.dump).toHaveBeenCalledTimes(3);
-      expect(result.retryCount).toBe(2);
+      expect(results[0].retryCount).toBe(2);
     });
 
     it('fails when retries are exhausted', async () => {
@@ -429,11 +428,11 @@ describe('BackupOrchestratorService', () => {
 
       mockDumper.dump.mockRejectedValue(new Error('persistent failure'));
 
-      const result = await service.runBackup('test-project');
+      const results = await service.execute(new RunBackupCommand({ projectName: 'test-project' }));
 
-      expect(result.status).toBe(BackupStatus.Failed);
-      expect(result.errorStage).toBe(BackupStage.Dump);
-      expect(result.errorMessage).toBe('persistent failure');
+      expect(results[0].status).toBe(BackupStatus.Failed);
+      expect(results[0].errorStage).toBe(BackupStage.Dump);
+      expect(results[0].errorMessage).toBe('persistent failure');
       expect(mockDumper.dump).toHaveBeenCalledTimes(3);
       expect(mockAuditLog.finishRun).toHaveBeenCalled();
       expect(mockNotifier.notifyFailure).toHaveBeenCalled();
@@ -446,10 +445,10 @@ describe('BackupOrchestratorService', () => {
       mockConfigLoader.getProject.mockReturnValue(config);
       mockHookExecutor.execute.mockRejectedValue(new Error('hook script failed'));
 
-      const result = await service.runBackup('test-project');
+      const results = await service.execute(new RunBackupCommand({ projectName: 'test-project' }));
 
-      expect(result.status).toBe(BackupStatus.Failed);
-      expect(result.errorStage).toBe(BackupStage.PreHook);
+      expect(results[0].status).toBe(BackupStatus.Failed);
+      expect(results[0].errorStage).toBe(BackupStage.PreHook);
       expect(mockDumper.dump).not.toHaveBeenCalled();
       expect(mockAuditLog.finishRun).toHaveBeenCalled();
       expect(mockNotifier.notifyFailure).toHaveBeenCalled();
@@ -459,10 +458,10 @@ describe('BackupOrchestratorService', () => {
       const config = buildProjectConfig({ encryption: null });
       mockConfigLoader.getProject.mockReturnValue(config);
 
-      const result = await service.runBackup('test-project');
+      const results = await service.execute(new RunBackupCommand({ projectName: 'test-project' }));
 
-      expect(result.status).toBe(BackupStatus.Success);
-      expect(result.encrypted).toBe(false);
+      expect(results[0].status).toBe(BackupStatus.Success);
+      expect(results[0].encrypted).toBe(false);
       expect(mockEncryptor.encrypt).not.toHaveBeenCalled();
     });
 
@@ -472,10 +471,10 @@ describe('BackupOrchestratorService', () => {
       });
       mockConfigLoader.getProject.mockReturnValue(config);
 
-      const result = await service.runBackup('test-project');
+      const results = await service.execute(new RunBackupCommand({ projectName: 'test-project' }));
 
-      expect(result.status).toBe(BackupStatus.Success);
-      expect(result.encrypted).toBe(true);
+      expect(results[0].status).toBe(BackupStatus.Success);
+      expect(results[0].encrypted).toBe(true);
       expect(mockEncryptor.encrypt).toHaveBeenCalledWith(defaultDumpResult.filePath);
     });
 
@@ -483,7 +482,7 @@ describe('BackupOrchestratorService', () => {
       const config = buildProjectConfig({ verification: { enabled: false } });
       mockConfigLoader.getProject.mockReturnValue(config);
 
-      await service.runBackup('test-project');
+      await service.execute(new RunBackupCommand({ projectName: 'test-project' }));
 
       expect(mockDumper.verify).not.toHaveBeenCalled();
     });
@@ -492,9 +491,9 @@ describe('BackupOrchestratorService', () => {
       const config = buildProjectConfig({ verification: { enabled: true } });
       mockConfigLoader.getProject.mockReturnValue(config);
 
-      const result = await service.runBackup('test-project');
+      const results = await service.execute(new RunBackupCommand({ projectName: 'test-project' }));
 
-      expect(result.verified).toBe(true);
+      expect(results[0].verified).toBe(true);
       expect(mockDumper.verify).toHaveBeenCalledWith(defaultDumpResult.filePath);
     });
 
@@ -502,7 +501,7 @@ describe('BackupOrchestratorService', () => {
       const config = buildProjectConfig({ hooks: null });
       mockConfigLoader.getProject.mockReturnValue(config);
 
-      await service.runBackup('test-project');
+      await service.execute(new RunBackupCommand({ projectName: 'test-project' }));
 
       expect(mockHookExecutor.execute).not.toHaveBeenCalled();
     });
@@ -522,7 +521,7 @@ describe('BackupOrchestratorService', () => {
         return defaultDumpResult;
       });
 
-      await service.runBackup('test-project');
+      await service.execute(new RunBackupCommand({ projectName: 'test-project' }));
 
       expect(callOrder).toEqual(['echo pre', 'dump', 'echo post']);
     });
@@ -532,9 +531,9 @@ describe('BackupOrchestratorService', () => {
       mockConfigLoader.getProject.mockReturnValue(config);
       mockAuditLog.finishRun.mockRejectedValue(new Error('DB connection lost'));
 
-      const result = await service.runBackup('test-project');
+      const results = await service.execute(new RunBackupCommand({ projectName: 'test-project' }));
 
-      expect(result.status).toBe(BackupStatus.Success);
+      expect(results[0].status).toBe(BackupStatus.Success);
       expect(mockFallbackWriter.writeAuditFallback).toHaveBeenCalledWith(
         expect.objectContaining({ status: BackupStatus.Success }),
       );
@@ -545,9 +544,9 @@ describe('BackupOrchestratorService', () => {
       mockConfigLoader.getProject.mockReturnValue(config);
       mockNotifier.notifySuccess.mockRejectedValue(new Error('Slack API down'));
 
-      const result = await service.runBackup('test-project');
+      const results = await service.execute(new RunBackupCommand({ projectName: 'test-project' }));
 
-      expect(result.status).toBe(BackupStatus.Success);
+      expect(results[0].status).toBe(BackupStatus.Success);
       expect(mockFallbackWriter.writeNotificationFallback).toHaveBeenCalledWith(
         'success',
         expect.objectContaining({ projectName: 'test-project' }),
@@ -568,7 +567,7 @@ describe('BackupOrchestratorService', () => {
           });
         });
 
-        const backupPromise = service.runBackup('test-project');
+        const backupPromise = service.execute(new RunBackupCommand({ projectName: 'test-project' }));
 
         // Flush microtasks so the orchestrator reaches the setTimeout setup
         await jest.advanceTimersByTimeAsync(61_000);
@@ -590,7 +589,7 @@ describe('BackupOrchestratorService', () => {
       const config = buildProjectConfig();
       mockConfigLoader.getProject.mockReturnValue(config);
 
-      await service.runBackup('test-project');
+      await service.execute(new RunBackupCommand({ projectName: 'test-project' }));
 
       expect(mockStorageFactory.createStorage).toHaveBeenCalledWith(config);
     });
@@ -599,7 +598,7 @@ describe('BackupOrchestratorService', () => {
       const config = buildProjectConfig();
       mockConfigLoader.getProject.mockReturnValue(config);
 
-      await service.runBackup('test-project');
+      await service.execute(new RunBackupCommand({ projectName: 'test-project' }));
 
       expect(mockStorage.sync).toHaveBeenCalledWith(
         [defaultDumpResult.filePath],
@@ -621,7 +620,7 @@ describe('BackupOrchestratorService', () => {
       });
       mockConfigLoader.getProject.mockReturnValue(config);
 
-      await service.runBackup('test-project');
+      await service.execute(new RunBackupCommand({ projectName: 'test-project' }));
 
       expect(mockStorage.sync).toHaveBeenCalledWith(
         [defaultDumpResult.filePath, '/data/uploads'],
@@ -637,12 +636,12 @@ describe('BackupOrchestratorService', () => {
       const config = buildProjectConfig();
       mockConfigLoader.getProject.mockReturnValue(config);
 
-      const result = await service.runBackup('test-project');
+      const results = await service.execute(new RunBackupCommand({ projectName: 'test-project' }));
 
-      expect(result.dumpResult).toEqual(defaultDumpResult);
-      expect(result.syncResult).toEqual(defaultSyncResult);
-      expect(result.pruneResult).toEqual(defaultPruneResult);
-      expect(result.cleanupResult).toEqual(defaultCleanupResult);
+      expect(results[0].dumpResult).toEqual(defaultDumpResult);
+      expect(results[0].syncResult).toEqual(defaultSyncResult);
+      expect(results[0].pruneResult).toEqual(defaultPruneResult);
+      expect(results[0].cleanupResult).toEqual(defaultCleanupResult);
     });
 
     it('calculates duration from clock timestamps', async () => {
@@ -653,15 +652,15 @@ describe('BackupOrchestratorService', () => {
       const config = buildProjectConfig();
       mockConfigLoader.getProject.mockReturnValue(config);
 
-      const result = await service.runBackup('test-project');
+      const results = await service.execute(new RunBackupCommand({ projectName: 'test-project' }));
 
-      expect(result.durationMs).toBe(300_000);
+      expect(results[0].durationMs).toBe(300_000);
     });
   });
 
-  // ── runAllBackups ──────────────────────────────────────────────────
+  // ── execute (isAll) ──────────────────────────────────────────────────
 
-  describe('runAllBackups', () => {
+  describe('execute (isAll)', () => {
     it('calls runBackup for each enabled project sequentially', async () => {
       const projectA = buildProjectConfig({ name: 'project-a' });
       const projectB = buildProjectConfig({ name: 'project-b' });
@@ -673,7 +672,7 @@ describe('BackupOrchestratorService', () => {
         return projectB;
       });
 
-      const results = await service.runAllBackups();
+      const results = await service.execute(new RunBackupCommand({ isAll: true }));
 
       expect(results).toHaveLength(2);
       expect(results[0].projectName).toBe('project-a');
@@ -695,172 +694,12 @@ describe('BackupOrchestratorService', () => {
         .mockResolvedValueOnce(false) // project-a fails
         .mockResolvedValueOnce(true); // project-b succeeds
 
-      const results = await service.runAllBackups();
+      const results = await service.execute(new RunBackupCommand({ isAll: true }));
 
       expect(results).toHaveLength(2);
       expect(results[0].status).toBe(BackupStatus.Failed);
       expect(results[0].errorMessage).toContain('already in progress');
       expect(results[1].status).toBe(BackupStatus.Success);
-    });
-  });
-
-  // ── restoreBackup ──────────────────────────────────────────────────
-
-  describe('restoreBackup', () => {
-    it('calls storage.restore with correct arguments', async () => {
-      const config = buildProjectConfig();
-      mockConfigLoader.getProject.mockReturnValue(config);
-
-      await service.restoreBackup('test-project', 'snap-123', '/restore/target');
-
-      expect(mockStorage.restore).toHaveBeenCalledWith('snap-123', '/restore/target');
-    });
-
-    it('filters to dump paths when --only db', async () => {
-      const config = buildProjectConfig();
-      mockConfigLoader.getProject.mockReturnValue(config);
-
-      await service.restoreBackup('test-project', 'snap-123', '/restore/target', {
-        only: 'db',
-      });
-
-      expect(mockStorage.restore).toHaveBeenCalledWith(
-        'snap-123',
-        '/restore/target',
-        ['/data/backups/test-project'],
-      );
-    });
-
-    it('filters to asset paths when --only assets', async () => {
-      const config = buildProjectConfig({
-        assets: { paths: ['/data/uploads', '/data/media'] },
-      });
-      mockConfigLoader.getProject.mockReturnValue(config);
-
-      await service.restoreBackup('test-project', 'snap-123', '/restore/target', {
-        only: 'assets',
-      });
-
-      expect(mockStorage.restore).toHaveBeenCalledWith(
-        'snap-123',
-        '/restore/target',
-        ['/data/uploads', '/data/media'],
-      );
-    });
-
-    it('decompresses files when --decompress is set', async () => {
-      const fs = require('fs');
-      fs.readdirSync.mockReturnValue(['dump.sql.gz', 'readme.txt']);
-
-      const config = buildProjectConfig();
-      mockConfigLoader.getProject.mockReturnValue(config);
-
-      // Mock safeExecFile via jest module mock
-      const childProcessUtil = require('@shared/child-process.util');
-      jest.spyOn(childProcessUtil, 'safeExecFile').mockResolvedValue({ stdout: '', stderr: '' });
-
-      await service.restoreBackup('test-project', 'snap-123', '/restore/target', {
-        decompress: true,
-      });
-
-      expect(childProcessUtil.safeExecFile).toHaveBeenCalledWith('gunzip', [
-        '/restore/target/dump.sql.gz',
-      ]);
-    });
-  });
-
-  // ── getRestoreGuide ────────────────────────────────────────────────
-
-  describe('getRestoreGuide', () => {
-    it('returns pg_restore instructions for postgres', () => {
-      const config = buildProjectConfig({ database: { type: 'postgres', host: 'db-host', port: 5432, name: 'mydb', user: 'admin', password: 'pass' } });
-      mockConfigLoader.getProject.mockReturnValue(config);
-
-      const guide = service.getRestoreGuide('test-project');
-
-      expect(guide).toContain('PostgreSQL');
-      expect(guide).toContain('pg_restore');
-      expect(guide).toContain('db-host');
-    });
-
-    it('returns mysql instructions for mysql', () => {
-      const config = buildProjectConfig({ database: { type: 'mysql', host: 'db-host', port: 3306, name: 'mydb', user: 'admin', password: 'pass' } });
-      mockConfigLoader.getProject.mockReturnValue(config);
-
-      const guide = service.getRestoreGuide('test-project');
-
-      expect(guide).toContain('MySQL');
-      expect(guide).toContain('mysql');
-    });
-
-    it('returns mongorestore instructions for mongodb', () => {
-      const config = buildProjectConfig({ database: { type: 'mongodb', host: 'db-host', port: 27017, name: 'mydb', user: 'admin', password: 'pass' } });
-      mockConfigLoader.getProject.mockReturnValue(config);
-
-      const guide = service.getRestoreGuide('test-project');
-
-      expect(guide).toContain('MongoDB');
-      expect(guide).toContain('mongorestore');
-    });
-
-    it('returns fallback message for unknown database type', () => {
-      const config = buildProjectConfig({ database: { type: 'redis', host: 'db-host', port: 6379, name: 'mydb', user: 'admin', password: 'pass' } });
-      mockConfigLoader.getProject.mockReturnValue(config);
-
-      const guide = service.getRestoreGuide('test-project');
-
-      expect(guide).toContain('No restore guide available');
-    });
-  });
-
-  // ── pruneProject ──────────────────────────────────────────────────
-
-  describe('pruneProject', () => {
-    it('delegates to storage.prune with retention config', async () => {
-      const config = buildProjectConfig();
-      mockConfigLoader.getProject.mockReturnValue(config);
-
-      const result = await service.pruneProject('test-project');
-
-      expect(mockStorageFactory.createStorage).toHaveBeenCalledWith(config);
-      expect(mockStorage.prune).toHaveBeenCalledWith(config.retention);
-      expect(result).toEqual(defaultPruneResult);
-    });
-  });
-
-  // ── pruneAll ──────────────────────────────────────────────────────
-
-  describe('pruneAll', () => {
-    it('prunes all enabled projects and collects results', async () => {
-      const projectA = buildProjectConfig({ name: 'project-a' });
-      const projectB = buildProjectConfig({ name: 'project-b' });
-      mockConfigLoader.loadAll.mockReturnValue([projectA, projectB]);
-      mockConfigLoader.getProject.mockImplementation((name: string) => {
-        if (name === 'project-a') return projectA;
-        return projectB;
-      });
-
-      const results = await service.pruneAll();
-
-      expect(results).toHaveLength(2);
-    });
-
-    it('continues on individual prune failure', async () => {
-      const projectA = buildProjectConfig({ name: 'project-a' });
-      const projectB = buildProjectConfig({ name: 'project-b' });
-      mockConfigLoader.loadAll.mockReturnValue([projectA, projectB]);
-      mockConfigLoader.getProject.mockImplementation((name: string) => {
-        if (name === 'project-a') return projectA;
-        return projectB;
-      });
-
-      mockStorage.prune
-        .mockRejectedValueOnce(new Error('prune failed'))
-        .mockResolvedValueOnce(defaultPruneResult);
-
-      const results = await service.pruneAll();
-
-      expect(results).toHaveLength(1);
     });
   });
 });

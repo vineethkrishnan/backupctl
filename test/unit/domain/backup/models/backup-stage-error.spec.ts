@@ -1,5 +1,5 @@
-import { BackupStage } from '../../../../../src/domain/backup/models/backup-stage.enum';
-import { BackupStageError } from '../../../../../src/domain/backup/models/backup-stage-error';
+import { BackupStage } from '@domain/backup/domain/value-objects/backup-stage.enum';
+import { BackupStageError } from '@domain/backup/domain/backup-stage-error';
 
 describe('BackupStageError', () => {
   it('should construct with stage, originalError, and isRetryable', () => {

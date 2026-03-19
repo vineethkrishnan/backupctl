@@ -1,10 +1,10 @@
-import { ShellHookExecutorAdapter } from '@infrastructure/adapters/hooks/shell-hook-executor.adapter';
+import { ShellHookExecutorAdapter } from '@domain/backup/infrastructure/adapters/hooks/shell-hook-executor.adapter';
 
-jest.mock('@shared/child-process.util', () => ({
+jest.mock('@common/helpers/child-process.util', () => ({
   safeExecFile: jest.fn().mockResolvedValue({ stdout: '', stderr: '' }),
 }));
 
-import { safeExecFile } from '@shared/child-process.util';
+import { safeExecFile } from '@common/helpers/child-process.util';
 
 const mockSafeExecFile = safeExecFile as jest.MockedFunction<typeof safeExecFile>;
 

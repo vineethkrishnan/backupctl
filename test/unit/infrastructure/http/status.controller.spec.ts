@@ -1,8 +1,8 @@
-import { StatusController } from '@infrastructure/http/status.controller';
-import { AuditQueryService } from '@application/audit/audit-query.service';
-import { BackupResult } from '@domain/backup/models/backup-result.model';
-import { BackupStatus } from '@domain/backup/models/backup-status.enum';
-import { BackupStage } from '@domain/backup/models/backup-stage.enum';
+import { StatusController } from '@domain/audit/presenters/http/status.controller';
+import { GetBackupStatusUseCase } from '@domain/audit/application/use-cases/get-backup-status/get-backup-status.use-case';
+import { BackupResult } from '@domain/backup/domain/backup-result.model';
+import { BackupStatus } from '@domain/backup/domain/value-objects/backup-status.enum';
+import { BackupStage } from '@domain/backup/domain/value-objects/backup-stage.enum';
 
 function createMockResult(projectName: string): BackupResult {
   return new BackupResult({
@@ -28,62 +28,71 @@ function createMockResult(projectName: string): BackupResult {
 
 describe('StatusController', () => {
   let controller: StatusController;
-  let auditQueryService: jest.Mocked<AuditQueryService>;
+  let getBackupStatus: jest.Mocked<GetBackupStatusUseCase>;
 
   beforeEach(() => {
-    auditQueryService = {
-      getStatus: jest.fn(),
-      getFailedLogs: jest.fn(),
-    } as unknown as jest.Mocked<AuditQueryService>;
+    getBackupStatus = {
+      execute: jest.fn(),
+    } as unknown as jest.Mocked<GetBackupStatusUseCase>;
 
-    controller = new StatusController(auditQueryService);
+    controller = new StatusController(getBackupStatus);
   });
 
   describe('getAllStatus', () => {
     it('should return all project statuses', async () => {
       const mockResults = [createMockResult('locaboo'), createMockResult('shopify')];
-      auditQueryService.getStatus.mockResolvedValue(mockResults);
+      getBackupStatus.execute.mockResolvedValue(mockResults);
 
       const response = await controller.getAllStatus();
 
-      expect(auditQueryService.getStatus).toHaveBeenCalledWith(undefined, undefined);
+      expect(getBackupStatus.execute).toHaveBeenCalledWith(
+        expect.objectContaining({ projectName: undefined, limit: undefined }),
+      );
       expect(response).toEqual({ projects: mockResults });
     });
 
     it('should pass parsed limit from query parameter', async () => {
-      auditQueryService.getStatus.mockResolvedValue([]);
+      getBackupStatus.execute.mockResolvedValue([]);
 
       await controller.getAllStatus('5');
 
-      expect(auditQueryService.getStatus).toHaveBeenCalledWith(undefined, 5);
+      expect(getBackupStatus.execute).toHaveBeenCalledWith(
+        expect.objectContaining({ projectName: undefined, limit: 5 }),
+      );
     });
 
     it('should handle missing limit parameter', async () => {
-      auditQueryService.getStatus.mockResolvedValue([]);
+      getBackupStatus.execute.mockResolvedValue([]);
 
       await controller.getAllStatus(undefined);
 
-      expect(auditQueryService.getStatus).toHaveBeenCalledWith(undefined, undefined);
+      expect(getBackupStatus.execute).toHaveBeenCalledWith(
+        expect.objectContaining({ projectName: undefined, limit: undefined }),
+      );
     });
   });
 
   describe('getProjectStatus', () => {
     it('should return specific project history', async () => {
       const mockResults = [createMockResult('locaboo')];
-      auditQueryService.getStatus.mockResolvedValue(mockResults);
+      getBackupStatus.execute.mockResolvedValue(mockResults);
 
       const response = await controller.getProjectStatus('locaboo');
 
-      expect(auditQueryService.getStatus).toHaveBeenCalledWith('locaboo', undefined);
+      expect(getBackupStatus.execute).toHaveBeenCalledWith(
+        expect.objectContaining({ projectName: 'locaboo', limit: undefined }),
+      );
       expect(response).toEqual({ project: 'locaboo', history: mockResults });
     });
 
     it('should pass parsed limit for project status', async () => {
-      auditQueryService.getStatus.mockResolvedValue([]);
+      getBackupStatus.execute.mockResolvedValue([]);
 
       await controller.getProjectStatus('locaboo', '10');
 
-      expect(auditQueryService.getStatus).toHaveBeenCalledWith('locaboo', 10);
+      expect(getBackupStatus.execute).toHaveBeenCalledWith(
+        expect.objectContaining({ projectName: 'locaboo', limit: 10 }),
+      );
     });
   });
 });

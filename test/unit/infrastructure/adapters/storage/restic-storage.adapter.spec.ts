@@ -1,13 +1,13 @@
-import { CacheInfo } from '@domain/backup/models/cache-info.model';
-import { PruneResult } from '@domain/backup/models/prune-result.model';
-import { SnapshotInfo } from '@domain/backup/models/snapshot-info.model';
-import { SyncResult } from '@domain/backup/models/sync-result.model';
-import { RetentionPolicy } from '@domain/config/models/retention-policy.model';
-import { ResticStorageAdapter } from '@infrastructure/adapters/storage/restic-storage.adapter';
+import { CacheInfo } from '@domain/backup/domain/value-objects/cache-info.model';
+import { PruneResult } from '@domain/backup/domain/value-objects/prune-result.model';
+import { SnapshotInfo } from '@domain/backup/domain/value-objects/snapshot-info.model';
+import { SyncResult } from '@domain/backup/domain/value-objects/sync-result.model';
+import { RetentionPolicy } from '@domain/config/domain/retention-policy.model';
+import { ResticStorageAdapter } from '@domain/backup/infrastructure/adapters/storage/restic-storage.adapter';
 
-jest.mock('@shared/child-process.util');
+jest.mock('@common/helpers/child-process.util');
 
-import { safeExecFile } from '@shared/child-process.util';
+import { safeExecFile } from '@common/helpers/child-process.util';
 
 const mockedSafeExecFile = safeExecFile as jest.MockedFunction<typeof safeExecFile>;
 

@@ -1,10 +1,10 @@
-import { DumpResult } from '@domain/backup/models/dump-result.model';
-import { MongoDumpAdapter, MongoConfig } from '@infrastructure/adapters/dumpers/mongo-dump.adapter';
+import { DumpResult } from '@domain/backup/domain/value-objects/dump-result.model';
+import { MongoDumpAdapter, MongoConfig } from '@domain/backup/infrastructure/adapters/dumpers/mongo-dump.adapter';
 
-jest.mock('@shared/child-process.util');
+jest.mock('@common/helpers/child-process.util');
 jest.mock('fs');
 
-import { safeExecFile } from '@shared/child-process.util';
+import { safeExecFile } from '@common/helpers/child-process.util';
 import * as fs from 'fs';
 
 const mockedSafeExecFile = safeExecFile as jest.MockedFunction<typeof safeExecFile>;

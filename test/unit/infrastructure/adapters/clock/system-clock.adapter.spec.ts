@@ -1,5 +1,5 @@
 import { ConfigService } from '@nestjs/config';
-import { SystemClockAdapter } from '@infrastructure/adapters/clock/system-clock.adapter';
+import { SystemClockAdapter } from '@common/clock/system-clock.adapter';
 
 describe('SystemClockAdapter', () => {
   function createAdapter(timezone?: string): SystemClockAdapter {

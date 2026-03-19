@@ -1,8 +1,8 @@
-import { StatusCommand } from '@infrastructure/cli/commands/status.command';
-import { AuditQueryService } from '@application/audit/audit-query.service';
-import { BackupResult } from '@domain/backup/models/backup-result.model';
-import { BackupStatus } from '@domain/backup/models/backup-status.enum';
-import { BackupStage } from '@domain/backup/models/backup-stage.enum';
+import { StatusCommand } from '@domain/audit/presenters/cli/status.command';
+import { GetBackupStatusUseCase } from '@domain/audit/application/use-cases/get-backup-status/get-backup-status.use-case';
+import { BackupResult } from '@domain/backup/domain/backup-result.model';
+import { BackupStatus } from '@domain/backup/domain/value-objects/backup-status.enum';
+import { BackupStage } from '@domain/backup/domain/value-objects/backup-stage.enum';
 
 function buildResult(overrides: Partial<BackupResult> = {}): BackupResult {
   return new BackupResult({
@@ -29,14 +29,14 @@ function buildResult(overrides: Partial<BackupResult> = {}): BackupResult {
 
 describe('StatusCommand', () => {
   let command: StatusCommand;
-  let auditQuery: jest.Mocked<AuditQueryService>;
+  let getBackupStatus: jest.Mocked<GetBackupStatusUseCase>;
 
   beforeEach(() => {
-    auditQuery = {
-      getStatus: jest.fn(),
-    } as unknown as jest.Mocked<AuditQueryService>;
+    getBackupStatus = {
+      execute: jest.fn(),
+    } as unknown as jest.Mocked<GetBackupStatusUseCase>;
 
-    command = new StatusCommand(auditQuery);
+    command = new StatusCommand(getBackupStatus);
     process.exitCode = undefined;
     jest.spyOn(console, 'log').mockImplementation();
     jest.spyOn(console, 'error').mockImplementation();
@@ -48,28 +48,32 @@ describe('StatusCommand', () => {
   });
 
   it('should show all project statuses when no project specified', async () => {
-    auditQuery.getStatus.mockResolvedValue([
+    getBackupStatus.execute.mockResolvedValue([
       buildResult({ projectName: 'project-a' }),
       buildResult({ projectName: 'project-b' }),
     ]);
 
     await command.run([], {});
 
-    expect(auditQuery.getStatus).toHaveBeenCalledWith(undefined, undefined);
+    expect(getBackupStatus.execute).toHaveBeenCalledWith(
+      expect.objectContaining({ projectName: undefined, limit: undefined }),
+    );
     expect(console.log).toHaveBeenCalledWith(expect.stringContaining('project-a'));
     expect(console.log).toHaveBeenCalledWith(expect.stringContaining('project-b'));
   });
 
   it('should show specific project history with --last', async () => {
-    auditQuery.getStatus.mockResolvedValue([buildResult()]);
+    getBackupStatus.execute.mockResolvedValue([buildResult()]);
 
     await command.run(['test-project'], { last: 5 });
 
-    expect(auditQuery.getStatus).toHaveBeenCalledWith('test-project', 5);
+    expect(getBackupStatus.execute).toHaveBeenCalledWith(
+      expect.objectContaining({ projectName: 'test-project', limit: 5 }),
+    );
   });
 
   it('should print message when no records found', async () => {
-    auditQuery.getStatus.mockResolvedValue([]);
+    getBackupStatus.execute.mockResolvedValue([]);
 
     await command.run([], {});
 
@@ -77,7 +81,7 @@ describe('StatusCommand', () => {
   });
 
   it('should set exit code 1 on error', async () => {
-    auditQuery.getStatus.mockRejectedValue(new Error('DB connection failed'));
+    getBackupStatus.execute.mockRejectedValue(new Error('DB connection failed'));
 
     await command.run([], {});
 

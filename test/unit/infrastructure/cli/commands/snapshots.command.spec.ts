@@ -1,17 +1,17 @@
-import { SnapshotsCommand } from '@infrastructure/cli/commands/snapshots.command';
-import { SnapshotManagementService } from '@application/snapshot/snapshot-management.service';
-import { SnapshotInfo } from '@domain/backup/models/snapshot-info.model';
+import { SnapshotsCommand } from '@domain/backup/presenters/cli/snapshots.command';
+import { ListSnapshotsUseCase } from '@domain/backup/application/use-cases/list-snapshots/list-snapshots.use-case';
+import { SnapshotInfo } from '@domain/backup/domain/value-objects/snapshot-info.model';
 
 describe('SnapshotsCommand', () => {
   let command: SnapshotsCommand;
-  let snapshotManagement: jest.Mocked<SnapshotManagementService>;
+  let listSnapshotsUseCase: jest.Mocked<ListSnapshotsUseCase>;
 
   beforeEach(() => {
-    snapshotManagement = {
-      listSnapshots: jest.fn(),
-    } as unknown as jest.Mocked<SnapshotManagementService>;
+    listSnapshotsUseCase = {
+      execute: jest.fn(),
+    } as unknown as jest.Mocked<ListSnapshotsUseCase>;
 
-    command = new SnapshotsCommand(snapshotManagement);
+    command = new SnapshotsCommand(listSnapshotsUseCase);
     process.exitCode = undefined;
     jest.spyOn(console, 'log').mockImplementation();
     jest.spyOn(console, 'error').mockImplementation();
@@ -23,7 +23,7 @@ describe('SnapshotsCommand', () => {
   });
 
   it('should list snapshots for a project', async () => {
-    snapshotManagement.listSnapshots.mockResolvedValue([
+    listSnapshotsUseCase.execute.mockResolvedValue([
       new SnapshotInfo(
         'abc123def456',
         '2026-03-18T10:00:00Z',
@@ -36,20 +36,24 @@ describe('SnapshotsCommand', () => {
 
     await command.run(['test-project'], {});
 
-    expect(snapshotManagement.listSnapshots).toHaveBeenCalledWith('test-project', undefined);
+    expect(listSnapshotsUseCase.execute).toHaveBeenCalledWith(
+      expect.objectContaining({ projectName: 'test-project', limit: undefined }),
+    );
     expect(console.log).toHaveBeenCalledWith(expect.stringContaining('abc123def4'));
   });
 
   it('should apply --last limit', async () => {
-    snapshotManagement.listSnapshots.mockResolvedValue([]);
+    listSnapshotsUseCase.execute.mockResolvedValue([]);
 
     await command.run(['test-project'], { last: 3 });
 
-    expect(snapshotManagement.listSnapshots).toHaveBeenCalledWith('test-project', 3);
+    expect(listSnapshotsUseCase.execute).toHaveBeenCalledWith(
+      expect.objectContaining({ projectName: 'test-project', limit: 3 }),
+    );
   });
 
   it('should print message when no snapshots found', async () => {
-    snapshotManagement.listSnapshots.mockResolvedValue([]);
+    listSnapshotsUseCase.execute.mockResolvedValue([]);
 
     await command.run(['test-project'], {});
 
@@ -57,7 +61,7 @@ describe('SnapshotsCommand', () => {
   });
 
   it('should set exit code 1 on error', async () => {
-    snapshotManagement.listSnapshots.mockRejectedValue(new Error('Connection failed'));
+    listSnapshotsUseCase.execute.mockRejectedValue(new Error('Connection failed'));
 
     await command.run(['test-project'], {});
 

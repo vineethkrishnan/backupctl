@@ -55,115 +55,213 @@ chore/BCTL-20-update-deps
 
 ## Architecture
 
-Hexagonal (Ports & Adapters) with 3-layer separation: **domain**, **application**, **infrastructure**.
+Hexagonal (Ports & Adapters) with **vertical-slice** (module-first) organization. Each domain module is self-contained with its own `domain/`, `application/`, `infrastructure/`, and `presenters/` layers.
 
 ```
 src/
-├── domain/                              # Pure TypeScript — ZERO framework imports
-│   ├── backup/                          # Core backup subdomain
-│   │   ├── ports/
-│   │   │   ├── database-dumper.port.ts
-│   │   │   ├── remote-storage.port.ts
-│   │   │   ├── dump-encryptor.port.ts
-│   │   │   ├── local-cleanup.port.ts
-│   │   │   ├── hook-executor.port.ts
-│   │   │   └── backup-lock.port.ts      # file-based .lock
-│   │   ├── models/                      # immutable value objects
-│   │   └── policies/
-│   │       └── retry.policy.ts          # pure function
-│   ├── audit/                           # Audit subdomain
-│   │   ├── ports/
-│   │   │   ├── audit-log.port.ts        # startRun/trackProgress/finishRun
-│   │   │   └── fallback-writer.port.ts  # JSONL format
-│   │   └── models/
-│   ├── config/                          # Config subdomain
-│   │   ├── ports/
-│   │   │   └── config-loader.port.ts
-│   │   └── models/
-│   │       ├── project-config.model.ts
-│   │       └── retention-policy.model.ts
-│   ├── notification/                    # Notification subdomain
-│   │   └── ports/
-│   │       └── notifier.port.ts         # incl. notifyWarning(project, message)
-│   └── shared/                          # Cross-domain
-│       └── ports/
-│           └── clock.port.ts
+├── domain/                                    # All domain modules (vertical slices)
+│   ├── backup/                                # Core backup module
+│   │   ├── domain/                            # Pure TS — ZERO framework imports
+│   │   │   ├── backup-result.model.ts
+│   │   │   ├── backup-stage-error.ts
+│   │   │   ├── value-objects/                 # Enums + immutable VOs
+│   │   │   │   ├── backup-stage.enum.ts
+│   │   │   │   ├── backup-status.enum.ts
+│   │   │   │   ├── dump-result.model.ts
+│   │   │   │   ├── sync-result.model.ts
+│   │   │   │   ├── prune-result.model.ts
+│   │   │   │   ├── cleanup-result.model.ts
+│   │   │   │   ├── cache-info.model.ts
+│   │   │   │   └── snapshot-info.model.ts
+│   │   │   └── policies/
+│   │   │       └── retry.policy.ts            # Pure function
+│   │   ├── application/                       # Use cases + ports
+│   │   │   ├── ports/                         # Outbound port interfaces
+│   │   │   │   ├── database-dumper.port.ts
+│   │   │   │   ├── remote-storage.port.ts
+│   │   │   │   ├── remote-storage-factory.port.ts
+│   │   │   │   ├── dump-encryptor.port.ts
+│   │   │   │   ├── local-cleanup.port.ts
+│   │   │   │   ├── hook-executor.port.ts
+│   │   │   │   └── backup-lock.port.ts
+│   │   │   ├── use-cases/                    # One directory per action, each with Command/Query + UseCase
+│   │   │   │   ├── run-backup/
+│   │   │   │   │   ├── run-backup.command.ts
+│   │   │   │   │   └── run-backup.use-case.ts
+│   │   │   │   ├── restore-backup/
+│   │   │   │   │   ├── restore-backup.command.ts
+│   │   │   │   │   └── restore-backup.use-case.ts
+│   │   │   │   ├── get-restore-guide/
+│   │   │   │   │   ├── get-restore-guide.query.ts
+│   │   │   │   │   └── get-restore-guide.use-case.ts
+│   │   │   │   ├── prune-backup/
+│   │   │   │   │   ├── prune-backup.command.ts
+│   │   │   │   │   └── prune-backup.use-case.ts
+│   │   │   │   ├── list-snapshots/
+│   │   │   │   │   ├── list-snapshots.query.ts
+│   │   │   │   │   └── list-snapshots.use-case.ts
+│   │   │   │   ├── get-cache-info/
+│   │   │   │   │   ├── get-cache-info.query.ts
+│   │   │   │   │   └── get-cache-info.use-case.ts
+│   │   │   │   └── clear-cache/
+│   │   │   │       ├── clear-cache.command.ts
+│   │   │   │       └── clear-cache.use-case.ts
+│   │   │   └── registries/
+│   │   │       ├── dumper.registry.ts
+│   │   │       └── notifier.registry.ts
+│   │   ├── infrastructure/                    # Adapters implementing ports
+│   │   │   ├── adapters/
+│   │   │   │   ├── dumpers/                   # postgres, mysql, mongo
+│   │   │   │   ├── storage/                   # restic + factory + tagging
+│   │   │   │   ├── encryptors/                # gpg + key manager
+│   │   │   │   ├── cleanup/                   # file cleanup
+│   │   │   │   ├── hooks/                     # shell hook executor
+│   │   │   │   └── lock/                      # file-based .lock
+│   │   │   └── scheduler/
+│   │   │       └── dynamic-scheduler.service.ts
+│   │   ├── presenters/                        # Inbound (CLI + HTTP)
+│   │   │   └── cli/
+│   │   │       ├── run.command.ts
+│   │   │       ├── restore.command.ts
+│   │   │       ├── snapshots.command.ts
+│   │   │       ├── prune.command.ts
+│   │   │       ├── cache.command.ts
+│   │   │       └── restic.command.ts
+│   │   └── backup.module.ts                   # NestJS module barrel
+│   │
+│   ├── audit/                                 # Audit module
+│   │   ├── domain/
+│   │   │   └── health-check-result.model.ts
+│   │   ├── application/
+│   │   │   ├── ports/
+│   │   │   │   ├── audit-log.port.ts
+│   │   │   │   └── fallback-writer.port.ts
+│   │   │   └── use-cases/
+│   │   │       ├── get-backup-status/
+│   │   │       │   ├── get-backup-status.query.ts
+│   │   │       │   └── get-backup-status.use-case.ts
+│   │   │       ├── get-failed-logs/
+│   │   │       │   ├── get-failed-logs.query.ts
+│   │   │       │   └── get-failed-logs.use-case.ts
+│   │   │       └── recover-startup/
+│   │   │           └── recover-startup.use-case.ts
+│   │   ├── infrastructure/
+│   │   │   └── persistence/
+│   │   │       ├── typeorm/
+│   │   │       │   ├── schema/
+│   │   │       │   │   └── backup-log.record.ts
+│   │   │       │   ├── typeorm-audit-log.repository.ts
+│   │   │       │   ├── data-source.ts
+│   │   │       │   └── migrations/
+│   │   │       └── fallback/
+│   │   │           └── jsonl-fallback-writer.adapter.ts
+│   │   ├── presenters/
+│   │   │   ├── cli/
+│   │   │   │   ├── status.command.ts
+│   │   │   │   └── logs.command.ts
+│   │   │   └── http/
+│   │   │       └── status.controller.ts
+│   │   └── audit.module.ts
+│   │
+│   ├── config/                                # Config module
+│   │   ├── domain/
+│   │   │   ├── project-config.model.ts
+│   │   │   └── retention-policy.model.ts
+│   │   ├── application/
+│   │   │   └── ports/
+│   │   │       └── config-loader.port.ts
+│   │   ├── infrastructure/
+│   │   │   └── yaml-config-loader.adapter.ts
+│   │   ├── presenters/
+│   │   │   └── cli/
+│   │   │       └── config.command.ts
+│   │   └── config.module.ts
+│   │
+│   ├── notification/                          # Notification module
+│   │   ├── application/
+│   │   │   └── ports/
+│   │   │       └── notifier.port.ts
+│   │   ├── infrastructure/
+│   │   │   ├── slack-notifier.adapter.ts
+│   │   │   ├── email-notifier.adapter.ts
+│   │   │   └── webhook-notifier.adapter.ts
+│   │   └── notification.module.ts
+│   │
+│   └── health/                                # Health module
+│       ├── application/
+│       │   └── use-cases/
+│       │       └── check-health/
+│       │           └── check-health.use-case.ts
+│       ├── presenters/
+│       │   ├── cli/
+│       │   │   └── health.command.ts
+│       │   └── http/
+│       │       └── health.controller.ts
+│       └── health.module.ts
 │
-├── application/                         # Use case orchestration — imports domain/ only
-│   ├── backup/
-│   │   ├── backup-orchestrator.service.ts
-│   │   ├── cache-management.service.ts
-│   │   └── registries/
-│   │       ├── dumper.registry.ts       # db type → DatabaseDumperPort
-│   │       └── notifier.registry.ts     # notification type → NotifierPort
-│   ├── audit/
-│   │   ├── audit-query.service.ts
-│   │   └── startup-recovery.service.ts  # crash recovery, fallback replay, GPG, unlock
-│   ├── health/
-│   │   └── health-check.service.ts
-│   ├── snapshot/
-│   │   └── snapshot-management.service.ts
-│   └── application.module.ts
+├── common/                                    # Cross-cutting (imported by any layer)
+│   ├── di/
+│   │   └── injection-tokens.ts                # All port DI tokens (Symbol-based)
+│   ├── helpers/
+│   │   ├── child-process.util.ts              # Safe execFile wrapper
+│   │   └── format.util.ts                     # Byte/duration/timestamp formatting
+│   └── clock/
+│       ├── clock.port.ts                      # Shared clock port interface
+│       └── system-clock.adapter.ts            # System clock implementation
 │
-├── infrastructure/                      # ALL external-facing code
-│   ├── adapters/                        # Driven (outbound): implements domain ports
-│   │   ├── dumpers/                     # postgres, mysql, mongo (always compress)
-│   │   ├── storage/                     # restic + factory + tagging
-│   │   ├── notifiers/                   # slack, email (smtp_secure), webhook (JSON+markdown)
-│   │   ├── encryptors/                  # gpg + key manager
-│   │   ├── cleanup/                     # file cleanup
-│   │   ├── hooks/                       # shell hook executor
-│   │   ├── config/                      # YAML loader + TIMEZONE + BACKUP_BASE_DIR
-│   │   └── clock/                       # system clock
-│   ├── persistence/                     # Driven (outbound): data storage
-│   │   ├── audit/                       # TypeORM + migrations
-│   │   ├── fallback/                    # JSONL fallback writer
-│   │   └── lock/                        # file-based .lock per project
-│   ├── cli/                             # Driving (inbound): 14 commands, exit codes 0-5
-│   ├── http/                            # Driving (inbound): health + status controllers
-│   ├── scheduler/                       # Driving (inbound): dynamic cron with lock
-│   └── infrastructure.module.ts         # Barrel: binds all adapters to port tokens
-│
-├── shared/                              # Cross-cutting
-│   ├── injection-tokens.ts              # All port DI tokens
-│   ├── child-process.util.ts            # Safe execFile wrapper
-│   └── format.util.ts                   # Byte/duration/timestamp formatting
-│
-├── app.module.ts
-├── main.ts                              # HTTP entry point
-└── cli.ts                               # CLI entry point
+├── app/
+│   └── app.module.ts                          # Root module — imports all domain modules
+├── main.ts                                    # HTTP entry point
+└── cli.ts                                     # CLI entry point
 
-scripts/                                 # Host-side ONLY
+scripts/                                       # Host-side ONLY
 ├── deploy.sh
-└── backupctl-manage.sh                  # setup, check, deploy, update, logs, shell
+└── backupctl-manage.sh                        # setup, check, deploy, update, logs, shell
+```
+
+### Path Aliases
+
+```
+@domain/*   → src/domain/*
+@common/*   → src/common/*
 ```
 
 ### Dependency Flow
 
 ```
-infrastructure/ ──→ application/ ──→ domain/
+presenters/ ──→ infrastructure/ ──→ application/ ──→ domain/
 ```
 
-### Layer Rules
+Each layer can only import from the layer(s) to its right. `common/` is imported by any layer.
 
-- **`domain/`** imports **nothing** outside itself. No `@nestjs/*`, no `typeorm`, no decorators. Pure TypeScript. Organized by subdomain: `backup/`, `audit/`, `config/`, `notification/`, `shared/`.
-- **`application/`** imports only `domain/`. Use case orchestration, registries, startup recovery.
-- **`infrastructure/`** imports `domain/` (to implement ports) + external libs. Split into `adapters/` (outbound), `persistence/` (data storage), `cli/`/`http/`/`scheduler/` (inbound).
-- **`shared/`** imported by any layer. Only pure utilities and DI token definitions.
+### Layer Rules (within each module)
+
+- **`domain/`** — Pure TypeScript. ZERO framework imports. Models, value objects, policies, domain errors.
+- **`application/`** — Ports (outbound interfaces), use cases (orchestration), registries. Imports only its own `domain/` and other modules' `application/ports/`.
+- **`infrastructure/`** — Implements ports with real adapters (DB, shell, HTTP). Imports `application/ports/` + external libs.
+- **`presenters/`** — Driving adapters: CLI commands (`cli/`) and HTTP controllers (`http/`). Imports `application/use-cases/`.
+- **`common/`** — Cross-cutting utilities and DI tokens. Imported by any layer of any module.
+
+### Cross-Module Imports
+
+Modules may only import another module's **`application/ports/`** or **`domain/`** — never its `infrastructure/` or `presenters/`.
 
 ### Key Design Decisions
 
 | Decision | Rationale |
 |----------|-----------|
-| Domain subdomains (`backup/`, `audit/`, `config/`, `notification/`) | Each owns its ports + models. Scales without cross-contamination. |
-| Orchestrator in `application/`, not `domain/` | Coordinates ports — application service, not domain logic |
+| Vertical-slice modules (`backup/`, `audit/`, `config/`, `notification/`, `health/`) | Each module self-contained with own domain/application/infrastructure/presenters |
+| Use cases in `application/use-cases/{action}/` | One directory per use case with Command/Query + UseCase. Single `execute()` method per use case |
+| Command/Query pattern | Commands for writes, Queries for reads. Plain data carriers with constructor params. Presenters map args → Command/Query → UseCase.execute() |
+| Ports in `application/ports/` (not `domain/`) | Ports define outbound contracts; application layer owns the orchestration interface |
 | `DumperRegistry` + `NotifierRegistry` | Dynamic adapter resolution by project config type |
 | `BackupLockPort` — file-based `.lock` | Survives crashes, visible on disk, cleaned on startup recovery |
 | `AuditLogPort` — `startRun`/`trackProgress`/`finishRun` | Real-time progress visibility + crash detection via orphaned records |
 | `FallbackWriterPort` — JSONL format | Append-only, replayed on startup. Backup success never lost to infra failure |
-| `notifyWarning(project, message)` | Generic warning method for timeouts, missing assets, disk space |
-| `RemoteStoragePort.sync(paths, options)` | Options object `{ tags, snapshotMode }` for tagging + mode |
-| `ClockPort` | Deterministic testing, timestamps in `TIMEZONE` (default `Europe/Berlin`) |
+| TypeORM entities as `*.record.ts` | Infrastructure concern, named "record" not "entity" to avoid DDD confusion |
+| `common/` over `shared/` | Cross-cutting utilities, DI tokens, shared clock port — imported by any module |
+| `presenters/` layer | CLI commands and HTTP controllers as driving adapters, separate from infrastructure |
+| `ClockPort` in `common/clock/` | Shared across modules, not owned by any single domain |
 | Compression always on | No toggle. Each dumper uses best method per DB type |
 | Explicit TypeORM migrations | No `synchronize: true`. Safe for production |
 | Winston with log rotation | JSON for prod, pretty for dev. `winston-daily-rotate-file` |
@@ -236,7 +334,7 @@ docker exec backupctl node dist/cli.js health
 docker exec backupctl node dist/cli.js run locaboo --dry-run
 
 # Migrations
-npx typeorm migration:run -d src/infrastructure/persistence/audit/data-source.ts
+npx typeorm migration:run -d src/domain/audit/infrastructure/persistence/typeorm/data-source.ts
 ```
 
 ## Testing
@@ -245,37 +343,41 @@ TDD approach — write tests first, then implementation.
 
 ### Test Structure
 
+Tests mirror the `src/` vertical-slice layout:
+
 ```
 test/
 ├── unit/
-│   ├── shared/                    # child-process util, format util
+│   ├── shared/                         # child-process util, format util
 │   ├── domain/
-│   │   ├── backup/models/         # Value object validation, accessors
-│   │   ├── backup/policies/       # Retry policy pure function
-│   │   └── config/models/         # ProjectConfig, RetentionPolicy
+│   │   ├── backup/models/              # Value object validation, accessors
+│   │   ├── backup/policies/            # Retry policy pure function
+│   │   └── config/models/              # ProjectConfig, RetentionPolicy
 │   ├── application/
-│   │   ├── backup/                # Orchestrator (flow, lock, dry-run, retry, fallback, timeout)
-│   │   ├── audit/                 # Audit query, startup recovery
-│   │   └── ...services
+│   │   ├── backup/                     # RunBackupUseCase (flow, lock, dry-run, retry, fallback, timeout)
+│   │   ├── backup/registries/          # DumperRegistry, NotifierRegistry
+│   │   ├── audit/                      # QueryAuditLogsUseCase, RecoverStartupUseCase
+│   │   ├── health/                     # CheckHealthUseCase
+│   │   └── snapshot/                   # ListSnapshotsUseCase
 │   └── infrastructure/
-│       ├── adapters/              # dumpers, storage, notifiers, encryptors, config...
-│       ├── persistence/           # TypeORM audit, JSONL fallback, file lock
-│       ├── cli/                   # Command parsing, exit codes, flags
-│       ├── http/                  # Controller responses
-│       └── scheduler/             # Cron registration with lock
+│       ├── adapters/                   # dumpers, storage, notifiers, encryptors, cleanup, hooks, clock, config
+│       ├── persistence/                # TypeORM audit repo, JSONL fallback, file lock
+│       ├── cli/commands/               # Command parsing, exit codes, flags
+│       ├── http/                       # Controller responses
+│       └── scheduler/                  # Cron registration with lock
 └── integration/
-    ├── config/                    # Full YAML + .env end-to-end
-    ├── audit/                     # TypeORM CRUD + migrations
-    ├── flow/                      # Full backup flow
-    └── cli/                       # End-to-end CLI via CommandTestFactory
+    ├── config/                         # Full YAML + .env end-to-end
+    ├── audit/                          # TypeORM CRUD + migrations
+    ├── flow/                           # Full backup flow
+    └── cli/                            # End-to-end CLI via CommandTestFactory
 ```
 
 ### What to Test
 
 - **Domain models:** Validation, accessors (`hasEncryption()`, `hasTimeout()`)
 - **Domain policies:** Retry — retryable/non-retryable stages, exponential backoff
-- **Orchestrator:** 11-step flow, lock acquire/release, dry run, retry, fallback, timeout warning, missing assets
-- **Startup recovery:** Orphan marking, fallback replay, restic unlock, GPG import
+- **Use cases:** RunBackupUseCase (11-step flow, lock, dry-run, retry, fallback, timeout), ListSnapshotsUseCase, ManageCacheUseCase
+- **Startup recovery:** RecoverStartupUseCase — orphan marking, fallback replay, restic unlock, GPG import
 - **Registries:** Register, resolve, resolve-unknown-throws
 - **Adapters:** Command construction, output parsing, tagging, TLS, markdown payload
 - **Persistence:** Insert+update audit, JSONL append/read/clear, .lock create/check/remove
@@ -288,9 +390,61 @@ test/
 - Mock `fs` for cleanup, fallback writer, file lock adapters
 - Mock `axios` for Slack/webhook notifiers
 - Mock `nodemailer` for email notifier
-- Mock TypeORM repository for audit adapter
-- All outbound ports mocked in orchestrator tests via DI tokens
+- Mock TypeORM repository for audit repository
+- All outbound ports mocked in use case tests via DI tokens
 - `ClockPort` mock for deterministic timestamps
+
+## Naming Conventions
+
+### Files & Folders
+
+- **Files**: `kebab-case` + type suffix: `run-backup.use-case.ts`, `backup-result.model.ts`, `database-dumper.port.ts`
+- **Folders**: `kebab-case`: `use-cases/`, `value-objects/`, `run-backup/`
+- **Type suffixes**: `.use-case.ts`, `.command.ts` (CQRS write), `.query.ts` (CQRS read), `.port.ts`, `.model.ts`, `.enum.ts`, `.adapter.ts`, `.repository.ts`, `.record.ts`, `.controller.ts`, `.module.ts`, `.service.ts`, `.registry.ts`, `.policy.ts`
+
+### Classes
+
+- **PascalCase + Type suffix**: `RunBackupUseCase`, `DatabaseDumperPort`, `BackupResult`, `BackupStage`, `TypeormAuditLogRepository`, `BackupLogRecord`
+- **Use cases**: `{Action}{Entity}UseCase` — e.g. `RunBackupUseCase`, `GetBackupStatusUseCase`, `CheckHealthUseCase`
+- **Commands**: `{Action}{Entity}Command` — e.g. `RunBackupCommand`, `RestoreBackupCommand`, `ClearCacheCommand`
+- **Queries**: `{Action}{Entity}Query` — e.g. `ListSnapshotsQuery`, `GetBackupStatusQuery`, `GetCacheInfoQuery`
+- **Ports**: `{Entity}{Action}Port` — e.g. `DatabaseDumperPort`, `AuditLogPort`, `ConfigLoaderPort`
+- **Adapters**: `{Technology}{Entity}Adapter` — e.g. `PostgresDumpAdapter`, `SlackNotifierAdapter`, `GpgEncryptorAdapter`
+
+### Command/Query Pattern (CQRS)
+
+Each use case that accepts user input follows the Command/Query pattern:
+
+```
+Presenter (CLI/HTTP) → map args → Command/Query → UseCase.execute(command)
+```
+
+- **Commands** (write operations): `{action}.command.ts` — plain data carrier, constructor with params object
+- **Queries** (read operations): `{action}.query.ts` — plain data carrier, constructor with params object
+- **Use cases**: single `execute(command/query)` method per class
+- **Validation**: happens at the presenter boundary (CLI arg parsing / HTTP DTO with class-validator), NOT in Commands/Queries
+- **No user input**: use cases like `RecoverStartupUseCase` and `CheckHealthUseCase` skip the pattern
+- **Repositories**: `{Technology}{Entity}Repository` — e.g. `TypeormAuditLogRepository`
+- **Records** (TypeORM entities): `{Entity}Record` — e.g. `BackupLogRecord`
+- **Commands** (CLI): `{Action}Command` — e.g. `RunCommand`, `HealthCommand`, `ConfigCommand`
+
+### Key Renames from Previous Structure
+
+| Old Name | New Name | New Path |
+|----------|----------|----------|
+| `BackupOrchestratorService` | `RunBackupUseCase` | `domain/backup/application/use-cases/run-backup/` |
+| (extracted from above) | `RestoreBackupUseCase` | `domain/backup/application/use-cases/restore-backup/` |
+| (extracted from above) | `GetRestoreGuideUseCase` | `domain/backup/application/use-cases/get-restore-guide/` |
+| (extracted from above) | `PruneBackupUseCase` | `domain/backup/application/use-cases/prune-backup/` |
+| `CacheManagementService` | `GetCacheInfoUseCase` | `domain/backup/application/use-cases/get-cache-info/` |
+| (extracted from above) | `ClearCacheUseCase` | `domain/backup/application/use-cases/clear-cache/` |
+| `SnapshotManagementService` | `ListSnapshotsUseCase` | `domain/backup/application/use-cases/list-snapshots/` |
+| `AuditQueryService` | `GetBackupStatusUseCase` | `domain/audit/application/use-cases/get-backup-status/` |
+| (extracted from above) | `GetFailedLogsUseCase` | `domain/audit/application/use-cases/get-failed-logs/` |
+| `StartupRecoveryService` | `RecoverStartupUseCase` | `domain/audit/application/use-cases/recover-startup/` |
+| `HealthCheckService` | `CheckHealthUseCase` | `domain/health/application/use-cases/check-health/` |
+| `BackupLogEntity` | `BackupLogRecord` | `domain/audit/infrastructure/persistence/typeorm/schema/` |
+| `TypeormAuditLogAdapter` | `TypeormAuditLogRepository` | `domain/audit/infrastructure/persistence/typeorm/` |
 
 ## Coding Conventions
 
@@ -360,7 +514,7 @@ Explain **why**, not obvious **what**. No comments on self-evident code.
 
 ## Startup Recovery
 
-`StartupRecoveryService` on `onModuleInit`:
+`RecoverStartupUseCase` on `onModuleInit`:
 1. Mark orphaned `started` records as `failed`
 2. Clean orphaned dump files
 3. Remove stale `.lock` files

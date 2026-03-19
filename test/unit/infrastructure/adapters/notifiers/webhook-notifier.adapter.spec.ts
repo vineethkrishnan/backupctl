@@ -1,13 +1,13 @@
 import axios from 'axios';
-import { WebhookNotifierAdapter } from '@infrastructure/adapters/notifiers/webhook-notifier.adapter';
-import { BackupResult } from '@domain/backup/models/backup-result.model';
-import { BackupStageError } from '@domain/backup/models/backup-stage-error';
-import { BackupStage } from '@domain/backup/models/backup-stage.enum';
-import { BackupStatus } from '@domain/backup/models/backup-status.enum';
-import { DumpResult } from '@domain/backup/models/dump-result.model';
-import { SyncResult } from '@domain/backup/models/sync-result.model';
-import { PruneResult } from '@domain/backup/models/prune-result.model';
-import { CleanupResult } from '@domain/backup/models/cleanup-result.model';
+import { WebhookNotifierAdapter } from '@domain/notification/infrastructure/webhook-notifier.adapter';
+import { BackupResult } from '@domain/backup/domain/backup-result.model';
+import { BackupStageError } from '@domain/backup/domain/backup-stage-error';
+import { BackupStage } from '@domain/backup/domain/value-objects/backup-stage.enum';
+import { BackupStatus } from '@domain/backup/domain/value-objects/backup-status.enum';
+import { DumpResult } from '@domain/backup/domain/value-objects/dump-result.model';
+import { SyncResult } from '@domain/backup/domain/value-objects/sync-result.model';
+import { PruneResult } from '@domain/backup/domain/value-objects/prune-result.model';
+import { CleanupResult } from '@domain/backup/domain/value-objects/cleanup-result.model';
 
 jest.mock('axios');
 

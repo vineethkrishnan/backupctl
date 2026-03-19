@@ -1,5 +1,5 @@
-import { NotifierPort } from '@domain/notification/ports/notifier.port';
-import { NotifierRegistry } from '@application/backup/registries/notifier.registry';
+import { NotifierPort } from '@domain/notification/application/ports/notifier.port';
+import { NotifierRegistry } from '@domain/backup/application/registries/notifier.registry';
 
 describe('NotifierRegistry', () => {
   let registry: NotifierRegistry;

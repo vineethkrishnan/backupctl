@@ -1,5 +1,5 @@
-import { DatabaseDumperPort } from '@domain/backup/ports/database-dumper.port';
-import { DumperRegistry } from '@application/backup/registries/dumper.registry';
+import { DatabaseDumperPort } from '@domain/backup/application/ports/database-dumper.port';
+import { DumperRegistry } from '@domain/backup/application/registries/dumper.registry';
 
 describe('DumperRegistry', () => {
   let registry: DumperRegistry;

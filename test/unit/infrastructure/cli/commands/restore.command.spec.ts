@@ -1,17 +1,21 @@
-import { RestoreCommand } from '@infrastructure/cli/commands/restore.command';
-import { BackupOrchestratorService } from '@application/backup/backup-orchestrator.service';
+import { RestoreCommand } from '@domain/backup/presenters/cli/restore.command';
+import { RestoreBackupUseCase } from '@domain/backup/application/use-cases/restore-backup/restore-backup.use-case';
+import { GetRestoreGuideUseCase } from '@domain/backup/application/use-cases/get-restore-guide/get-restore-guide.use-case';
 
 describe('RestoreCommand', () => {
   let command: RestoreCommand;
-  let orchestrator: jest.Mocked<BackupOrchestratorService>;
+  let mockRestoreBackup: jest.Mocked<RestoreBackupUseCase>;
+  let mockGetRestoreGuide: jest.Mocked<GetRestoreGuideUseCase>;
 
   beforeEach(() => {
-    orchestrator = {
-      restoreBackup: jest.fn(),
-      getRestoreGuide: jest.fn(),
-    } as unknown as jest.Mocked<BackupOrchestratorService>;
+    mockRestoreBackup = {
+      execute: jest.fn(),
+    } as unknown as jest.Mocked<RestoreBackupUseCase>;
+    mockGetRestoreGuide = {
+      execute: jest.fn(),
+    } as unknown as jest.Mocked<GetRestoreGuideUseCase>;
 
-    command = new RestoreCommand(orchestrator);
+    command = new RestoreCommand(mockRestoreBackup, mockGetRestoreGuide);
     process.exitCode = undefined;
     jest.spyOn(console, 'log').mockImplementation();
     jest.spyOn(console, 'error').mockImplementation();
@@ -22,57 +26,66 @@ describe('RestoreCommand', () => {
     process.exitCode = undefined;
   });
 
-  it('should call restoreBackup with correct arguments', async () => {
-    orchestrator.restoreBackup.mockResolvedValue();
+  it('should call restoreBackup execute with correct arguments', async () => {
+    mockRestoreBackup.execute.mockResolvedValue();
 
     await command.run(['my-project', 'snap-abc', '/restore/path'], {});
 
-    expect(orchestrator.restoreBackup).toHaveBeenCalledWith(
-      'my-project',
-      'snap-abc',
-      '/restore/path',
-      { only: undefined, decompress: undefined },
+    expect(mockRestoreBackup.execute).toHaveBeenCalledWith(
+      expect.objectContaining({
+        projectName: 'my-project',
+        snapshotId: 'snap-abc',
+        targetPath: '/restore/path',
+        decompress: false,
+      }),
     );
   });
 
   it('should pass --only option to restoreBackup', async () => {
-    orchestrator.restoreBackup.mockResolvedValue();
+    mockRestoreBackup.execute.mockResolvedValue();
 
     await command.run(['my-project', 'snap-abc', '/restore/path'], { only: 'db' });
 
-    expect(orchestrator.restoreBackup).toHaveBeenCalledWith(
-      'my-project',
-      'snap-abc',
-      '/restore/path',
-      { only: 'db', decompress: undefined },
+    expect(mockRestoreBackup.execute).toHaveBeenCalledWith(
+      expect.objectContaining({
+        projectName: 'my-project',
+        snapshotId: 'snap-abc',
+        targetPath: '/restore/path',
+        only: 'db',
+        decompress: false,
+      }),
     );
   });
 
   it('should pass --decompress option', async () => {
-    orchestrator.restoreBackup.mockResolvedValue();
+    mockRestoreBackup.execute.mockResolvedValue();
 
     await command.run(['my-project', 'snap-abc', '/restore/path'], { decompress: true });
 
-    expect(orchestrator.restoreBackup).toHaveBeenCalledWith(
-      'my-project',
-      'snap-abc',
-      '/restore/path',
-      { only: undefined, decompress: true },
+    expect(mockRestoreBackup.execute).toHaveBeenCalledWith(
+      expect.objectContaining({
+        projectName: 'my-project',
+        snapshotId: 'snap-abc',
+        targetPath: '/restore/path',
+        decompress: true,
+      }),
     );
   });
 
   it('should print restore guide when --guide is set', async () => {
-    orchestrator.getRestoreGuide.mockReturnValue('Step 1: pg_restore...');
+    mockGetRestoreGuide.execute.mockReturnValue('Step 1: pg_restore...');
 
     await command.run(['my-project', 'snap-abc', '/restore/path'], { guide: true });
 
-    expect(orchestrator.getRestoreGuide).toHaveBeenCalledWith('my-project');
-    expect(orchestrator.restoreBackup).not.toHaveBeenCalled();
+    expect(mockGetRestoreGuide.execute).toHaveBeenCalledWith(
+      expect.objectContaining({ projectName: 'my-project' }),
+    );
+    expect(mockRestoreBackup.execute).not.toHaveBeenCalled();
     expect(console.log).toHaveBeenCalledWith('Step 1: pg_restore...');
   });
 
   it('should set exit code 1 on error', async () => {
-    orchestrator.restoreBackup.mockRejectedValue(new Error('Snapshot not found'));
+    mockRestoreBackup.execute.mockRejectedValue(new Error('Snapshot not found'));
 
     await command.run(['my-project', 'snap-abc', '/restore/path'], {});
 

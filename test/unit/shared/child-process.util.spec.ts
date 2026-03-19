@@ -1,5 +1,5 @@
 import { execFile } from 'child_process';
-import { safeExecFile } from '../../../src/shared/child-process.util';
+import { safeExecFile } from '@common/helpers/child-process.util';
 
 jest.mock('child_process', () => ({
   execFile: jest.fn(),

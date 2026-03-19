@@ -1,9 +1,9 @@
-import { ResticCommand } from '@infrastructure/cli/commands/restic.command';
-import { ConfigLoaderPort } from '@domain/config/ports/config-loader.port';
-import { RemoteStorageFactory } from '@domain/backup/ports/remote-storage-factory.port';
-import { RemoteStoragePort } from '@domain/backup/ports/remote-storage.port';
-import { ProjectConfig } from '@domain/config/models/project-config.model';
-import { RetentionPolicy } from '@domain/config/models/retention-policy.model';
+import { ResticCommand } from '@domain/backup/presenters/cli/restic.command';
+import { ConfigLoaderPort } from '@domain/config/application/ports/config-loader.port';
+import { RemoteStorageFactory } from '@domain/backup/application/ports/remote-storage-factory.port';
+import { RemoteStoragePort } from '@domain/backup/application/ports/remote-storage.port';
+import { ProjectConfig } from '@domain/config/domain/project-config.model';
+import { RetentionPolicy } from '@domain/config/domain/retention-policy.model';
 
 function buildProjectConfig(): ProjectConfig {
   return new ProjectConfig({

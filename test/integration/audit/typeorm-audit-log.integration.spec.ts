@@ -1,11 +1,11 @@
 import { Repository } from 'typeorm';
 import { v4 as uuidv4 } from 'uuid';
 
-import { TypeormAuditLogAdapter } from '@infrastructure/persistence/audit/typeorm-audit-log.adapter';
-import { BackupLogEntity } from '@infrastructure/persistence/audit/entities/backup-log.entity';
-import { BackupStage } from '@domain/backup/models/backup-stage.enum';
-import { BackupStatus } from '@domain/backup/models/backup-status.enum';
-import { BackupResult } from '@domain/backup/models/backup-result.model';
+import { TypeormAuditLogRepository } from '@domain/audit/infrastructure/persistence/typeorm/typeorm-audit-log.repository';
+import { BackupLogRecord } from '@domain/audit/infrastructure/persistence/typeorm/schema/backup-log.record';
+import { BackupStage } from '@domain/backup/domain/value-objects/backup-stage.enum';
+import { BackupStatus } from '@domain/backup/domain/value-objects/backup-status.enum';
+import { BackupResult } from '@domain/backup/domain/backup-result.model';
 
 jest.setTimeout(30000);
 
@@ -32,17 +32,17 @@ function buildBackupResult(overrides: Partial<BackupResult> = {}): BackupResult 
   });
 }
 
-function createMockRepository(): jest.Mocked<Repository<BackupLogEntity>> {
-  const store: BackupLogEntity[] = [];
+function createMockRepository(): jest.Mocked<Repository<BackupLogRecord>> {
+  const store: BackupLogRecord[] = [];
 
   const mockRepo = {
-    create: jest.fn((partial: Partial<BackupLogEntity>) => {
-      const entity = new BackupLogEntity();
+    create: jest.fn((partial: Partial<BackupLogRecord>) => {
+      const entity = new BackupLogRecord();
       Object.assign(entity, partial);
       return entity;
     }),
 
-    save: jest.fn(async (entity: BackupLogEntity) => {
+    save: jest.fn(async (entity: BackupLogRecord) => {
       const existingIndex = store.findIndex((e) => e.id === entity.id);
       if (existingIndex >= 0) {
         store[existingIndex] = entity;
@@ -52,7 +52,7 @@ function createMockRepository(): jest.Mocked<Repository<BackupLogEntity>> {
       return entity;
     }),
 
-    update: jest.fn(async (id: string, partial: Partial<BackupLogEntity>) => {
+    update: jest.fn(async (id: string, partial: Partial<BackupLogRecord>) => {
       const entity = store.find((e) => e.id === id);
       if (entity) {
         Object.assign(entity, partial);
@@ -97,21 +97,21 @@ function createMockRepository(): jest.Mocked<Repository<BackupLogEntity>> {
 
       return results;
     }),
-  } as unknown as jest.Mocked<Repository<BackupLogEntity>>;
+  } as unknown as jest.Mocked<Repository<BackupLogRecord>>;
 
   // Expose the store for assertions
-  (mockRepo as unknown as { _store: BackupLogEntity[] })._store = store;
+  (mockRepo as unknown as { _store: BackupLogRecord[] })._store = store;
 
   return mockRepo;
 }
 
-describe('TypeormAuditLogAdapter (integration)', () => {
-  let adapter: TypeormAuditLogAdapter;
-  let repository: jest.Mocked<Repository<BackupLogEntity>>;
+describe('TypeormAuditLogRepository (integration)', () => {
+  let adapter: TypeormAuditLogRepository;
+  let repository: jest.Mocked<Repository<BackupLogRecord>>;
 
   beforeEach(() => {
     repository = createMockRepository();
-    adapter = new TypeormAuditLogAdapter(repository);
+    adapter = new TypeormAuditLogRepository(repository);
   });
 
   describe('startRun', () => {
@@ -235,7 +235,7 @@ describe('TypeormAuditLogAdapter (integration)', () => {
     it('should return results ordered by started_at DESC', async () => {
       // Insert two runs
       const runId1 = await adapter.startRun('locaboo');
-      const store = (repository as unknown as { _store: BackupLogEntity[] })._store;
+      const store = (repository as unknown as { _store: BackupLogRecord[] })._store;
       const entity1 = store.find((e) => e.id === runId1);
       if (entity1) entity1.startedAt = new Date('2026-03-17T02:00:00Z');
 

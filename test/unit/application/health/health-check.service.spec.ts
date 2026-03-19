@@ -1,12 +1,12 @@
 import { ConfigService } from '@nestjs/config';
-import { HealthCheckService } from '@application/health/health-check.service';
-import { AuditLogPort } from '@domain/audit/ports/audit-log.port';
-import * as childProcessUtil from '@shared/child-process.util';
+import { CheckHealthUseCase } from '@domain/health/application/use-cases/check-health/check-health.use-case';
+import { AuditLogPort } from '@domain/audit/application/ports/audit-log.port';
+import * as childProcessUtil from '@common/helpers/child-process.util';
 
-jest.mock('@shared/child-process.util');
+jest.mock('@common/helpers/child-process.util');
 
-describe('HealthCheckService', () => {
-  let service: HealthCheckService;
+describe('CheckHealthUseCase', () => {
+  let service: CheckHealthUseCase;
   let mockAuditLog: jest.Mocked<AuditLogPort>;
   let mockConfigService: jest.Mocked<ConfigService>;
   let mockSafeExecFile: jest.MockedFunction<typeof childProcessUtil.safeExecFile>;
@@ -30,7 +30,7 @@ describe('HealthCheckService', () => {
       typeof childProcessUtil.safeExecFile
     >;
 
-    service = new HealthCheckService(
+    service = new CheckHealthUseCase(
       mockAuditLog,
       mockConfigService,
     );

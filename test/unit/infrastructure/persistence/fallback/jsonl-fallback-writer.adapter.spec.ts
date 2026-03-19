@@ -2,10 +2,10 @@ import * as fs from 'fs';
 
 import { ConfigService } from '@nestjs/config';
 
-import { JsonlFallbackWriterAdapter } from '@infrastructure/persistence/fallback/jsonl-fallback-writer.adapter';
-import { BackupResult } from '@domain/backup/models/backup-result.model';
-import { BackupStage } from '@domain/backup/models/backup-stage.enum';
-import { BackupStatus } from '@domain/backup/models/backup-status.enum';
+import { JsonlFallbackWriterAdapter } from '@domain/audit/infrastructure/persistence/fallback/jsonl-fallback-writer.adapter';
+import { BackupResult } from '@domain/backup/domain/backup-result.model';
+import { BackupStage } from '@domain/backup/domain/value-objects/backup-stage.enum';
+import { BackupStatus } from '@domain/backup/domain/value-objects/backup-status.enum';
 
 jest.mock('fs');
 jest.mock('uuid', () => ({
