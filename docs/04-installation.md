@@ -1,6 +1,10 @@
 # Installation
 
-This guide covers deploying backupctl from scratch on a fresh server. There are two paths: an interactive installation wizard that generates all configuration files for you, or a manual step-by-step setup.
+This guide covers deploying backupctl on a fresh server. There are three paths:
+
+1. **Quick install** — one command, pulls a pre-built Docker image (fastest)
+2. **Installation wizard** — interactive setup that generates all config files
+3. **Manual setup** — step-by-step for full control
 
 ## Prerequisites
 
@@ -11,17 +15,63 @@ This guide covers deploying backupctl from scratch on a fresh server. There are 
 | SSH access | — | Hetzner Storage Box with SSH/SFTP enabled |
 | GPG | 2.x | Optional — only if using dump encryption |
 | Disk space | 5+ GB free | Configurable via `HEALTH_DISK_MIN_FREE_GB` |
-| Git | 2.x | For cloning the repository |
-| OpenSSL | — | For generating secure passwords (wizard uses this) |
+| curl | — | For the quick installer |
 
 The host OS should be Linux (Ubuntu 24.04 recommended). macOS works for local development but production deployments target Linux.
 
-## Option A: Installation Wizard (Recommended)
+## Docker Images
 
-The zero-edit interactive setup generates `.env` and `config/projects.yml` from your answers, creates all required directories, and optionally builds and starts containers.
+backupctl is published as a Docker image on every release:
 
 ```bash
-git clone <repo-url> backupctl && cd backupctl
+# Docker Hub
+docker pull vineethkrishnan/backupctl:latest
+
+# GitHub Container Registry
+docker pull ghcr.io/vineethkrishnan/backupctl:latest
+```
+
+Tags follow semver: `latest`, `1`, `1.0`, `1.0.0`.
+
+---
+
+## Option A: Quick Install (Recommended)
+
+A single command that pulls the pre-built image, generates `docker-compose.yml`, downloads management scripts, and sets up the directory structure.
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/vineethkrishnan/backupctl/main/scripts/get-backupctl.sh | bash
+```
+
+Custom install directory:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/vineethkrishnan/backupctl/main/scripts/get-backupctl.sh | bash -s -- --dir /opt/backupctl
+```
+
+Pin to a specific version:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/vineethkrishnan/backupctl/main/scripts/get-backupctl.sh | bash -s -- --version 1.0.0
+```
+
+After the installer finishes, run the interactive setup wizard:
+
+```bash
+cd ~/backupctl
+bash scripts/install.sh
+```
+
+This generates `.env` and `config/projects.yml` from your answers, sets up SSH keys, initializes restic repos, and optionally starts the service.
+
+---
+
+## Option B: Installation Wizard (From Source)
+
+Clone the repository and run the interactive setup. This builds the Docker image locally instead of pulling a pre-built one.
+
+```bash
+git clone https://github.com/vineethkrishnan/backupctl.git && cd backupctl
 ./scripts/install.sh
 ```
 
@@ -224,19 +274,22 @@ You can also install shortcuts separately at any time:
 ./scripts/install-cli.sh --uninstall   # remove both commands
 ```
 
-## Option B: Manual Setup
+## Option C: Manual Setup
 
-### 1. Clone and Install
+### 1. Set Up the Project
+
+**Using the pre-built image (recommended):**
 
 ```bash
-git clone <repo-url> backupctl
-cd backupctl
-npm ci
+mkdir backupctl && cd backupctl
+mkdir -p config ssh-keys gpg-keys
 ```
 
-### 2. Create Directories
+**Or from source:**
 
 ```bash
+git clone https://github.com/vineethkrishnan/backupctl.git && cd backupctl
+npm ci
 mkdir -p config ssh-keys gpg-keys
 ```
 
@@ -339,16 +392,20 @@ GPG_RECIPIENT=backup@company.com
 
 Keys are auto-imported into the container's GPG keyring on every startup.
 
-### 7. Build and Deploy
+### 7. Start the Service
+
+**Using the pre-built image:**
+
+Create a `docker-compose.yml` (the [quick installer](#option-a-quick-install-recommended) generates this for you), then:
 
 ```bash
-# Build the application
+docker compose up -d
+```
+
+**From source:**
+
+```bash
 npm run build
-
-# Create the Docker network (first time only)
-docker network create backupctl-network
-
-# Build and start containers
 docker compose up -d --build
 ```
 
@@ -412,7 +469,25 @@ The cron scheduler starts automatically when the container boots. Backups will r
 
 ## Updating
 
-### Using the Management Script
+### Image-based (quick install)
+
+```bash
+cd ~/backupctl
+
+# Pull latest image
+docker compose pull
+
+# Restart with new image
+docker compose up -d
+
+# Run pending migrations (if any)
+docker exec backupctl node dist/cli.js config reload
+
+# Verify
+docker exec backupctl node dist/cli.js health
+```
+
+### From source (management script)
 
 ```bash
 ./scripts/backupctl-manage.sh update
@@ -420,25 +495,14 @@ The cron scheduler starts automatically when the container boots. Backups will r
 
 This pulls the latest code, rebuilds the container, runs any pending migrations, and performs a health check.
 
-### Manual Update
+### From source (manual)
 
 ```bash
-# Pull latest code
 git pull origin main
-
-# Install dependencies
 npm ci
-
-# Build
 npm run build
-
-# Rebuild and restart containers
 docker compose up -d --build
-
-# Run pending migrations (if any)
 docker exec backupctl npx typeorm migration:run -d dist/db/datasource.js
-
-# Verify
 docker exec backupctl node dist/cli.js health
 ```
 
