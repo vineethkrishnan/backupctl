@@ -15,6 +15,9 @@ hero:
     - theme: alt
       text: GitHub
       link: https://github.com/vineethkrishnan/backupctl
+    - theme: alt
+      text: Report an Issue
+      link: https://github.com/vineethkrishnan/backupctl/issues/new
 
 features:
   - icon: "🗄️"

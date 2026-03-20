@@ -393,6 +393,11 @@ The `data` field contains machine-readable structured data for programmatic cons
 
 ---
 
+## Getting Help
+
+- **Backup failing at a specific stage?** — [Troubleshooting](12-troubleshooting.md) covers common errors per stage
+- **Still stuck?** — **[Report an issue on GitHub](https://github.com/vineethkrishnan/backupctl/issues/new)**
+
 ## What's Next
 
 - **Recover from a snapshot** — [Restore Guide](09-restore-guide.md) covers browsing snapshots, extracting files, and importing database dumps.

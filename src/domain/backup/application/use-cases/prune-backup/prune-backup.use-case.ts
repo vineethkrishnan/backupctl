@@ -1,6 +1,6 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { ConfigLoaderPort } from '@domain/config/application/ports/config-loader.port';
-import { RemoteStorageFactory } from '@domain/backup/application/ports/remote-storage-factory.port';
+import { RemoteStorageFactoryPort } from '@domain/backup/application/ports/remote-storage-factory.port';
 import { PruneResult } from '@domain/backup/domain/value-objects/prune-result.model';
 import { CONFIG_LOADER_PORT, REMOTE_STORAGE_FACTORY } from '@common/di/injection-tokens';
 import { PruneBackupCommand } from './prune-backup.command';
@@ -11,7 +11,7 @@ export class PruneBackupUseCase {
 
   constructor(
     @Inject(CONFIG_LOADER_PORT) private readonly configLoader: ConfigLoaderPort,
-    @Inject(REMOTE_STORAGE_FACTORY) private readonly storageFactory: RemoteStorageFactory,
+    @Inject(REMOTE_STORAGE_FACTORY) private readonly storageFactory: RemoteStorageFactoryPort,
   ) {}
 
   async execute(command: PruneBackupCommand): Promise<PruneResult[]> {

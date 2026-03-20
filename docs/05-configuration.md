@@ -2,7 +2,7 @@
 
 backupctl configuration is split between two files: `.env` for global settings and secrets, and `config/projects.yml` for per-project settings. Secrets always live in `.env` and are referenced in YAML via `${VAR_NAME}` syntax, which is resolved at load time.
 
-Configuration changes are never hot-reloaded. After modifying either file, run `backupctl config reload` to apply changes and re-register cron schedules.
+Most configuration changes in `projects.yml` take effect automatically on the next backup run — the config is re-read from disk each time. The exception is **cron schedules**: if you change the `cron:` field, run `backupctl config reload` to re-register the new schedule with the scheduler. Changes to `.env` require a container restart (`docker compose up -d --force-recreate backupctl`).
 
 ## Environment Variables (.env)
 
@@ -206,7 +206,7 @@ If the entire `notification` block is absent, the global notification channel fr
 5. **Missing `encryption` block** — uses `ENCRYPTION_ENABLED` / `ENCRYPTION_TYPE` / `GPG_RECIPIENT` from `.env`.
 6. **Missing `restic.password`** — uses `RESTIC_PASSWORD` from `.env`.
 7. **`compression.enabled` defaults to `true`** — compression is always on unless explicitly disabled.
-8. **Config changes require `backupctl config reload`** — no hot-reload or file watching.
+8. **`projects.yml` changes apply on next backup run** — no restart needed. Only cron schedule changes require `backupctl config reload`. `.env` changes require a container restart.
 
 ## Cron Expression Examples
 
@@ -501,6 +501,12 @@ backupctl config show locaboo
 - Cron expressions are valid
 - Retention values are non-negative
 - GPG recipient is set when encryption is enabled
+
+## Getting Help
+
+- **Config not working?** — Run `backupctl config validate` to check for errors
+- **Need examples?** — See the [Complete Multi-Project Example](#complete-multi-project-example) above
+- **Still stuck?** — **[Report an issue on GitHub](https://github.com/vineethkrishnan/backupctl/issues/new)**
 
 ## What's Next
 

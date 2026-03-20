@@ -25,6 +25,11 @@ Frequently asked questions grouped by topic. Each entry describes the symptom, e
 - [Docker Cannot Reach Hetzner Storage Box (Port 23 Blocked)](#docker-cannot-reach-hetzner-storage-box-port-23-blocked)
 - [What is docker_network in projects.yml?](#what-is-docker_network-in-projectsyml)
 - [How to Connect backupctl to Another Docker Compose Project's Database](#how-to-connect-backupctl-to-another-docker-compose-projects-database)
+- [Docker Image Fails on ARM64 / Apple Silicon](#docker-image-fails-on-arm64-apple-silicon)
+- [Notifications Disabled — "No notifier registered"](#notifications-disabled-no-notifier-registered-for-type-slack)
+- [How to Verify Backup Integrity](#how-to-verify-backup-integrity-full-round-trip-test)
+- [When Do Config Changes Require a Restart?](#when-do-config-changes-require-a-restart)
+- [GPG Encryption — Which Key Goes Where?](#gpg-encryption-which-key-goes-where)
 
 ---
 
@@ -141,7 +146,7 @@ sftp:u547206@host:backups/myproject
 scripts/dev.sh cli restic myproject init
 
 # Production
-docker exec backupctl node dist/cli.js restic myproject init
+backupctl restic myproject init
 ```
 
 **Also check the repository path format.** Hetzner Storage Boxes use relative paths from the user's home directory:
@@ -801,6 +806,182 @@ docker exec backupctl-dev pg_isready -h postgres -p 5432
 ```
 
 ---
+
+---
+
+### Docker Image Fails on ARM64 / Apple Silicon
+
+**Symptom:**
+
+```
+exec /usr/local/bin/restic: exec format error
+```
+
+Or `docker pull` fails with:
+
+```
+no matching manifest for linux/arm64/v8
+```
+
+**Why:** The Docker image was built only for AMD64 (x86_64). ARM64 servers (AWS Graviton, Apple Silicon Macs, Oracle Ampere) need a native ARM64 image.
+
+**Fix:**
+
+Starting from v0.1.3, backupctl publishes multi-architecture images (AMD64 + ARM64). Pull the latest:
+
+```bash
+docker compose pull
+docker compose up -d
+```
+
+If you're running from source, Docker Buildx handles multi-arch automatically:
+
+```bash
+docker compose up -d --build
+```
+
+---
+
+### Notifications Disabled — "No notifier registered for type: slack"
+
+**Symptom:**
+
+```
+No notifier registered for type: slack
+```
+
+Backup fails during dry-run or actual run.
+
+**Why:** The notification type is set to `slack` (either explicitly or via the default), but `SLACK_WEBHOOK_URL` is missing from `.env`. The `NotifierBootstrapService` only registers a notifier adapter when its required env var is present.
+
+**Fix:**
+
+**Option A — Configure the notifier:**
+
+```env
+SLACK_WEBHOOK_URL=https://hooks.slack.com/services/T.../B.../xxx
+```
+
+**Option B — Disable notifications** (if you don't need them):
+
+Remove the `notification` block from `projects.yml` and don't set `NOTIFICATION_TYPE` in `.env`. The system will log "Notifications disabled" and skip notification steps.
+
+Then restart:
+
+```bash
+docker compose restart backupctl
+```
+
+---
+
+### How to Verify Backup Integrity (Full Round-Trip Test)
+
+**Question:** How do I verify that my backup is not corrupted and can actually be restored?
+
+**Answer:** Run a full round-trip test: backup → restic check → restore → decrypt → compare checksums.
+
+**Step 1 — Restic repository integrity:**
+
+```bash
+backupctl restic myproject check
+```
+
+Expected: `no errors were found`
+
+**Step 2 — Restore the latest snapshot:**
+
+```bash
+docker exec backupctl sh -c 'mkdir -p /tmp/verify && \
+  RESTIC_PASSWORD=your-restic-password restic \
+  -r sftp:user@host:backups/myproject \
+  -o sftp.command="ssh -p 23 -i /home/node/.ssh/id_ed25519 -F /home/node/.ssh/config user@host -s sftp" \
+  restore latest --target /tmp/verify'
+```
+
+**Step 3 — If encrypted, copy to your local machine and decrypt:**
+
+```bash
+docker cp backupctl:/tmp/verify/data/backups/myproject/myproject_backup.dump.gpg /tmp/
+gpg --decrypt /tmp/myproject_backup.dump.gpg > /tmp/myproject_backup.dump
+```
+
+**Step 4 — Compare checksums:**
+
+```bash
+# On the server (original dump)
+docker exec backupctl sha256sum /data/backups/myproject/myproject_backup.dump
+
+# On your machine (decrypted from restore)
+shasum -a 256 /tmp/myproject_backup.dump
+```
+
+If both checksums match, the full chain (dump → encrypt → restic → restore → decrypt) is verified.
+
+**Step 5 — Verify the dump is readable:**
+
+```bash
+pg_restore --list /tmp/myproject_backup.dump | head -20
+```
+
+**Step 6 — Clean up:**
+
+```bash
+docker exec backupctl rm -rf /tmp/verify
+rm /tmp/myproject_backup.dump /tmp/myproject_backup.dump.gpg
+```
+
+---
+
+### When Do Config Changes Require a Restart?
+
+**Question:** When I change configuration, what needs a restart vs reload vs nothing?
+
+| Change | Action Required |
+|--------|----------------|
+| `projects.yml` fields (database, retention, encryption, hooks, etc.) | **Nothing** — re-read on next backup run |
+| `projects.yml` cron schedule | `backupctl config reload` |
+| `.env` values (secrets, ports, hosts) | `docker compose up -d --force-recreate backupctl` |
+| `projects.yml` new project added | `backupctl config reload` |
+
+---
+
+### GPG Encryption — Which Key Goes Where?
+
+**Question:** How does GPG encryption work and where do I put the keys?
+
+| Key | Location | Purpose |
+|-----|----------|---------|
+| **Public key** | `gpg-keys/` directory (mounted into container) | Encrypts the dump during backup. Safe to store on the backup server. |
+| **Private key** | Your local machine / secure workstation | Decrypts the dump during restore. **Never put this on the backup server.** |
+
+**Setup:**
+
+```bash
+# Export your public key
+gpg --export --armor your@email.com > gpg-keys/backup.pub
+
+# Configure in .env
+ENCRYPTION_ENABLED=true
+GPG_RECIPIENT=your@email.com
+GPG_KEYS_DIR=/app/gpg-keys
+
+# Restart to auto-import
+docker compose restart backupctl
+
+# Verify it was imported
+docker exec backupctl gpg --list-keys
+```
+
+The public key is auto-imported on every container startup from the `gpg-keys/` directory.
+
+---
+
+## Getting Help
+
+If you've checked this FAQ and the [Troubleshooting](12-troubleshooting.md) guide and are still stuck:
+
+- **[Report an issue on GitHub](https://github.com/vineethkrishnan/backupctl/issues/new)** — Bug reports, feature requests, or documentation improvements
+- **[View existing issues](https://github.com/vineethkrishnan/backupctl/issues)** — Check if someone else has reported the same problem
 
 ## What's Next
 

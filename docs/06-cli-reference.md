@@ -1021,6 +1021,12 @@ All timestamps in CLI output, log files, audit records, and file names use the t
 
 ---
 
+## Getting Help
+
+- **Command not working?** — [Troubleshooting](12-troubleshooting.md) covers common errors
+- **Setup issues?** — [FAQ](15-faq.md) for SSH, GPG, Docker networking, and restic problems
+- **Still stuck?** — **[Report an issue on GitHub](https://github.com/vineethkrishnan/backupctl/issues/new)**
+
 ## What's Next
 
 - **Understand the backup pipeline** — [Backup Flow](08-backup-flow.md) explains each of the 11 steps.

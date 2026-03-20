@@ -36,3 +36,8 @@
 ## Getting Help
 
 If something isn't working, start with the [Troubleshooting](12-troubleshooting.md) guide. It covers common errors, diagnostic commands, and recovery procedures for lock files, audit DB connectivity, restic repos, and more.
+
+If you've checked the troubleshooting guide and FAQ and still need help:
+
+- **[Report an Issue](https://github.com/vineethkrishnan/backupctl/issues/new)** — Bug reports, feature requests, or documentation improvements
+- **[View Existing Issues](https://github.com/vineethkrishnan/backupctl/issues)** — Check if someone else has reported the same problem

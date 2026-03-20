@@ -2,7 +2,7 @@ import { Logger } from '@nestjs/common';
 import { PruneBackupUseCase } from '@domain/backup/application/use-cases/prune-backup/prune-backup.use-case';
 import { PruneBackupCommand } from '@domain/backup/application/use-cases/prune-backup/prune-backup.command';
 import { ConfigLoaderPort } from '@domain/config/application/ports/config-loader.port';
-import { RemoteStorageFactory } from '@domain/backup/application/ports/remote-storage-factory.port';
+import { RemoteStorageFactoryPort } from '@domain/backup/application/ports/remote-storage-factory.port';
 import { RemoteStoragePort } from '@domain/backup/application/ports/remote-storage.port';
 import { PruneResult } from '@domain/backup/domain/value-objects/prune-result.model';
 import { ProjectConfig } from '@domain/config/domain/project-config.model';
@@ -10,7 +10,7 @@ import { RetentionPolicy } from '@domain/config/domain/retention-policy.model';
 
 describe('PruneBackupUseCase', () => {
   let useCase: PruneBackupUseCase;
-  let mockStorageFactory: jest.Mocked<RemoteStorageFactory>;
+  let mockStorageFactory: jest.Mocked<RemoteStorageFactoryPort>;
   let mockConfigLoader: jest.Mocked<ConfigLoaderPort>;
   let mockStorage: jest.Mocked<RemoteStoragePort>;
   let loggerErrorSpy: jest.SpyInstance;

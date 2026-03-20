@@ -25,6 +25,7 @@ export default defineConfig({
         items: [
           { text: 'GitHub', link: 'https://github.com/vineethkrishnan/backupctl' },
           { text: 'Changelog', link: 'https://github.com/vineethkrishnan/backupctl/releases' },
+          { text: 'Report an Issue', link: 'https://github.com/vineethkrishnan/backupctl/issues/new' },
         ],
       },
     ],
@@ -63,6 +64,12 @@ export default defineConfig({
           { text: 'Development', link: '/13-development' },
           { text: 'Migrations', link: '/14-migrations' },
           { text: 'FAQ', link: '/15-faq' },
+        ],
+      },
+      {
+        text: 'Help',
+        items: [
+          { text: 'Report an Issue', link: 'https://github.com/vineethkrishnan/backupctl/issues/new' },
         ],
       },
     ],
