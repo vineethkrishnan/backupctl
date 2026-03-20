@@ -271,6 +271,8 @@ The fallback files are processed line by line. Each entry is re-attempted agains
 
 `backupctl run <project> --dry-run` performs a complete pre-flight validation without executing any destructive operations. No database is dumped, no files are transferred, no notifications are sent.
 
+![backupctl run --dry-run](/images/03-dry-run.png)
+
 ### Checks Performed
 
 | # | Check | What It Validates |
