@@ -156,7 +156,7 @@ describe('GetRestoreGuideUseCase', () => {
       expect(guide).toContain('gpg --decrypt <file>.dump.gpg > <file>.dump');
     });
 
-    it('uses .sql extension in decrypt step for mysql', () => {
+    it('uses .sql.gz extension in decrypt step for mysql (encryption wraps compressed file)', () => {
       configLoader.getProject.mockReturnValue(buildConfig({
         ...encryptedConfig,
         database: { type: 'mysql', host: 'db', port: 3306, name: 'app', user: 'root', password: 'secret' },
@@ -164,7 +164,7 @@ describe('GetRestoreGuideUseCase', () => {
 
       const guide = useCase.execute(new GetRestoreGuideQuery({ projectName: 'test-project' }));
 
-      expect(guide).toContain('gpg --decrypt <file>.sql.gpg > <file>.sql');
+      expect(guide).toContain('gpg --decrypt <file>.sql.gz.gpg > <file>.sql.gz');
     });
 
     it('uses .archive.gz extension in decrypt step for mongodb', () => {
@@ -200,7 +200,7 @@ describe('GetRestoreGuideUseCase', () => {
       expect(guide).toContain('gunzip <file>.sql.gz');
     });
 
-    it('numbers steps correctly: restic → decompress → restore', () => {
+    it('numbers steps correctly: restic → decompress → restore (unencrypted)', () => {
       configLoader.getProject.mockReturnValue(buildConfig(mysqlConfig));
 
       const guide = useCase.execute(new GetRestoreGuideQuery({ projectName: 'test-project' }));
@@ -208,6 +208,20 @@ describe('GetRestoreGuideUseCase', () => {
       expect(guide).toContain('Step 1: Restore snapshot from Restic');
       expect(guide).toContain('Step 2: Decompress the dump');
       expect(guide).toContain('Step 3: Restore to database');
+    });
+
+    it('numbers steps correctly: restic → decrypt → decompress → restore (encrypted)', () => {
+      configLoader.getProject.mockReturnValue(buildConfig({
+        ...mysqlConfig,
+        encryption: { enabled: true, type: 'gpg', recipient: 'test@example.com' },
+      }));
+
+      const guide = useCase.execute(new GetRestoreGuideQuery({ projectName: 'test-project' }));
+
+      expect(guide).toContain('Step 1: Restore snapshot from Restic');
+      expect(guide).toContain('Step 2: Decrypt the dump (GPG-encrypted)');
+      expect(guide).toContain('Step 3: Decompress the dump');
+      expect(guide).toContain('Step 4: Restore to database');
     });
   });
 

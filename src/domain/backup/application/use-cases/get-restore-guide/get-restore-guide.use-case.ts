@@ -35,7 +35,7 @@ export class GetRestoreGuideUseCase {
     const lines: string[] = [];
     const isEncrypted = config.hasEncryption();
     const recipient = config.encryption?.recipient;
-    const ext = this.getDumpExtension(dbType);
+    const dumpFileExt = this.getDumpFileExtension(dbType);
     let step = 1;
 
     // Header
@@ -51,23 +51,23 @@ export class GetRestoreGuideUseCase {
     lines.push(`  backupctl snapshots ${config.name}`);
     step++;
 
-    // Step: Decompress (MySQL and MongoDB produce gzipped output)
-    if (dbType === 'mysql') {
-      lines.push('');
-      lines.push(`Step ${step}: Decompress the dump`);
-      lines.push(`  gunzip <file>${ext}.gz`);
-      step++;
-    }
-
-    // Step: Decrypt (only if encryption is enabled)
+    // Decrypt before decompress — encryption wraps the compressed dump file
     if (isEncrypted) {
       lines.push('');
       lines.push(`Step ${step}: Decrypt the dump (GPG-encrypted)`);
-      lines.push(`  gpg --decrypt <file>${ext}.gpg > <file>${ext}`);
+      lines.push(`  gpg --decrypt <file>${dumpFileExt}.gpg > <file>${dumpFileExt}`);
       if (recipient) {
         lines.push(`  Recipient: ${recipient}`);
       }
       lines.push('  ⚠ The private key must be available in your GPG keyring');
+      step++;
+    }
+
+    // Decompress after decrypt — MySQL dumps are gzipped .sql.gz
+    if (dbType === 'mysql') {
+      lines.push('');
+      lines.push(`Step ${step}: Decompress the dump`);
+      lines.push('  gunzip <file>.sql.gz');
       step++;
     }
 
@@ -98,10 +98,10 @@ export class GetRestoreGuideUseCase {
     return commands[dbType] ?? null;
   }
 
-  private getDumpExtension(dbType: string): string {
+  private getDumpFileExtension(dbType: string): string {
     const extensions: Record<string, string> = {
       postgres: '.dump',
-      mysql: '.sql',
+      mysql: '.sql.gz',
       mongodb: '.archive.gz',
     };
 
