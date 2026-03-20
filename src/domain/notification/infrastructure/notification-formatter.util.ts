@@ -1,4 +1,4 @@
-import { BackupResult } from '@domain/backup/domain/backup-result.model';
+import { BackupResult, BackupType } from '@domain/backup/domain/backup-result.model';
 import { BackupStageError } from '@domain/backup/domain/backup-stage-error';
 import { BackupStatus } from '@domain/backup/domain/value-objects/backup-status.enum';
 import { formatBytes, formatDuration } from '@common/helpers/format.util';
@@ -8,6 +8,7 @@ export interface SuccessDetail {
   dumpSize: string;
   encrypted: string;
   verified: string;
+  modeLabel: string;
   snapshot: { id: string; mode: string; filesNew: number; filesChanged: number; bytesAdded: string } | null;
   prune: { label: string } | null;
   cleanup: { label: string } | null;
@@ -24,12 +25,23 @@ export interface DailySummaryEntry {
   errorMessage: string;
 }
 
+export function resolveModeLabel(
+  backupType: BackupType,
+  snapshotMode: 'combined' | 'separate',
+): string {
+  if (backupType === 'database') return 'database';
+  if (backupType === 'assets') return 'assets';
+  return snapshotMode === 'combined' ? 'db + assets' : 'db + assets (split)';
+}
+
 // Extract common fields from a BackupResult for success formatting
 export function extractSuccessDetail(result: BackupResult): SuccessDetail {
   const dumpSize = result.dumpResult ? formatBytes(result.dumpResult.sizeBytes) : 'N/A';
   const dbName = result.dumpResult
     ? (result.dumpResult.filePath.split('/').pop()?.split('.')[0] ?? result.projectName)
     : result.projectName;
+
+  const modeLabel = resolveModeLabel(result.backupType, result.snapshotMode);
 
   const snapshot = result.syncResult
     ? {
@@ -54,6 +66,7 @@ export function extractSuccessDetail(result: BackupResult): SuccessDetail {
     dumpSize,
     encrypted: result.encrypted ? 'Yes' : 'No',
     verified: result.verified ? 'Yes' : 'No',
+    modeLabel,
     snapshot,
     prune,
     cleanup,
@@ -94,7 +107,7 @@ export function formatSuccessText(result: BackupResult): string {
   lines.push(`DB: ${d.dbName} | Dump: ${d.dumpSize} | Encrypted: ${d.encrypted} | Verified: ${d.verified}`);
 
   if (d.snapshot) {
-    lines.push(`Snapshot: ${d.snapshot.id} | Mode: ${d.snapshot.mode}`);
+    lines.push(`Snapshot: ${d.snapshot.id} | Mode: ${d.modeLabel}`);
     lines.push(`New files: ${d.snapshot.filesNew} | Changed: ${d.snapshot.filesChanged} | Added: ${d.snapshot.bytesAdded}`);
   }
 

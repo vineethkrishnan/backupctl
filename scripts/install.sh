@@ -149,9 +149,36 @@ ask_yn() {
   esac
 }
 
-# Generate a secure random password
+# Generate a secure random password (48 alphanumeric chars)
 generate_password() {
-  openssl rand -base64 32 | tr -d '/+=' | head -c 32
+  openssl rand -base64 64 | tr -d '/+=' | head -c 48
+}
+
+# Warn if a user-provided password is weak (soft check, does not block)
+warn_if_weak_password() {
+  local password="$1"
+  local label="${2:-Password}"
+  local len=${#password}
+
+  if [ "$len" -lt 12 ]; then
+    print_warning "${label} is very short (${len} chars). Recommended: 16+ characters."
+    return 1
+  elif [ "$len" -lt 16 ]; then
+    print_warning "${label} is short (${len} chars). Recommended: 16+ characters."
+    return 1
+  fi
+
+  if echo "$password" | grep -qE '^[a-zA-Z]+$'; then
+    print_warning "${label} contains only letters. Consider adding numbers or symbols."
+    return 1
+  fi
+
+  if echo "$password" | grep -qE '^[0-9]+$'; then
+    print_warning "${label} contains only numbers. Consider adding letters or symbols."
+    return 1
+  fi
+
+  return 0
 }
 
 # Validate input is not empty
@@ -390,6 +417,7 @@ step_audit_db() {
     while true; do
       AUDIT_DB_PASSWORD=$(ask_password "Database password")
       if validate_not_empty "$AUDIT_DB_PASSWORD" "Database password"; then
+        warn_if_weak_password "$AUDIT_DB_PASSWORD" "Database password" || true
         break
       fi
     done
@@ -533,6 +561,7 @@ step_restic() {
     while true; do
       RESTIC_PASSWORD=$(ask_password "Global restic password")
       if validate_not_empty "$RESTIC_PASSWORD" "Restic password"; then
+        warn_if_weak_password "$RESTIC_PASSWORD" "Restic password" || true
         break
       fi
     done
@@ -843,7 +872,10 @@ add_project() {
     else
       while true; do
         proj_restic_password=$(ask_password "Project restic password")
-        if validate_not_empty "$proj_restic_password" "Restic password"; then break; fi
+        if validate_not_empty "$proj_restic_password" "Restic password"; then
+          warn_if_weak_password "$proj_restic_password" "Restic password" || true
+          break
+        fi
       done
     fi
   fi

@@ -85,7 +85,7 @@ export class EmailNotifierAdapter implements NotifierPort {
     if (d.snapshot) {
       rows.push(
         `<tr><td><strong>Snapshot</strong></td><td>${d.snapshot.id}</td></tr>`,
-        `<tr><td><strong>Mode</strong></td><td>${d.snapshot.mode}</td></tr>`,
+        `<tr><td><strong>Mode</strong></td><td>${d.modeLabel}</td></tr>`,
         `<tr><td><strong>New Files</strong></td><td>${d.snapshot.filesNew}</td></tr>`,
         `<tr><td><strong>Changed Files</strong></td><td>${d.snapshot.filesChanged}</td></tr>`,
         `<tr><td><strong>Added</strong></td><td>${d.snapshot.bytesAdded}</td></tr>`,

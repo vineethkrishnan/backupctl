@@ -5,6 +5,8 @@ import { DumpResult } from './value-objects/dump-result.model';
 import { PruneResult } from './value-objects/prune-result.model';
 import { SyncResult } from './value-objects/sync-result.model';
 
+export type BackupType = 'database' | 'assets' | 'database+assets';
+
 export interface BackupResultParams {
   readonly runId: string;
   readonly projectName: string;
@@ -18,6 +20,7 @@ export interface BackupResultParams {
   readonly cleanupResult: CleanupResult | null;
   readonly encrypted: boolean;
   readonly verified: boolean;
+  readonly backupType: BackupType;
   readonly snapshotMode: 'combined' | 'separate';
   readonly errorStage: BackupStage | null;
   readonly errorMessage: string | null;
@@ -38,6 +41,7 @@ export class BackupResult {
   readonly cleanupResult: CleanupResult | null;
   readonly encrypted: boolean;
   readonly verified: boolean;
+  readonly backupType: BackupType;
   readonly snapshotMode: 'combined' | 'separate';
   readonly errorStage: BackupStage | null;
   readonly errorMessage: string | null;
@@ -57,6 +61,7 @@ export class BackupResult {
     this.cleanupResult = params.cleanupResult;
     this.encrypted = params.encrypted;
     this.verified = params.verified;
+    this.backupType = params.backupType;
     this.snapshotMode = params.snapshotMode;
     this.errorStage = params.errorStage;
     this.errorMessage = params.errorMessage;

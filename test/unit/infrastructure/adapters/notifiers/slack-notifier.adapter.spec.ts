@@ -40,6 +40,7 @@ describe('SlackNotifierAdapter', () => {
       cleanupResult: new CleanupResult(1, 1048576),
       encrypted: true,
       verified: true,
+      backupType: 'database',
       snapshotMode: 'combined',
       errorStage: null,
       errorMessage: null,
@@ -74,7 +75,7 @@ describe('SlackNotifierAdapter', () => {
       expect(mockedAxios.post).toHaveBeenCalledTimes(1);
 
       const payload = getPayload();
-      expect(payload.text).toContain('Backup started');
+      expect(payload.text).toBe(' ');
 
       expect(getAttachment().color).toBe('#3498db');
 
@@ -109,16 +110,16 @@ describe('SlackNotifierAdapter', () => {
       expect(text).toContain('🔒 Yes');
       expect(text).toContain('☑️ Yes');
       expect(text).toContain('a1b2c3d4');
-      expect(text).toContain('combined');
+      expect(text).toContain('database');
       expect(text).toContain('3m 12s');
     });
 
-    it('should include concise fallback in text field', async () => {
+    it('should use minimal text to avoid duplicate with Block Kit', async () => {
       const result = createSuccessResult();
       await adapter.notifySuccess(result);
 
       const { text } = getPayload() as { text: string };
-      expect(text).toBe('✅ locaboo — 246.00 MB, 3m 12s');
+      expect(text).toBe(' ');
     });
 
     it('should include snapshot fields and added-bytes context', async () => {
@@ -183,12 +184,12 @@ describe('SlackNotifierAdapter', () => {
       expect(text).toContain('connection timeout to storage box');
     });
 
-    it('should include concise fallback in text field', async () => {
+    it('should use minimal text to avoid duplicate with Block Kit', async () => {
       const error = new BackupStageError(BackupStage.Sync, new Error('timeout'), true);
       await adapter.notifyFailure('locaboo', error);
 
       const { text } = getPayload() as { text: string };
-      expect(text).toBe('❌ locaboo failed at sync');
+      expect(text).toBe(' ');
     });
 
     it('should show retryable status in fields', async () => {
@@ -235,11 +236,11 @@ describe('SlackNotifierAdapter', () => {
       expect(text).toContain('Backup timeout exceeded');
     });
 
-    it('should preserve plain fallback text', async () => {
+    it('should use minimal text to avoid duplicate with Block Kit', async () => {
       await adapter.notifyWarning('locaboo', 'Backup timeout exceeded');
 
       const { text } = getPayload() as { text: string };
-      expect(text).toBe('⚠️ Backup timeout exceeded');
+      expect(text).toBe(' ');
     });
   });
 
@@ -317,11 +318,11 @@ describe('SlackNotifierAdapter', () => {
       expect(text).toContain('unknown error');
     });
 
-    it('should include concise fallback in text field', async () => {
+    it('should use minimal text to avoid duplicate with Block Kit', async () => {
       await adapter.notifyDailySummary([createSuccessResult()]);
 
       const { text } = getPayload() as { text: string };
-      expect(text).toMatch(/📊 Backup summary \d{4}-\d{2}-\d{2}: 1\/1 successful/);
+      expect(text).toBe(' ');
     });
   });
 

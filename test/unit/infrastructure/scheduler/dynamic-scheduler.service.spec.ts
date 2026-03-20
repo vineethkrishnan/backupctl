@@ -57,6 +57,7 @@ function createBackupResult(overrides: Partial<{ projectName: string; status: Ba
     cleanupResult: null,
     encrypted: false,
     verified: false,
+    backupType: 'database',
     snapshotMode: 'combined',
     errorStage: null,
     errorMessage: overrides.errorMessage ?? null,

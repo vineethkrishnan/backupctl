@@ -39,6 +39,7 @@ function createResult(overrides: Partial<{
     cleanupResult: overrides.cleanupResult ?? null,
     encrypted: overrides.encrypted ?? false,
     verified: overrides.verified ?? false,
+    backupType: 'database',
     snapshotMode: 'combined',
     errorStage: null,
     errorMessage: overrides.errorMessage ?? null,
@@ -78,6 +79,7 @@ describe('notification-formatter', () => {
       const result = createResult({ syncResult: sync, pruneResult: prune, cleanupResult: cleanup });
       const detail = extractSuccessDetail(result);
 
+      expect(detail.modeLabel).toBe('database');
       expect(detail.snapshot).toEqual({
         id: 'abc123',
         mode: 'combined',

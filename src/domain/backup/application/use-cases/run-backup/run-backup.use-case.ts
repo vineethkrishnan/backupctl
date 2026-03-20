@@ -16,7 +16,7 @@ import { ConfigLoaderPort } from '@domain/config/application/ports/config-loader
 import { ClockPort } from '@common/clock/clock.port';
 import { FileSystemPort } from '@common/filesystem/filesystem.port';
 import { ProjectConfig } from '@domain/config/domain/project-config.model';
-import { BackupResult } from '@domain/backup/domain/backup-result.model';
+import { BackupResult, BackupType } from '@domain/backup/domain/backup-result.model';
 import { BackupStage } from '@domain/backup/domain/value-objects/backup-stage.enum';
 import { BackupStatus } from '@domain/backup/domain/value-objects/backup-status.enum';
 import { BackupStageError } from '@domain/backup/domain/backup-stage-error';
@@ -99,6 +99,12 @@ export class RunBackupUseCase {
     if (command.isDryRun) {
       const report = await this.executeDryRun(projectName);
       const now = this.clock.now();
+      let backupType: BackupType = 'database';
+      try {
+        backupType = this.resolveBackupType(this.configLoader.getProject(projectName));
+      } catch {
+        // Config failed to load — already captured in dry-run checks
+      }
       const result = new BackupResult({
         runId: 'dry-run',
         projectName,
@@ -112,6 +118,7 @@ export class RunBackupUseCase {
         cleanupResult: null,
         encrypted: false,
         verified: false,
+        backupType,
         snapshotMode: 'combined',
         errorStage: null,
         errorMessage: report.allPassed ? null : report.checks.filter((c) => !c.passed).map((c) => c.message).join('; '),
@@ -420,6 +427,7 @@ export class RunBackupUseCase {
       cleanupResult,
       encrypted,
       verified,
+      backupType: this.resolveBackupType(config),
       snapshotMode: config.restic.snapshotMode,
       errorStage,
       errorMessage,
@@ -596,12 +604,21 @@ export class RunBackupUseCase {
       cleanupResult: null,
       encrypted: false,
       verified: false,
+      backupType: 'database',
       snapshotMode: 'combined',
       errorStage: null,
       errorMessage: error.message,
       retryCount: 0,
       durationMs: 0,
     });
+  }
+
+  private resolveBackupType(config: ProjectConfig): BackupType {
+    const hasDb = config.hasDatabase();
+    const hasAssets = config.hasAssets();
+    if (hasDb && hasAssets) return 'database+assets';
+    if (hasAssets) return 'assets';
+    return 'database';
   }
 
   private delay(ms: number): Promise<void> {
