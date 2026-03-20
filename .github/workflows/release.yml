@@ -22,21 +22,17 @@ jobs:
       tag_name: ${{ steps.release.outputs.tag_name }}
       version: ${{ steps.release.outputs.version }}
     steps:
-      - name: Import GPG signing key
-        uses: crazy-max/ghaction-import-gpg@v6
-        id: gpg
+      - name: Generate GitHub App token
+        uses: actions/create-github-app-token@v1
+        id: app-token
         with:
-          gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
-          git_user_signingkey: true
-          git_commit_gpgsign: true
-          git_config_global: true
+          app-id: ${{ secrets.APP_ID }}
+          private-key: ${{ secrets.APP_PRIVATE_KEY }}
 
       - uses: googleapis/release-please-action@v4
         id: release
         with:
-          token: ${{ secrets.RELEASE_PAT || secrets.GITHUB_TOKEN }}
-          git-user-name: ${{ steps.gpg.outputs.name }}
-          git-user-email: ${{ steps.gpg.outputs.email }}
+          token: ${{ steps.app-token.outputs.token }}
 
   # ── Post-release jobs (only when a release is created) ───
 
