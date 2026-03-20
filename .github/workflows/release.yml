@@ -94,7 +94,7 @@ jobs:
         with:
           images: |
             ghcr.io/${{ github.repository }}
-            vineethkrishnan/backupctl
+            vineethnkrishnan/backupctl
           tags: |
             type=raw,value=${{ needs.release-please.outputs.version }}
             type=raw,value=latest

@@ -12,7 +12,7 @@ set -e
 REPO="vineethkrishnan/backupctl"
 BRANCH="main"
 BASE_URL="https://raw.githubusercontent.com/${REPO}/${BRANCH}"
-IMAGE="vineethkrishnan/backupctl"
+IMAGE="vineethnkrishnan/backupctl"
 INSTALL_DIR="${HOME}/backupctl"
 
 # ── Colors ─────────────────────────────────────────────────

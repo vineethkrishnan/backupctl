@@ -25,7 +25,7 @@ backupctl is published as a Docker image on every release:
 
 ```bash
 # Docker Hub
-docker pull vineethkrishnan/backupctl:latest
+docker pull vineethnkrishnan/backupctl:latest
 
 # GitHub Container Registry
 docker pull ghcr.io/vineethkrishnan/backupctl:latest
@@ -301,7 +301,7 @@ If using the pre-built image, create a `docker-compose.yml`:
 services:
   backupctl:
     container_name: backupctl
-    image: vineethkrishnan/backupctl:latest
+    image: vineethnkrishnan/backupctl:latest
     env_file: .env
     environment:
       AUDIT_DB_HOST: backupctl-audit-db
