@@ -46,6 +46,9 @@ jobs:
             shared
             docker
             deps
+            main
+            backup
+            restore-guide
           requireScope: false
           subjectPattern: ^(?![A-Z]).+$
           subjectPatternError: |
