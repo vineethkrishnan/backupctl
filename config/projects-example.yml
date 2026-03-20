@@ -1,7 +1,7 @@
 projects:
   - name: locaboo
     enabled: true
-    cron: "0 0 * * *"
+    cron: '0 0 * * *'
     timeout_minutes: 30
     database:
       type: postgres
@@ -28,10 +28,10 @@ projects:
     encryption:
       enabled: true
       type: gpg
-      recipient: locaboo-backup@company.com
+      recipient: vineeth.nk@ayunis.com
     hooks:
-      pre_backup: "curl -s http://locaboo-app:3000/maintenance/on"
-      post_backup: "curl -s http://locaboo-app:3000/maintenance/off"
+      pre_backup: 'curl -s http://locaboo-app:3000/maintenance/on'
+      post_backup: 'curl -s http://locaboo-app:3000/maintenance/off'
     verification:
       enabled: true
     notification:
@@ -41,7 +41,7 @@ projects:
 
   - name: project-x
     enabled: true
-    cron: "30 1 * * *"
+    cron: '30 1 * * *'
     database:
       type: mysql
       host: mysql-projectx
@@ -71,7 +71,7 @@ projects:
 
   - name: project-y
     enabled: true
-    cron: "0 2 * * *"
+    cron: '0 2 * * *'
     database:
       type: postgres
       host: postgres-projecty

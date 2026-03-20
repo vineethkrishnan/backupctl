@@ -334,9 +334,6 @@ projects:
       user: backup_user
       password: ${LOCABOO_DB_PASSWORD}
 
-    compression:
-      enabled: true
-
     assets:
       paths:
         - /data/locaboo/uploads

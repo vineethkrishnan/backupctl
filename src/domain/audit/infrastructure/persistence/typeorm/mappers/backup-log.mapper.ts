@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 
-import { BackupResult } from '@domain/backup/domain/backup-result.model';
+import { BackupResult, BackupType } from '@domain/backup/domain/backup-result.model';
 import { BackupStage } from '@domain/backup/domain/value-objects/backup-stage.enum';
 import { BackupStatus } from '@domain/backup/domain/value-objects/backup-status.enum';
 import { BackupLogRecord } from '../schema/backup-log.record';
@@ -43,6 +43,7 @@ export class BackupLogMapper {
         : null,
       encrypted: record.encrypted,
       verified: record.verified,
+      backupType: this.normalizeBackupType(record.backupType),
       snapshotMode: (record.snapshotMode as 'combined' | 'separate') ?? 'combined',
       errorStage,
       errorMessage: record.errorMessage,
@@ -58,6 +59,13 @@ export class BackupLogMapper {
     return fallback;
   }
 
+  private normalizeBackupType(value: string | null): BackupType {
+    if (value === 'database' || value === 'assets' || value === 'database+assets') {
+      return value;
+    }
+    return 'database';
+  }
+
   toPartialRecord(result: BackupResult): Partial<BackupLogRecord> {
     return {
       status: result.status,
@@ -66,6 +74,7 @@ export class BackupLogMapper {
       dumpSizeBytes: result.dumpResult?.sizeBytes?.toString() ?? null,
       encrypted: result.encrypted,
       verified: result.verified,
+      backupType: result.backupType,
       snapshotId: result.syncResult?.snapshotId ?? null,
       snapshotMode: result.snapshotMode,
       filesNew: result.syncResult?.filesNew ?? null,

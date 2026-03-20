@@ -23,6 +23,7 @@ describe('GetFailedLogsUseCase', () => {
       cleanupResult: null,
       encrypted: false,
       verified: false,
+      backupType: 'database',
       snapshotMode: 'combined',
       errorStage: BackupStage.Dump,
       errorMessage: 'Dump timeout',

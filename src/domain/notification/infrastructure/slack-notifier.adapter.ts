@@ -52,7 +52,7 @@ export class SlackNotifierAdapter implements NotifierPort {
     const time = new Date().toLocaleString('en-GB', { timeZone: this.timezone });
 
     await this.post({
-      text: `🔄 Backup started — ${projectName}`,
+      text: ' ',
       attachments: [{
         color: COLOR.started,
         blocks: [
@@ -83,7 +83,7 @@ export class SlackNotifierAdapter implements NotifierPort {
       blocks.push(this.divider());
       blocks.push(this.fields([
         `*Snapshot*\n\`${d.snapshot.id}\``,
-        `*Mode*\n${d.snapshot.mode}`,
+        `*Mode*\n${d.modeLabel}`,
         `*New Files*\n${d.snapshot.filesNew}`,
         `*Changed*\n${d.snapshot.filesChanged}`,
       ]));
@@ -103,14 +103,14 @@ export class SlackNotifierAdapter implements NotifierPort {
     blocks.push(this.context(`⏱️  Duration: ${d.duration}`));
 
     await this.post({
-      text: `✅ ${result.projectName} — ${d.dumpSize}, ${d.duration}`,
+      text: ' ',
       attachments: [{ color: COLOR.success, blocks }],
     });
   }
 
   async notifyFailure(projectName: string, error: BackupStageError): Promise<void> {
     await this.post({
-      text: `❌ ${projectName} failed at ${error.stage}`,
+      text: ' ',
       attachments: [{
         color: COLOR.failure,
         blocks: [
@@ -127,7 +127,7 @@ export class SlackNotifierAdapter implements NotifierPort {
 
   async notifyWarning(projectName: string, message: string): Promise<void> {
     await this.post({
-      text: `⚠️ ${message}`,
+      text: ' ',
       attachments: [{
         color: COLOR.warning,
         blocks: [
@@ -154,7 +154,7 @@ export class SlackNotifierAdapter implements NotifierPort {
     const statusIcon = allPassed ? '🟢' : '🔴';
 
     await this.post({
-      text: `📊 Backup summary ${date}: ${successCount}/${entries.length} successful`,
+      text: ' ',
       attachments: [{
         color: allPassed ? COLOR.success : COLOR.failure,
         blocks: [

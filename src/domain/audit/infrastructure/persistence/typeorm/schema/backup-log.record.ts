@@ -34,6 +34,9 @@ export class BackupLogRecord {
   @Column({ type: 'boolean', default: false })
   verified!: boolean;
 
+  @Column({ name: 'backup_type', type: 'varchar', nullable: true })
+  backupType!: string | null;
+
   @Column({ name: 'snapshot_id', type: 'varchar', nullable: true })
   snapshotId!: string | null;
 

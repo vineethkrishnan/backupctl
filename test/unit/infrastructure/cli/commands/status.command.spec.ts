@@ -18,6 +18,7 @@ function buildResult(overrides: Partial<BackupResult> = {}): BackupResult {
     cleanupResult: null,
     encrypted: false,
     verified: false,
+    backupType: 'database',
     snapshotMode: 'combined',
     errorStage: null,
     errorMessage: null,

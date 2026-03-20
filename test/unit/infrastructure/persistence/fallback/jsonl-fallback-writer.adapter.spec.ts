@@ -37,6 +37,7 @@ function createBackupResult(): BackupResult {
     cleanupResult: null,
     encrypted: false,
     verified: true,
+    backupType: 'database',
     snapshotMode: 'combined',
     errorStage: null,
     errorMessage: null,

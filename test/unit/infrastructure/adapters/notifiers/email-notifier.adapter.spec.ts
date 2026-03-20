@@ -48,6 +48,7 @@ describe('EmailNotifierAdapter', () => {
       cleanupResult: new CleanupResult(1, 1048576),
       encrypted: true,
       verified: true,
+      backupType: 'database',
       snapshotMode: 'combined',
       errorStage: null,
       errorMessage: null,
