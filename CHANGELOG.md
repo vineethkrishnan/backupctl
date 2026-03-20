@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.5](https://github.com/vineethkrishnan/backupctl/compare/v0.1.4...v0.1.5) (2026-03-20)
+
+
+### Documentation
+
+* comprehensive documentation overhaul with battle-tested commands ([#20](https://github.com/vineethkrishnan/backupctl/issues/20)) ([a669ffd](https://github.com/vineethkrishnan/backupctl/commit/a669ffd68970abaf9d6227227d7ce52b1118b595))
+
+
+### CI/CD
+
+* **commitlint:** add main and other missing scopes ([#22](https://github.com/vineethkrishnan/backupctl/issues/22)) ([2b999a9](https://github.com/vineethkrishnan/backupctl/commit/2b999a9f14071d6f9affc05be1b77e91d20a6354))
+
 ## [0.1.4](https://github.com/vineethkrishnan/backupctl/compare/v0.1.3...v0.1.4) (2026-03-20)
 
 
