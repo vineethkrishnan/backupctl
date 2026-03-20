@@ -455,6 +455,7 @@ Host ${HETZNER_SSH_HOST}
     User ${HETZNER_SSH_USER}
     Port ${HETZNER_SSH_PORT}
     IdentityFile /home/node/.ssh/id_${SSH_KEY_TYPE}
+    UserKnownHostsFile /home/node/.ssh/known_hosts
     StrictHostKeyChecking accept-new
 SSHCONF
     chmod 600 ssh-keys/config

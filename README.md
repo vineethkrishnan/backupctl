@@ -34,9 +34,11 @@ backupctl is a standalone Docker service that orchestrates scheduled backups for
 ## Quick Start
 
 ```bash
-git clone <repo-url> backupctl && cd backupctl
+# One-line install (pulls pre-built image)
+curl -fsSL https://raw.githubusercontent.com/vineethkrishnan/backupctl/main/scripts/get-backupctl.sh | bash
 
-# Interactive setup — generates .env, SSH keys, projects.yml, starts containers
+# Or from source
+git clone https://github.com/vineethkrishnan/backupctl.git && cd backupctl
 ./scripts/install.sh
 
 # Verify
@@ -45,6 +47,14 @@ docker exec backupctl node dist/cli.js health
 # Run first backup
 docker exec backupctl node dist/cli.js run myproject --dry-run
 docker exec backupctl node dist/cli.js run myproject
+```
+
+```bash
+# Docker Hub
+docker pull vineethnkrishnan/backupctl:latest
+
+# GitHub Container Registry
+docker pull ghcr.io/vineethkrishnan/backupctl:latest
 ```
 
 ## CLI at a Glance
@@ -93,7 +103,9 @@ Hexagonal (Ports & Adapters) with strict layer separation.
 
 ## Documentation
 
-The full docs live in [`docs/`](docs/README.md):
+**[backupctl.vineethnk.in](https://backupctl.vineethnk.in/)** — full documentation site.
+
+Also available in [`docs/`](docs/README.md):
 
 | #   | Document                                      | What's inside                                              |
 | --- | --------------------------------------------- | ---------------------------------------------------------- |

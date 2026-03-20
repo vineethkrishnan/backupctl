@@ -152,7 +152,7 @@ Only applies when `database` is configured.
 
 | Field | Type | Required | Default | Description |
 |-------|------|----------|---------|-------------|
-| `restic.repository_path` | string | yes | — | Path on the Hetzner Storage Box for this project's restic repo |
+| `restic.repository_path` | string | yes | — | Path on the Hetzner Storage Box for this project's restic repo. **Must be relative** (e.g., `backups/myproject`, not `/backups/myproject`) — Hetzner Storage Box chroots to the user home directory |
 | `restic.password` | string | no | `RESTIC_PASSWORD` from `.env` | Per-project restic repo password |
 | `restic.snapshot_mode` | string | no | `combined` | `combined` (one snapshot for dump + assets) or `separate` (individual snapshots) |
 
@@ -343,7 +343,7 @@ projects:
         - /data/locaboo/assets
 
     restic:
-      repository_path: /backups/locaboo
+      repository_path: backups/locaboo
       password: ${LOCABOO_RESTIC_PASSWORD}
       snapshot_mode: combined
 
@@ -388,7 +388,7 @@ projects:
         - /data/projectx/storage
 
     restic:
-      repository_path: /backups/project-x
+      repository_path: backups/project-x
       snapshot_mode: separate
 
     retention:
@@ -423,7 +423,7 @@ projects:
       paths: []
 
     restic:
-      repository_path: /backups/analytics
+      repository_path: backups/analytics
       snapshot_mode: combined
 
     retention:
@@ -445,7 +445,7 @@ projects:
         - /data/static/media
 
     restic:
-      repository_path: /backups/static-assets
+      repository_path: backups/static-assets
       snapshot_mode: combined
 
     retention:
