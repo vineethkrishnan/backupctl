@@ -36,7 +36,7 @@ import { typeormConfig } from '../config/typeorm.config';
       imports: [ConfigModule],
       inject: [ConfigService],
       useFactory: (configService: ConfigService) => {
-        const logLevel = configService.get('LOG_LEVEL', 'info');
+        const logLevel = configService.get<string>('LOG_LEVEL', 'info');
         return {
           level: logLevel,
           transports: [
@@ -52,7 +52,7 @@ import { typeormConfig } from '../config/typeorm.config';
               ),
             }),
             new winston.transports.File({
-              dirname: configService.get('LOG_DIR', '/data/backups/.logs'),
+              dirname: configService.get<string>('LOG_DIR', '/data/backups/.logs'),
               filename: 'backupctl.log',
               maxsize: 10 * 1024 * 1024, // 10 MB
               maxFiles: 5,

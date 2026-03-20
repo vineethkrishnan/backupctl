@@ -26,7 +26,7 @@ RUN apk add --no-cache \
 
 # Install restic
 RUN wget https://github.com/restic/restic/releases/download/v0.17.3/restic_0.17.3_linux_amd64.bz2 \
-    && echo "d3fc3632b7bcc35aae5a3e6f2e1c1f06a6aae9c17800e84cda5cd46af3b0dcbc  restic_0.17.3_linux_amd64.bz2" | sha256sum -c \
+    && echo "5097faeda6aa13167aae6e36efdba636637f8741fed89bbf015678334632d4d3  restic_0.17.3_linux_amd64.bz2" | sha256sum -c \
     && bunzip2 restic_0.17.3_linux_amd64.bz2 \
     && chmod +x restic_0.17.3_linux_amd64 \
     && mv restic_0.17.3_linux_amd64 /usr/local/bin/restic

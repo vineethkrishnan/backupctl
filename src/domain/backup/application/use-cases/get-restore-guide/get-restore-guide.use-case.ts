@@ -16,7 +16,10 @@ export class GetRestoreGuideUseCase {
       return 'This project has no database configured — restore guide is only available for database backups.';
     }
 
-    const db = config.database!;
+    const db = config.database;
+    if (!db) {
+      return 'This project has no database configured — restore guide is only available for database backups.';
+    }
     const dbType = db.type.toLowerCase();
 
     const guides: Record<string, string> = {

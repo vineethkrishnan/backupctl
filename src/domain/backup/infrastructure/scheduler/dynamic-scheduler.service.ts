@@ -47,7 +47,7 @@ export class DynamicSchedulerService implements OnModuleInit, OnModuleDestroy {
     return Promise.resolve();
   }
 
-  async onModuleDestroy(): Promise<void> {
+  onModuleDestroy(): void {
     this.shutdownInProgress = true;
     this.clearAllJobs();
     this.logger.log('Scheduler shut down — all cron jobs stopped');

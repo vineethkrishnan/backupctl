@@ -184,11 +184,12 @@ export class RunBackupUseCase {
       return { projectName, checks, allPassed: false };
     }
 
-    if (config.hasDatabase()) {
-      if (this.dumperRegistry.has(config.database!.type)) {
-        checks.push({ name: 'Database dumper', passed: true, message: `Adapter found for database type: ${config.database!.type}` });
+    if (config.hasDatabase() && config.database) {
+      const dbType = config.database.type;
+      if (this.dumperRegistry.has(dbType)) {
+        checks.push({ name: 'Database dumper', passed: true, message: `Adapter found for database type: ${dbType}` });
       } else {
-        checks.push({ name: 'Database dumper', passed: false, message: `No database dumper registered for type: ${config.database!.type}` });
+        checks.push({ name: 'Database dumper', passed: false, message: `No database dumper registered for type: ${dbType}` });
       }
     }
 
@@ -312,8 +313,8 @@ export class RunBackupUseCase {
       }
 
       // Database dump/verify/encrypt — only when a database is configured
-      if (config.hasDatabase()) {
-        const dumper = this.dumperRegistry.create(config.database!.type, config);
+      if (config.hasDatabase() && config.database) {
+        const dumper = this.dumperRegistry.create(config.database.type, config);
 
         dumpResult = await this.executeRetryableStage<DumpResult>(
           BackupStage.Dump,
@@ -566,8 +567,8 @@ export class RunBackupUseCase {
       `timestamp:${timestamp}`,
     ];
 
-    if (config.hasDatabase()) {
-      tags.push(`db:${config.database!.type}`);
+    if (config.hasDatabase() && config.database) {
+      tags.push(`db:${config.database.type}`);
     }
 
     return tags;
