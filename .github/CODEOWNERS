@@ -1,0 +1,11 @@
+# Default owner for everything
+* @vineethkrishnan
+
+# CI/CD and GitHub config
+.github/ @vineethkrishnan
+Dockerfile @vineethkrishnan
+docker-compose*.yml @vineethkrishnan
+
+# Security-sensitive files
+scripts/ @vineethkrishnan
+src/common/helpers/child-process.util.ts @vineethkrishnan
