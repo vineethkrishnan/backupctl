@@ -87,22 +87,6 @@ backupctl run --all
 
 ![backupctl run --dry-run](/images/03-dry-run.png)
 
-```
-$ backupctl run locaboo --dry-run
-
-=== Dry Run: locaboo ===
-Validating config and connectivity without executing backup.
-  ✅ Config loaded — Project "locaboo" configuration is valid
-  ✅ Database dumper — Adapter found for database type: postgres
-  ✅ Notifier — Adapter found for notification type: slack
-  ✅ Restic repo — Repository accessible at /backups/locaboo
-  ✅ Disk space — 42.0 GB free (minimum: 5 GB)
-  ✅ GPG key — Key found for recipient: locaboo-backup@company.com
-  ✅ Asset paths — All 2 asset path(s) exist
-
-✅ All checks passed — locaboo is ready for backup.
-```
-
 **Dry run — failure detected:**
 
 ```
@@ -124,26 +108,6 @@ Validating config and connectivity without executing backup.
 **Single project backup:**
 
 ![backupctl run](/images/09-run-backup.png)
-
-```
-$ backupctl run locaboo
-
-[2026-03-18 00:00:05] Starting backup for locaboo (run: a1b2c3d4)
-[2026-03-18 00:00:05] [1/11] Sending start notification...
-[2026-03-18 00:00:06] [2/11] Executing pre-backup hook...
-[2026-03-18 00:00:07] [3/11] Dumping database (postgres)...
-[2026-03-18 00:00:32] [4/11] Verifying dump integrity...
-[2026-03-18 00:00:34] [5/11] Encrypting dump with GPG...
-[2026-03-18 00:00:36] [6/11] Syncing to remote storage (combined mode)...
-[2026-03-18 00:01:15] [7/11] Pruning old snapshots...
-[2026-03-18 00:01:22] [8/11] Cleaning up local files...
-[2026-03-18 00:01:23] [9/11] Executing post-backup hook...
-[2026-03-18 00:01:24] [10/11] Recording audit log...
-[2026-03-18 00:01:24] [11/11] Sending success notification...
-
-✅ Backup completed for locaboo in 1m 19s
-   Dump size: 145.2 MB | Snapshot: abc12345 | Restic repo: 1.8 GB
-```
 
 **All projects — mixed results:**
 
@@ -215,35 +179,9 @@ backupctl status <project> [--last <n>]
 
 ![backupctl status](/images/15-status-all.png)
 
-```
-$ backupctl status
-
-PROJECT       LAST RUN              STATUS    DURATION  NEXT SCHEDULED
-locaboo       2026-03-18 00:00:05   success   1m 19s    2026-03-19 00:00:00
-project-x     2026-03-18 01:30:00   success   1m 25s    2026-03-19 01:30:00
-project-y     2026-03-18 02:00:00   failed    6s        2026-03-19 02:00:00
-
-3 project(s) configured. 2 healthy, 1 failing.
-```
-
 **Single project history:**
 
 ![backupctl status](/images/05-status.png)
-
-```
-$ backupctl status locaboo --last 5
-
-=== locaboo — Backup History ===
-
-RUN ID      STARTED               FINISHED              STATUS    DURATION  SNAPSHOT
-a1b2c3d4    2026-03-18 00:00:05   2026-03-18 00:01:24   success   1m 19s    abc12345
-e5f6a7b8    2026-03-17 00:00:03   2026-03-17 00:01:18   success   1m 15s    def67890
-c9d0e1f2    2026-03-16 00:00:04   2026-03-16 00:01:22   success   1m 18s    ghi11223
-a3b4c5d6    2026-03-15 00:00:05   2026-03-15 00:01:30   success   1m 25s    jkl44556
-e7f8a9b0    2026-03-14 00:00:03   2026-03-14 00:00:48   failed    45s       —
-
-Showing 5 of 42 runs. Last failure: 2026-03-14 (Dump: connection timeout)
-```
 
 **In-progress backup:**
 
@@ -287,21 +225,6 @@ None.
 **Healthy system:**
 
 ![backupctl health](/images/01-health.png)
-
-```
-$ backupctl health
-
-=== System Health Check ===
-
-  ✅ Audit DB — Connected (PostgreSQL 16.2, 142 records)
-  ✅ Disk space — 42.0 GB free (minimum: 5 GB)
-  ✅ SSH — Connection to u123456.your-storagebox.de successful
-  ✅ Restic repo (locaboo) — Repository OK, 42 snapshots
-  ✅ Restic repo (project-x) — Repository OK, 28 snapshots
-  ✅ Restic repo (project-y) — Repository OK, 14 snapshots
-
-All checks passed.
-```
 
 **Degraded system:**
 
@@ -475,21 +398,6 @@ backupctl snapshots <project> [--last <n>]
 
 ![backupctl snapshots](/images/04-snapshots.png)
 
-```
-$ backupctl snapshots locaboo --last 5
-
-=== locaboo — Restic Snapshots (combined mode) ===
-
-SNAPSHOT     DATE                  TAGS                                    SIZE
-abc12345     2026-03-18 00:01:15   backupctl:combined, project:locaboo     145.2 MB
-def67890     2026-03-17 00:01:10   backupctl:combined, project:locaboo     144.8 MB
-ghi11223     2026-03-16 00:01:12   backupctl:combined, project:locaboo     143.9 MB
-jkl44556     2026-03-15 00:01:20   backupctl:combined, project:locaboo     145.1 MB
-mno77889     2026-03-14 00:00:38   backupctl:combined, project:locaboo     142.3 MB
-
-Showing 5 of 42 snapshots. Repository size: 1.8 GB
-```
-
 **Separate snapshot mode:**
 
 ```
@@ -603,21 +511,6 @@ backupctl logs <project> [--last <n>] [--failed]
 
 ![backupctl logs](/images/10-logs.png)
 
-```
-$ backupctl logs locaboo --last 5
-
-=== locaboo — Audit Logs ===
-
-RUN ID      STARTED               STATUS    DURATION  LAST STAGE       ERROR
-a1b2c3d4    2026-03-18 00:00:05   success   1m 19s    Notify           —
-e5f6a7b8    2026-03-17 00:00:03   success   1m 15s    Notify           —
-c9d0e1f2    2026-03-16 00:00:04   success   1m 18s    Notify           —
-a3b4c5d6    2026-03-15 00:00:05   success   1m 25s    Notify           —
-e7f8a9b0    2026-03-14 00:00:03   failed    45s       Dump             connection timeout
-
-Showing 5 of 42 entries.
-```
-
 **Failed runs only:**
 
 ```
@@ -671,18 +564,6 @@ backupctl config import-gpg-key <file>
 
 ![backupctl config validate](/images/02-config-validate.png)
 
-```
-$ backupctl config validate
-
-Validating config/projects.yml...
-
-  ✅ locaboo — valid
-  ✅ project-x — valid
-  ✅ project-y — valid
-
-All 3 project(s) are valid.
-```
-
 **Validate — errors found:**
 
 ```
@@ -702,64 +583,6 @@ Validating config/projects.yml...
 **Show resolved config (secrets masked):**
 
 ![backupctl config show](/images/08-config-show.png)
-
-```
-$ backupctl config show locaboo
-
-=== locaboo — Resolved Configuration ===
-
-name: locaboo
-enabled: true
-cron: "0 0 * * *"
-timeout_minutes: 30
-
-database:
-  type: postgres
-  host: postgres-locaboo
-  port: 5432
-  name: locaboo_db
-  user: backup_user
-  password: ********
-
-compression:
-  enabled: true
-
-assets:
-  paths:
-    - /data/locaboo/uploads
-    - /data/locaboo/assets
-
-restic:
-  repository_path: backups/locaboo
-  password: ********
-  snapshot_mode: combined
-
-retention:
-  local_days: 7
-  keep_daily: 7
-  keep_weekly: 4
-  keep_monthly: 0
-
-encryption:
-  enabled: true
-  type: gpg
-  recipient: locaboo-backup@company.com
-
-hooks:
-  pre_backup: "curl -s http://locaboo-app:3000/maintenance/on"
-  post_backup: "curl -s http://locaboo-app:3000/maintenance/off"
-
-verification:
-  enabled: true
-
-notification:
-  type: slack
-  config:
-    webhook_url: ********
-
-Config source: config/projects.yml
-Secrets resolved from: .env
-```
 
 **Reload config:**
 
@@ -822,16 +645,6 @@ backupctl cache --clear-all
 
 ![backupctl cache](/images/07-cache.png)
 
-```
-$ backupctl cache locaboo
-
-=== locaboo — Restic Cache ===
-
-Cache directory: /root/.cache/restic/abc123def456
-Size: 28.5 MB
-Last accessed: 2026-03-18 00:01:22
-```
-
 **Clear single project cache:**
 
 ```
@@ -891,79 +704,21 @@ backupctl restic <project> <cmd> [args...]
 
 ![backupctl restic snapshots](/images/13-restic-snapshots.png)
 
-```
-$ backupctl restic locaboo snapshots
-
-repository abc12345 opened (version 2, compression auto)
-ID        Time                 Host        Tags                                    Paths
------------------------------------------------------------------------------------------------------------------------
-abc12345  2026-03-18 00:01:15  backupctl   backupctl:combined,project:locaboo      /data/backups/locaboo
-def67890  2026-03-17 00:01:10  backupctl   backupctl:combined,project:locaboo      /data/backups/locaboo
-ghi11223  2026-03-16 00:01:12  backupctl   backupctl:combined,project:locaboo      /data/backups/locaboo
------------------------------------------------------------------------------------------------------------------------
-3 snapshots
-```
-
 **Check repository integrity:**
 
 ![backupctl restic check](/images/06-restic-check.png)
-
-```
-$ backupctl restic locaboo check
-
-using temporary cache in /tmp/restic-check-cache-123456
-repository abc12345 opened (version 2, compression auto)
-created new cache in /tmp/restic-check-cache-123456
-create exclusive lock for repository
-load indexes
-check all packs
-check snapshots, trees and blobs
-no errors were found
-```
 
 **Repository statistics:**
 
 ![backupctl restic stats](/images/11-restic-stats.png)
 
-```
-$ backupctl restic locaboo stats
-
-repository abc12345 opened (version 2, compression auto)
-scanning...
-Stats in restore-size mode:
-     Snapshots processed:   42
-        Total File Count:   15234
-              Total Size:   4.812 GiB
-```
-
 **List files in latest snapshot:**
 
 ![backupctl restic ls latest](/images/12-restic-ls.png)
 
-```
-$ backupctl restic locaboo ls latest
-
-snapshot abc12345 of [/data/backups/locaboo] at 2026-03-18 00:01:15
-/data/backups/locaboo
-/data/backups/locaboo/locaboo_db_20260318_000032.sql.gz.gpg
-/data/backups/locaboo/uploads
-/data/backups/locaboo/uploads/image001.jpg
-...
-```
-
 **Find a specific file across snapshots:**
 
 ![backupctl restic find](/images/14-restic-find.png)
-
-```
-$ backupctl restic locaboo find "*.sql.gz"
-
-Found matching entries in snapshot abc12345 from 2026-03-18 00:01:15
-  /data/backups/locaboo/locaboo_db_20260318_000032.sql.gz.gpg
-
-Found matching entries in snapshot def67890 from 2026-03-17 00:01:10
-  /data/backups/locaboo/locaboo_db_20260317_000028.sql.gz.gpg
-```
 
 **Unlock stale locks:**
 
