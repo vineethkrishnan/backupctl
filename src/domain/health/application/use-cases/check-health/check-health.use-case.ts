@@ -26,6 +26,8 @@ export class CheckHealthUseCase {
         sshConfig?.keyPath ? this.systemHealth.checkSshAuthentication(sshConfig.keyPath) : Promise.resolve(false),
       ]);
 
+    const isSshConfigured = sshConfig !== null;
+
     return new HealthCheckResult(
       auditDbConnected,
       diskResult.available,
@@ -34,6 +36,7 @@ export class CheckHealthUseCase {
       sshAuthenticated,
       sshConnected && sshAuthenticated,
       uptime,
+      isSshConfigured,
     );
   }
 

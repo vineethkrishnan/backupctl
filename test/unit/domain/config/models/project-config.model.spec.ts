@@ -32,6 +32,20 @@ function buildParams(overrides: Partial<ProjectConfigParams> = {}): ProjectConfi
 }
 
 describe('ProjectConfig', () => {
+  describe('hasDatabase', () => {
+    it('should return true when database is configured', () => {
+      const config = new ProjectConfig(buildParams());
+
+      expect(config.hasDatabase()).toBe(true);
+    });
+
+    it('should return false when database is null', () => {
+      const config = new ProjectConfig(buildParams({ database: null }));
+
+      expect(config.hasDatabase()).toBe(false);
+    });
+  });
+
   describe('hasEncryption', () => {
     it('should return true when encryption is enabled', () => {
       const config = new ProjectConfig(

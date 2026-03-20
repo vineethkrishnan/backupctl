@@ -1,7 +1,8 @@
 export function formatBytes(bytes: number): string {
   if (bytes === 0) return '0 B';
+  if (bytes < 0) return `-${formatBytes(-bytes)}`;
 
-  const units = ['B', 'KB', 'MB', 'GB'];
+  const units = ['B', 'KB', 'MB', 'GB', 'TB'];
   const threshold = 1024;
 
   let unitIndex = 0;
@@ -30,8 +31,15 @@ export function formatDuration(ms: number): string {
 }
 
 export function formatTimestamp(date: Date, timezone = 'Europe/Berlin'): string {
+  let validTimezone = timezone;
+  try {
+    Intl.DateTimeFormat(undefined, { timeZone: timezone });
+  } catch {
+    validTimezone = 'Europe/Berlin';
+  }
+
   const formatter = new Intl.DateTimeFormat('en-GB', {
-    timeZone: timezone,
+    timeZone: validTimezone,
     year: 'numeric',
     month: '2-digit',
     day: '2-digit',

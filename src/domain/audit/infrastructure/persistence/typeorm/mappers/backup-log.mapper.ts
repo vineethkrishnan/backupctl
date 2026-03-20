@@ -8,11 +8,19 @@ import { BackupLogRecord } from '../schema/backup-log.record';
 @Injectable()
 export class BackupLogMapper {
   toDomain(record: BackupLogRecord): BackupResult {
+    const status = this.validateEnum(record.status, Object.values(BackupStatus), BackupStatus.Failed);
+    const currentStage = record.currentStage
+      ? this.validateEnum(record.currentStage, Object.values(BackupStage), BackupStage.NotifyStarted)
+      : BackupStage.NotifyStarted;
+    const errorStage = record.errorStage
+      ? this.validateEnum(record.errorStage, Object.values(BackupStage), null)
+      : null;
+
     return new BackupResult({
       runId: record.id,
       projectName: record.projectName,
-      status: record.status as BackupStatus,
-      currentStage: (record.currentStage as BackupStage) ?? BackupStage.NotifyStarted,
+      status,
+      currentStage,
       startedAt: record.startedAt,
       completedAt: record.completedAt,
       dumpResult: record.dumpSizeBytes
@@ -36,11 +44,18 @@ export class BackupLogMapper {
       encrypted: record.encrypted,
       verified: record.verified,
       snapshotMode: (record.snapshotMode as 'combined' | 'separate') ?? 'combined',
-      errorStage: (record.errorStage as BackupStage) ?? null,
+      errorStage,
       errorMessage: record.errorMessage,
       retryCount: record.retryCount,
       durationMs: Number(record.durationMs ?? 0),
     });
+  }
+
+  private validateEnum<T>(value: string, validValues: T[], fallback: T): T {
+    if (validValues.includes(value as T)) {
+      return value as T;
+    }
+    return fallback;
   }
 
   toPartialRecord(result: BackupResult): Partial<BackupLogRecord> {

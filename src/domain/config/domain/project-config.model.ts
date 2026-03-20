@@ -13,7 +13,7 @@ export interface ProjectConfigParams {
     readonly name: string;
     readonly user: string;
     readonly password: string;
-  };
+  } | null;
   readonly compression: { readonly enabled: boolean };
   readonly assets: { readonly paths: readonly string[] };
   readonly restic: {
@@ -41,7 +41,7 @@ export class ProjectConfig {
     readonly name: string;
     readonly user: string;
     readonly password: string;
-  };
+  } | null;
   readonly compression: { readonly enabled: boolean };
   readonly assets: { readonly paths: readonly string[] };
   readonly restic: {
@@ -74,6 +74,10 @@ export class ProjectConfig {
     this.hooks = params.hooks;
     this.verification = params.verification;
     this.notification = params.notification;
+  }
+
+  hasDatabase(): boolean {
+    return this.database != null;
   }
 
   hasEncryption(): boolean {

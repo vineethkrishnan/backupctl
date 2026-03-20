@@ -14,7 +14,7 @@ export class SystemHealthAdapter implements SystemHealthPort {
       const fields = lines[lines.length - 1].trim().split(/\s+/);
       // POSIX df -k: filesystem, 1K-blocks, used, available, capacity%, mountpoint
       const availKb = parseInt(fields[3], 10);
-      const freeGb = Math.floor(availKb / (1024 * 1024));
+      const freeGb = parseFloat((availKb / (1024 * 1024)).toFixed(2));
 
       return { available: freeGb >= minFreeGb, freeGb };
     } catch {
@@ -30,7 +30,7 @@ export class SystemHealthAdapter implements SystemHealthPort {
       await safeExecFile('ssh', [
         '-i', config.keyPath,
         '-p', String(config.port),
-        '-o', 'StrictHostKeyChecking=no',
+        '-o', 'StrictHostKeyChecking=accept-new',
         '-o', 'ConnectTimeout=5',
         '-o', 'BatchMode=yes',
         '-o', 'LogLevel=error',

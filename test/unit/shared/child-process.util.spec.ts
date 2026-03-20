@@ -59,7 +59,7 @@ describe('safeExecFile', () => {
     mockExecFileFailure(new Error('spawn ENOENT'));
 
     await expect(safeExecFile('pg_dump', ['mydb'])).rejects.toThrow(
-      'Command "pg_dump mydb" failed: spawn ENOENT',
+      'Command "pg_dump" failed: spawn ENOENT',
     );
   });
 

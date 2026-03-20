@@ -21,6 +21,8 @@ export class PostgresDumpAdapter implements DatabaseDumperPort {
     const filePath = path.join(outputDir, fileName);
     const startTime = Date.now();
 
+    fs.mkdirSync(outputDir, { recursive: true });
+
     const args = [
       '--host', this.config.host,
       '--port', String(this.config.port),

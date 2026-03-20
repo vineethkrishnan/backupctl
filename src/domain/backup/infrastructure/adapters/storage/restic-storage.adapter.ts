@@ -1,4 +1,3 @@
-import * as fs from 'fs';
 import * as path from 'path';
 
 import { RemoteStoragePort, SyncOptions } from '@domain/backup/application/ports/remote-storage.port';
@@ -47,7 +46,7 @@ export class ResticStorageAdapter implements RemoteStoragePort {
     sshPort = 22,
   ) {
     this.repository = `sftp:${sshUser}@${sshHost}:${repositoryPath}`;
-    this.sshCommand = `ssh -i ${sshKeyPath} -p ${sshPort} -o StrictHostKeyChecking=accept-new`;
+    this.sshCommand = `ssh -i "${sshKeyPath}" -p ${sshPort} -o StrictHostKeyChecking=accept-new`;
   }
 
   async sync(paths: string[], options: SyncOptions): Promise<SyncResult> {
@@ -78,6 +77,7 @@ export class ResticStorageAdapter implements RemoteStoragePort {
     const args = [
       'forget',
       '--prune',
+      '--tag', `project:${this.projectName}`,
       '--keep-daily', String(retention.keepDaily),
       '--keep-weekly', String(retention.keepWeekly),
     ];
@@ -137,18 +137,20 @@ export class ResticStorageAdapter implements RemoteStoragePort {
     return stdout;
   }
 
-  getCacheInfo(): Promise<CacheInfo> {
+  async getCacheInfo(): Promise<CacheInfo> {
     const homeDir = process.env.HOME ?? '/root';
     const cachePath = path.join(homeDir, '.cache', 'restic');
 
     let cacheSizeBytes = 0;
     try {
-      cacheSizeBytes = this.calculateDirectorySize(cachePath);
+      const { stdout } = await safeExecFile('du', ['-sb', cachePath], { timeout: 30000 });
+      const sizeStr = stdout.trim().split('\t')[0];
+      cacheSizeBytes = parseInt(sizeStr, 10) || 0;
     } catch {
       cacheSizeBytes = 0;
     }
 
-    return Promise.resolve(new CacheInfo(this.projectName, cacheSizeBytes, cachePath));
+    return new CacheInfo(this.projectName, cacheSizeBytes, cachePath);
   }
 
   async clearCache(): Promise<void> {
@@ -168,9 +170,22 @@ export class ResticStorageAdapter implements RemoteStoragePort {
   }
 
   private parseSyncOutput(stdout: string): ResticSummary {
+    if (!stdout.trim()) {
+      throw new Error('Restic backup produced no output — check repository access and credentials');
+    }
+
     const lines = stdout.trim().split('\n');
     for (let i = lines.length - 1; i >= 0; i--) {
-      const parsed = JSON.parse(lines[i]) as Record<string, unknown>;
+      const line = lines[i].trim();
+      if (!line) continue;
+
+      let parsed: Record<string, unknown>;
+      try {
+        parsed = JSON.parse(line) as Record<string, unknown>;
+      } catch {
+        continue;
+      }
+
       if (parsed.message_type === 'summary') {
         return {
           snapshot_id: parsed.snapshot_id as string,
@@ -183,21 +198,5 @@ export class ResticStorageAdapter implements RemoteStoragePort {
     }
 
     throw new Error('No summary message found in restic backup output');
-  }
-
-  private calculateDirectorySize(dirPath: string): number {
-    let totalSize = 0;
-    const entries = fs.readdirSync(dirPath, { withFileTypes: true });
-
-    for (const entry of entries) {
-      const entryPath = path.join(dirPath, entry.name);
-      if (entry.isDirectory()) {
-        totalSize += this.calculateDirectorySize(entryPath);
-      } else {
-        totalSize += fs.statSync(entryPath).size;
-      }
-    }
-
-    return totalSize;
   }
 }

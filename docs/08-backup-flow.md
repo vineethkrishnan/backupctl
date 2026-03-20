@@ -2,7 +2,7 @@
 
 This document is a deep dive into the 11-step backup orchestration pipeline. It covers every stage, the retry policy, concurrency model, snapshot tagging, failure recovery, and notification formats.
 
-The orchestration is implemented in `BackupOrchestratorService` (application layer), which coordinates domain ports without containing business logic itself. Each step calls a port interface — the infrastructure layer provides the concrete adapters.
+The orchestration is implemented in `RunBackupUseCase` (application layer), which coordinates domain ports without containing business logic itself. Each step calls a port interface — the infrastructure layer provides the concrete adapters.
 
 ---
 
@@ -127,7 +127,7 @@ When a user manually triggers `backupctl run <project>` while a backup is alread
 ```
 acquire() → backup runs → release() (in finally block)
                 ↓ (on crash)
-         StartupRecoveryService cleans stale locks on next boot
+         RecoverStartupUseCase cleans stale locks on next boot
 ```
 
 ---
@@ -214,17 +214,17 @@ The `--dry-run` flag checks asset path existence and reports missing paths as wa
 If the audit database is unreachable when the orchestrator attempts to write the backup result (step 10), the result is written to the JSONL fallback file instead:
 
 ```
-{BACKUP_BASE_DIR}/.fallback/audit.jsonl
+{BACKUP_BASE_DIR}/.fallback-audit/fallback.jsonl
 ```
 
-Each line is a complete JSON object with the full audit record. The backup is still considered **successful** — the audit write failure is an infrastructure concern, not a backup concern. The JSONL entries are replayed automatically by `StartupRecoveryService` on the next container start.
+Each line is a complete JSON object with the full audit record. The backup is still considered **successful** — the audit write failure is an infrastructure concern, not a backup concern. The JSONL entries are replayed automatically by `RecoverStartupUseCase` on the next container start.
 
 ### Notification Failure
 
-If the notification adapter fails to deliver the success or failure notification (step 11), the notification payload is written to the JSONL fallback file:
+If the notification adapter fails to deliver the success or failure notification (step 11), the notification payload is written to the same JSONL fallback file as audit entries:
 
 ```
-{BACKUP_BASE_DIR}/.fallback/notifications.jsonl
+{BACKUP_BASE_DIR}/.fallback-audit/fallback.jsonl
 ```
 
 Like audit failures, notification failures do not affect the backup's success status. They are retried on the next startup.
@@ -244,7 +244,7 @@ The orchestrator distinguishes between backup-critical and non-critical failures
 
 ## Crash Recovery (Startup)
 
-`StartupRecoveryService` runs automatically during `onModuleInit` on every container start. It handles all the edge cases that can occur when a container is killed mid-backup.
+`RecoverStartupUseCase` runs automatically during `onModuleInit` on every container start. It handles all the edge cases that can occur when a container is killed mid-backup.
 
 ### Recovery Steps
 
@@ -368,7 +368,7 @@ All notification types sent via the webhook adapter use this JSON structure:
 
 ```json
 {
-  "event": "backup.success",
+  "event": "backup_success",
   "project": "locaboo",
   "text": "✅ Backup completed for locaboo\nRun ID: a1b2c3d4\nDuration: 1m 19s\nDump size: 145.2 MB\nSnapshot: abc12345\nRepository size: 1.8 GB",
   "data": {
@@ -385,7 +385,7 @@ All notification types sent via the webhook adapter use this JSON structure:
 }
 ```
 
-The `event` field uses dot notation: `backup.started`, `backup.success`, `backup.failure`, `backup.timeout_warning`, `backup.daily_summary`.
+The `event` field uses underscore notation: `backup_started`, `backup_success`, `backup_failed`, `backup_warning`, `daily_summary`.
 
 The `text` field contains the same markdown-formatted message sent to Slack/Email — suitable for display in chat integrations or logging.
 

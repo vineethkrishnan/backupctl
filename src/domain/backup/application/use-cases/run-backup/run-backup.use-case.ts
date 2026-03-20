@@ -184,10 +184,12 @@ export class RunBackupUseCase {
       return { projectName, checks, allPassed: false };
     }
 
-    if (this.dumperRegistry.has(config.database.type)) {
-      checks.push({ name: 'Database dumper', passed: true, message: `Adapter found for database type: ${config.database.type}` });
-    } else {
-      checks.push({ name: 'Database dumper', passed: false, message: `No database dumper registered for type: ${config.database.type}` });
+    if (config.hasDatabase()) {
+      if (this.dumperRegistry.has(config.database!.type)) {
+        checks.push({ name: 'Database dumper', passed: true, message: `Adapter found for database type: ${config.database!.type}` });
+      } else {
+        checks.push({ name: 'Database dumper', passed: false, message: `No database dumper registered for type: ${config.database!.type}` });
+      }
     }
 
     try {
@@ -252,7 +254,6 @@ export class RunBackupUseCase {
     const startedAt = this.clock.now();
     const timestamp = this.clock.timestamp();
 
-    const dumper = this.dumperRegistry.create(config.database.type, config);
     const notifier = this.resolveNotifier(config);
     const storage = this.storageFactory.create(config);
     const outputDir = path.join(this.baseDir, config.name);
@@ -310,41 +311,44 @@ export class RunBackupUseCase {
         });
       }
 
-      dumpResult = await this.executeRetryableStage<DumpResult>(
-        BackupStage.Dump,
-        runId,
-        () => dumper.dump(outputDir, config.name, timestamp),
-        (retries) => { totalRetries += retries; },
-      );
+      // Database dump/verify/encrypt — only when a database is configured
+      if (config.hasDatabase()) {
+        const dumper = this.dumperRegistry.create(config.database!.type, config);
 
-      if (config.hasVerification()) {
-        if (!dumpResult) throw new BackupStageError(BackupStage.Verify, new Error('No dump result available'), false);
-        const verifyPath = dumpResult.filePath;
-        await this.executeRetryableStage<boolean>(
-          BackupStage.Verify,
+        dumpResult = await this.executeRetryableStage<DumpResult>(
+          BackupStage.Dump,
           runId,
-          () => dumper.verify(verifyPath),
+          () => dumper.dump(outputDir, config.name, timestamp),
           (retries) => { totalRetries += retries; },
         );
-        verified = true;
+
+        if (config.hasVerification()) {
+          const verifyPath = dumpResult.filePath;
+          await this.executeRetryableStage<boolean>(
+            BackupStage.Verify,
+            runId,
+            () => dumper.verify(verifyPath),
+            (retries) => { totalRetries += retries; },
+          );
+          verified = true;
+        }
+
+        if (config.hasEncryption()) {
+          const encryption = config.encryption;
+          if (!encryption) throw new Error('Encryption config required');
+          const encryptPath = dumpResult.filePath;
+          const encryptedPath = await this.executeRetryableStage<string>(
+            BackupStage.Encrypt,
+            runId,
+            () => this.encryptor.encrypt(encryptPath, encryption.recipient),
+            (retries) => { totalRetries += retries; },
+          );
+          dumpResult = new DumpResult(encryptedPath, dumpResult.sizeBytes, dumpResult.durationMs);
+          encrypted = true;
+        }
       }
 
-      if (config.hasEncryption()) {
-        const encryption = config.encryption;
-        if (!encryption) throw new Error('Encryption config required');
-        if (!dumpResult) throw new BackupStageError(BackupStage.Encrypt, new Error('No dump result available'), false);
-        const encryptPath = dumpResult.filePath;
-        const encryptedPath = await this.executeRetryableStage<string>(
-          BackupStage.Encrypt,
-          runId,
-          () => this.encryptor.encrypt(encryptPath, encryption.recipient),
-          (retries) => { totalRetries += retries; },
-        );
-        dumpResult = new DumpResult(encryptedPath, dumpResult.sizeBytes, dumpResult.durationMs);
-        encrypted = true;
-      }
-
-      const syncPaths = this.buildSyncPaths(dumpResult.filePath, config, notifier);
+      const syncPaths = this.buildSyncPaths(dumpResult, config, notifier);
       syncResult = await this.executeRetryableStage<SyncResult>(
         BackupStage.Sync,
         runId,
@@ -428,7 +432,11 @@ export class RunBackupUseCase {
     runId: string,
     operation: () => Promise<void>,
   ): Promise<void> {
-    await this.auditLog.trackProgress(runId, stage);
+    try {
+      await this.auditLog.trackProgress(runId, stage);
+    } catch (trackError) {
+      this.logger.error(`Audit trackProgress failed for stage ${stage}, continuing: ${String(trackError)}`);
+    }
     try {
       await operation();
     } catch (error) {
@@ -442,7 +450,11 @@ export class RunBackupUseCase {
     operation: () => Promise<T>,
     onRetryCount: (retries: number) => void,
   ): Promise<T> {
-    await this.auditLog.trackProgress(runId, stage);
+    try {
+      await this.auditLog.trackProgress(runId, stage);
+    } catch (trackError) {
+      this.logger.error(`Audit trackProgress failed for stage ${stage}, continuing: ${String(trackError)}`);
+    }
 
     let attempt = 0;
 
@@ -520,11 +532,15 @@ export class RunBackupUseCase {
   }
 
   private buildSyncPaths(
-    dumpFilePath: string,
+    dumpResult: DumpResult | null,
     config: ProjectConfig,
     notifier: NotifierPort,
   ): string[] {
-    const syncPaths = [dumpFilePath];
+    const syncPaths: string[] = [];
+
+    if (dumpResult) {
+      syncPaths.push(dumpResult.filePath);
+    }
 
     if (config.hasAssets()) {
       for (const assetPath of config.assets.paths) {
@@ -545,11 +561,16 @@ export class RunBackupUseCase {
   }
 
   private buildTags(config: ProjectConfig, timestamp: string): string[] {
-    return [
+    const tags = [
       `project:${config.name}`,
-      `db:${config.database.type}`,
       `timestamp:${timestamp}`,
     ];
+
+    if (config.hasDatabase()) {
+      tags.push(`db:${config.database!.type}`);
+    }
+
+    return tags;
   }
 
   private buildFailureResult(projectName: string, error: Error): BackupResult {

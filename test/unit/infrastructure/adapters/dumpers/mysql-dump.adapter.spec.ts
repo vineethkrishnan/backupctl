@@ -32,7 +32,7 @@ describe('MysqlDumpAdapter', () => {
       mockedStatSync.mockReturnValue({ size: 2048 } as fs.Stats);
     });
 
-    it('should build correct mysqldump args', async () => {
+    it('should build correct mysqldump args with MYSQL_PWD env var', async () => {
       await adapter.dump('/backups', 'myproject', '20260318_120000');
 
       expect(mockedSafeExecFile).toHaveBeenCalledWith(
@@ -44,7 +44,6 @@ describe('MysqlDumpAdapter', () => {
           '3306',
           '--user',
           'root',
-          '--password=mysqlpass',
           '--single-transaction',
           '--quick',
           '--routines',
@@ -52,6 +51,7 @@ describe('MysqlDumpAdapter', () => {
           '/backups/myproject_backup_20260318_120000.sql',
           'appdb',
         ],
+        { env: { MYSQL_PWD: 'mysqlpass' } },
       );
     });
 
@@ -59,7 +59,9 @@ describe('MysqlDumpAdapter', () => {
       await adapter.dump('/backups', 'myproject', '20260318_120000');
 
       expect(mockedSafeExecFile).toHaveBeenCalledTimes(2);
-      expect(mockedSafeExecFile).toHaveBeenNthCalledWith(1, 'mysqldump', expect.any(Array));
+      expect(mockedSafeExecFile).toHaveBeenNthCalledWith(
+        1, 'mysqldump', expect.any(Array), expect.objectContaining({ env: { MYSQL_PWD: 'mysqlpass' } }),
+      );
       expect(mockedSafeExecFile).toHaveBeenNthCalledWith(2, 'gzip', [
         '/backups/myproject_backup_20260318_120000.sql',
       ]);

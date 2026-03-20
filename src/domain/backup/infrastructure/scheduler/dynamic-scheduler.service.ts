@@ -1,4 +1,4 @@
-import { Inject, Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { Inject, Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { SchedulerRegistry } from '@nestjs/schedule';
 import { CronJob } from 'cron';
@@ -17,7 +17,7 @@ import {
 } from '@common/di/injection-tokens';
 
 @Injectable()
-export class DynamicSchedulerService implements OnModuleInit {
+export class DynamicSchedulerService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(DynamicSchedulerService.name);
   private readonly dailySummaryCron: string;
 
@@ -31,17 +31,26 @@ export class DynamicSchedulerService implements OnModuleInit {
     configService: ConfigService,
   ) {
     this.dailySummaryCron = configService.get<string>('DAILY_SUMMARY_CRON', '0 7 * * *');
+    this.isCliMode = configService.get<string>('BACKUPCTL_CLI_MODE') === '1';
   }
 
+  private readonly isCliMode: boolean;
+  private shutdownInProgress = false;
+
   onModuleInit(): Promise<void> {
-    // Skip scheduler registration for short-lived CLI commands
-    if (process.env.BACKUPCTL_CLI_MODE === '1') {
+    if (this.isCliMode) {
       return Promise.resolve();
     }
 
     this.registerBackupJobs();
     this.registerDailySummaryJob();
     return Promise.resolve();
+  }
+
+  async onModuleDestroy(): Promise<void> {
+    this.shutdownInProgress = true;
+    this.clearAllJobs();
+    this.logger.log('Scheduler shut down — all cron jobs stopped');
   }
 
   reRegisterJobs(): void {
@@ -53,6 +62,10 @@ export class DynamicSchedulerService implements OnModuleInit {
 
   // Extracted for testability — called by cron callback
   async executeScheduledBackup(projectName: string): Promise<void> {
+    if (this.shutdownInProgress) {
+      this.logger.warn(`Skipping scheduled backup for ${projectName} — shutdown in progress`);
+      return;
+    }
     this.logger.log(`Scheduled backup triggered for ${projectName}`);
     await this.backupLock.acquireOrQueue(projectName);
     try {
@@ -92,7 +105,10 @@ export class DynamicSchedulerService implements OnModuleInit {
 
     for (const config of projects) {
       const jobName = `backup-${config.name}`;
-      const job = new CronJob(config.cron, () => this.executeScheduledBackup(config.name));
+      const job = new CronJob(
+        config.cron,
+        () => { this.executeScheduledBackup(config.name).catch((err) => this.logger.error(`Scheduled backup failed for ${config.name}: ${(err as Error).message}`)); },
+      );
 
       this.schedulerRegistry.addCronJob(jobName, job);
       job.start();
@@ -101,7 +117,10 @@ export class DynamicSchedulerService implements OnModuleInit {
   }
 
   private registerDailySummaryJob(): void {
-    const job = new CronJob(this.dailySummaryCron, () => this.executeDailySummary());
+    const job = new CronJob(
+      this.dailySummaryCron,
+      () => { this.executeDailySummary().catch((err) => this.logger.error(`Daily summary failed: ${(err as Error).message}`)); },
+    );
 
     this.schedulerRegistry.addCronJob('daily-summary', job);
     job.start();

@@ -56,10 +56,15 @@ export class JsonlFallbackWriterAdapter implements FallbackWriterPort {
       return Promise.resolve([]);
     }
 
-    const entries = content
-      .split('\n')
-      .filter((line) => line.trim())
-      .map((line) => JSON.parse(line) as FallbackEntry);
+    const entries: FallbackEntry[] = [];
+    for (const line of content.split('\n')) {
+      if (!line.trim()) continue;
+      try {
+        entries.push(JSON.parse(line) as FallbackEntry);
+      } catch {
+        // Skip corrupt lines — partial write from a crash
+      }
+    }
     return Promise.resolve(entries);
   }
 
@@ -77,8 +82,11 @@ export class JsonlFallbackWriterAdapter implements FallbackWriterPort {
       return;
     }
 
+    // Atomic write: write to temp file then rename to avoid corruption
+    const tmpFile = `${this.fallbackFile}.tmp`;
     const lines = remaining.map((entry) => JSON.stringify(entry)).join('\n') + '\n';
-    fs.writeFileSync(this.fallbackFile, lines, 'utf-8');
+    fs.writeFileSync(tmpFile, lines, 'utf-8');
+    fs.renameSync(tmpFile, this.fallbackFile);
   }
 
   private appendEntry(entry: FallbackEntry): void {

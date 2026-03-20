@@ -70,7 +70,7 @@ describe('YamlConfigLoaderAdapter', () => {
       expect(result).toHaveLength(1);
       expect(result[0]).toBeInstanceOf(ProjectConfig);
       expect(result[0].name).toBe('test-project');
-      expect(result[0].database.type).toBe('postgres');
+      expect(result[0].database?.type).toBe('postgres');
       expect(result[0].restic.repositoryPath).toBe('/backups/test');
     });
 
@@ -91,7 +91,7 @@ describe('YamlConfigLoaderAdapter', () => {
 
       const result = adapter.loadAll();
 
-      expect(result[0].database.password).toBe('env-secret-123');
+      expect(result[0].database?.password).toBe('env-secret-123');
     });
 
     it('should throw when env var is not set for ${VAR_NAME}', () => {
@@ -174,6 +174,29 @@ describe('YamlConfigLoaderAdapter', () => {
       expect(result[0].restic.password).toBe('global-restic-pass');
     });
 
+    it('should load files-only config (no database)', () => {
+      const filesOnlyProject = {
+        name: 'static-assets',
+        cron: '0 3 * * *',
+        assets: { paths: ['/data/uploads', '/data/media'] },
+        restic: {
+          repository_path: '/backups/assets',
+          password: 'restic-pass',
+          snapshot_mode: 'combined',
+        },
+        retention: { local_days: 7, keep_daily: 7, keep_weekly: 4 },
+      };
+      mockedFs.readFileSync.mockReturnValue(yaml.dump({ projects: [filesOnlyProject] }));
+      const adapter = createAdapter();
+
+      const result = adapter.loadAll();
+
+      expect(result[0].database).toBeNull();
+      expect(result[0].hasDatabase()).toBe(false);
+      expect(result[0].hasAssets()).toBe(true);
+      expect(result[0].assets.paths).toEqual(['/data/uploads', '/data/media']);
+    });
+
     it('should throw for invalid YAML structure', () => {
       mockedFs.readFileSync.mockReturnValue(yaml.dump({ invalid: 'structure' }));
       const adapter = createAdapter();
@@ -253,6 +276,22 @@ describe('YamlConfigLoaderAdapter', () => {
 
       expect(result.isValid).toBe(false);
       expect(result.errors.some((e) => e.includes('invalid cron expression'))).toBe(true);
+    });
+
+    it('should return error when neither database nor assets is provided', () => {
+      const project = {
+        name: 'empty-project',
+        cron: '0 0 * * *',
+        restic: { repository_path: '/backups/test', password: 'pass' },
+        retention: { local_days: 7, keep_daily: 7, keep_weekly: 4 },
+      };
+      mockedFs.readFileSync.mockReturnValue(yaml.dump({ projects: [project] }));
+      const adapter = createAdapter();
+
+      const result = adapter.validate();
+
+      expect(result.isValid).toBe(false);
+      expect(result.errors.some((e) => e.includes('must have at least one of "database" or "assets"'))).toBe(true);
     });
 
     it('should return error when projects array is missing', () => {

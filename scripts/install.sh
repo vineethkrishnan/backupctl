@@ -236,7 +236,7 @@ welcome() {
   echo -e "${BOLD}${CYAN}╔═══════════════════════════════════════════════════════════════╗${RESET}"
   echo -e "${BOLD}${CYAN}║                                                               ║${RESET}"
   echo -e "${BOLD}${CYAN}║            ${BOLD}backupctl Installation Wizard${CYAN}                      ║${RESET}"
-  echo -e "${BOLD}${CYAN}║         Database-Agnostic Backup Orchestration                ║${RESET}"
+  echo -e "${BOLD}${CYAN}║       Backup Orchestration — Databases, Files, or Both       ║${RESET}"
   echo -e "${BOLD}${CYAN}║                                                               ║${RESET}"
   echo -e "${BOLD}${CYAN}╚═══════════════════════════════════════════════════════════════╝${RESET}"
   echo ""
@@ -565,13 +565,13 @@ step_notifications() {
   done
 
   SLACK_WEBHOOK_URL=""
-  EMAIL_HOST=""
-  EMAIL_PORT=""
-  EMAIL_SECURE=""
-  EMAIL_USER=""
-  EMAIL_PASSWORD=""
-  EMAIL_FROM=""
-  EMAIL_TO=""
+  SMTP_HOST=""
+  SMTP_PORT=""
+  SMTP_SECURE=""
+  SMTP_USER=""
+  SMTP_PASSWORD=""
+  SMTP_FROM=""
+  SMTP_TO=""
   WEBHOOK_URL=""
 
   case "$NOTIFICATION_TYPE" in
@@ -584,17 +584,17 @@ step_notifications() {
       ;;
     email)
       echo ""
-      EMAIL_HOST=$(ask_required "SMTP host" "smtp.gmail.com" "SMTP host")
-      EMAIL_PORT=$(ask_port "SMTP port" "587")
+      SMTP_HOST=$(ask_required "SMTP host" "smtp.gmail.com" "SMTP host")
+      SMTP_PORT=$(ask_port "SMTP port" "587")
       if ask_yn "Use TLS/SSL?" "y"; then
-        EMAIL_SECURE="true"
+        SMTP_SECURE="true"
       else
-        EMAIL_SECURE="false"
+        SMTP_SECURE="false"
       fi
-      EMAIL_USER=$(ask_required "SMTP username" "" "SMTP user")
-      EMAIL_PASSWORD=$(ask_password "SMTP password")
-      EMAIL_FROM=$(ask_required "From address" "" "From address")
-      EMAIL_TO=$(ask_required "To address(es), comma-separated" "" "To address")
+      SMTP_USER=$(ask_required "SMTP username" "" "SMTP user")
+      SMTP_PASSWORD=$(ask_password "SMTP password")
+      SMTP_FROM=$(ask_required "From address" "" "From address")
+      SMTP_TO=$(ask_required "To address(es), comma-separated" "" "To address")
       ;;
     webhook)
       echo ""
@@ -746,46 +746,82 @@ add_project() {
   local proj_docker_network
   proj_docker_network=$(ask "Docker network (empty = host/default)" "")
 
-  # Database
+  # Backup scope
   echo ""
-  echo -e "  ${BOLD}Database:${RESET}"
+  echo -e "  ${BOLD}What to back up:${RESET}"
+  print_dim "  1) Database + files  — dump a database and sync asset directories"
+  print_dim "  2) Database only     — dump a database (no asset files)"
+  print_dim "  3) Files only        — sync asset directories (no database dump)"
 
-  local proj_db_type
+  local proj_backup_type
   while true; do
-    proj_db_type=$(ask "Database type (postgres/mysql/mongodb)" "postgres")
-    case "$proj_db_type" in
-      postgres|mysql|mongodb) break ;;
-      *) print_error "Must be one of: postgres, mysql, mongodb" ;;
+    proj_backup_type=$(ask "Backup type (1/2/3)" "1")
+    case "$proj_backup_type" in
+      1|2|3) break ;;
+      *) print_error "Must be 1, 2, or 3" ;;
     esac
   done
 
-  local default_port
-  case "$proj_db_type" in
-    postgres) default_port="5432" ;;
-    mysql)    default_port="3306" ;;
-    mongodb)  default_port="27017" ;;
+  local proj_has_db="false"
+  local proj_has_assets="false"
+  case "$proj_backup_type" in
+    1) proj_has_db="true"; proj_has_assets="true" ;;
+    2) proj_has_db="true" ;;
+    3) proj_has_assets="true" ;;
   esac
-
-  local proj_db_host proj_db_port proj_db_name proj_db_user proj_db_password
-  proj_db_host=$(ask_required "Database host" "" "Database host")
-  proj_db_port=$(ask_port "Database port" "$default_port")
-  proj_db_name=$(ask_required "Database name" "" "Database name")
-  proj_db_user=$(ask_required "Database user" "" "Database user")
 
   local proj_env_key
   proj_env_key=$(project_env_key "$proj_name")
 
-  echo ""
-  while true; do
-    proj_db_password=$(ask_password "Database password")
-    if validate_not_empty "$proj_db_password" "Database password"; then break; fi
-  done
-  print_success "Password stored as ${proj_env_key}_DB_PASSWORD in .env"
+  # Database (when selected)
+  local proj_db_type="" proj_db_host="" proj_db_port="" proj_db_name="" proj_db_user="" proj_db_password=""
+  if [ "$proj_has_db" = "true" ]; then
+    echo ""
+    echo -e "  ${BOLD}Database:${RESET}"
+
+    while true; do
+      proj_db_type=$(ask "Database type (postgres/mysql/mongodb)" "postgres")
+      case "$proj_db_type" in
+        postgres|mysql|mongodb) break ;;
+        *) print_error "Must be one of: postgres, mysql, mongodb" ;;
+      esac
+    done
+
+    local default_port
+    case "$proj_db_type" in
+      postgres) default_port="5432" ;;
+      mysql)    default_port="3306" ;;
+      mongodb)  default_port="27017" ;;
+    esac
+
+    proj_db_host=$(ask_required "Database host" "" "Database host")
+    proj_db_port=$(ask_port "Database port" "$default_port")
+    proj_db_name=$(ask_required "Database name" "" "Database name")
+    proj_db_user=$(ask_required "Database user" "" "Database user")
+
+    echo ""
+    while true; do
+      proj_db_password=$(ask_password "Database password")
+      if validate_not_empty "$proj_db_password" "Database password"; then break; fi
+    done
+    print_success "Password stored as ${proj_env_key}_DB_PASSWORD in .env"
+  fi
 
   # Assets
   echo ""
   local proj_assets
-  proj_assets=$(ask "Asset paths to back up (comma-separated, empty = none)" "")
+  if [ "$proj_has_assets" = "true" ]; then
+    if [ "$proj_backup_type" = "3" ]; then
+      while true; do
+        proj_assets=$(ask "Asset paths to back up (comma-separated)" "")
+        if validate_not_empty "$proj_assets" "At least one asset path is required for files-only backup"; then break; fi
+      done
+    else
+      proj_assets=$(ask "Asset paths to back up (comma-separated)" "")
+    fi
+  else
+    proj_assets=""
+  fi
 
   # Restic
   echo ""
@@ -833,41 +869,47 @@ add_project() {
   proj_ret_weekly=$(ask "Remote keep weekly" "4")
   proj_ret_monthly=$(ask "Remote keep monthly" "6")
 
-  # Encryption override
-  echo ""
-  local proj_encryption_enabled="$ENCRYPTION_ENABLED"
+  # Encryption override (only for database dumps)
+  local proj_encryption_enabled="false"
   local proj_encryption_type="$ENCRYPTION_TYPE"
   local proj_gpg_recipient="$GPG_RECIPIENT"
 
-  if [ "$ENCRYPTION_ENABLED" = "true" ]; then
-    if ! ask_yn "Use global encryption settings (GPG → ${GPG_RECIPIENT})?" "y"; then
-      if ask_yn "Enable encryption for this project?" "n"; then
+  if [ "$proj_has_db" = "true" ]; then
+    proj_encryption_enabled="$ENCRYPTION_ENABLED"
+    echo ""
+    if [ "$ENCRYPTION_ENABLED" = "true" ]; then
+      if ! ask_yn "Use global encryption settings (GPG → ${GPG_RECIPIENT})?" "y"; then
+        if ask_yn "Enable encryption for this project?" "n"; then
+          proj_encryption_enabled="true"
+          proj_encryption_type="gpg"
+          while true; do
+            proj_gpg_recipient=$(ask "GPG recipient for this project" "")
+            if validate_not_empty "$proj_gpg_recipient" "GPG recipient"; then break; fi
+          done
+        else
+          proj_encryption_enabled="false"
+        fi
+      fi
+    else
+      if ask_yn "Enable encryption for this project? (global default: no)" "n"; then
         proj_encryption_enabled="true"
         proj_encryption_type="gpg"
         while true; do
-          proj_gpg_recipient=$(ask "GPG recipient for this project" "")
+          proj_gpg_recipient=$(ask "GPG recipient" "")
           if validate_not_empty "$proj_gpg_recipient" "GPG recipient"; then break; fi
         done
-      else
-        proj_encryption_enabled="false"
       fi
-    fi
-  else
-    if ask_yn "Enable encryption for this project? (global default: no)" "n"; then
-      proj_encryption_enabled="true"
-      proj_encryption_type="gpg"
-      while true; do
-        proj_gpg_recipient=$(ask "GPG recipient" "")
-        if validate_not_empty "$proj_gpg_recipient" "GPG recipient"; then break; fi
-      done
     fi
   fi
 
-  # Verification
-  echo ""
-  local proj_verification="true"
-  if ! ask_yn "Enable backup verification?" "y"; then
-    proj_verification="false"
+  # Verification (only meaningful for database backups)
+  local proj_verification="false"
+  if [ "$proj_has_db" = "true" ]; then
+    echo ""
+    proj_verification="true"
+    if ! ask_yn "Enable backup verification?" "y"; then
+      proj_verification="false"
+    fi
   fi
 
   # Hooks
@@ -953,7 +995,9 @@ add_project() {
   fi
 
   # Store the env vars for this project
-  env_set "${proj_env_key}_DB_PASSWORD" "$proj_db_password"
+  if [ "$proj_has_db" = "true" ]; then
+    env_set "${proj_env_key}_DB_PASSWORD" "$proj_db_password"
+  fi
   if [ "$proj_restic_password_mode" = "custom" ]; then
     env_set "${proj_env_key}_RESTIC_PASSWORD" "$proj_restic_password"
   fi
@@ -969,17 +1013,20 @@ add_project() {
   if [ -n "$proj_docker_network" ]; then
     yaml+="    docker_network: ${proj_docker_network}"$'\n'
   fi
-  yaml+=""$'\n'
-  yaml+="    database:"$'\n'
-  yaml+="      type: ${proj_db_type}"$'\n'
-  yaml+="      host: ${proj_db_host}"$'\n'
-  yaml+="      port: ${proj_db_port}"$'\n'
-  yaml+="      name: ${proj_db_name}"$'\n'
-  yaml+="      user: ${proj_db_user}"$'\n'
-  yaml+="      password: \${${proj_env_key}_DB_PASSWORD}"$'\n'
-  yaml+=""$'\n'
-  yaml+="    compression:"$'\n'
-  yaml+="      enabled: true"$'\n'
+
+  if [ "$proj_has_db" = "true" ]; then
+    yaml+=""$'\n'
+    yaml+="    database:"$'\n'
+    yaml+="      type: ${proj_db_type}"$'\n'
+    yaml+="      host: ${proj_db_host}"$'\n'
+    yaml+="      port: ${proj_db_port}"$'\n'
+    yaml+="      name: ${proj_db_name}"$'\n'
+    yaml+="      user: ${proj_db_user}"$'\n'
+    yaml+="      password: \${${proj_env_key}_DB_PASSWORD}"$'\n'
+    yaml+=""$'\n'
+    yaml+="    compression:"$'\n'
+    yaml+="      enabled: true"$'\n'
+  fi
 
   if [ -n "$proj_assets" ]; then
     yaml+=""$'\n'
@@ -1028,9 +1075,11 @@ add_project() {
     fi
   fi
 
-  yaml+=""$'\n'
-  yaml+="    verification:"$'\n'
-  yaml+="      enabled: ${proj_verification}"$'\n'
+  if [ "$proj_has_db" = "true" ]; then
+    yaml+=""$'\n'
+    yaml+="    verification:"$'\n'
+    yaml+="      enabled: ${proj_verification}"$'\n'
+  fi
 
   # Notification block
   if [ "$proj_notif_type" != "none" ] && [ "$proj_notif_type" != "$NOTIFICATION_TYPE" -o -n "$proj_notif_config" ]; then
@@ -1110,18 +1159,29 @@ step_review() {
       echo -e "    ${DIM}(none configured)${RESET}"
     else
       for proj_yaml in "${PROJECTS[@]}"; do
-        local pname pdb_type pdb_host pdb_name pcron pnet
+        local pname pcron pnet pdb_type pdb_host pdb_name
         pname=$(echo "$proj_yaml" | grep 'name:' | head -1 | sed 's/.*name: //')
-        pdb_type=$(echo "$proj_yaml" | grep 'type:' | head -1 | sed 's/.*type: //')
-        pdb_host=$(echo "$proj_yaml" | grep 'host:' | head -1 | sed 's/.*host: //')
-        pdb_name=$(echo "$proj_yaml" | grep 'name:' | tail -1 | sed 's/.*name: //')
         pcron=$(echo "$proj_yaml" | grep 'cron:' | head -1 | sed 's/.*cron: "//;s/"//')
         pnet=$(echo "$proj_yaml" | grep 'docker_network:' | head -1 | sed 's/.*docker_network: //')
         local net_info=""
         if [ -n "$pnet" ]; then
           net_info=" — net: ${DIM}${pnet}${RESET}"
         fi
-        echo -e "    ${CHECKMARK} ${BOLD}${pname}${RESET} — ${pdb_type} @ ${pdb_host}/${pdb_name} — cron: ${DIM}${pcron}${RESET}${net_info}"
+        local scope_info=""
+        if echo "$proj_yaml" | grep -q '    database:'; then
+          pdb_type=$(echo "$proj_yaml" | grep '      type:' | head -1 | sed 's/.*type: //')
+          pdb_host=$(echo "$proj_yaml" | grep '      host:' | head -1 | sed 's/.*host: //')
+          pdb_name=$(echo "$proj_yaml" | grep '      name:' | head -1 | sed 's/.*name: //')
+          scope_info="${pdb_type} @ ${pdb_host}/${pdb_name}"
+        fi
+        if echo "$proj_yaml" | grep -q '    assets:'; then
+          if [ -n "$scope_info" ]; then
+            scope_info="${scope_info} + files"
+          else
+            scope_info="files only"
+          fi
+        fi
+        echo -e "    ${CHECKMARK} ${BOLD}${pname}${RESET} — ${scope_info} — cron: ${DIM}${pcron}${RESET}${net_info}"
       done
     fi
     echo ""
@@ -1210,13 +1270,13 @@ ENVEOF
 
   if [ "$NOTIFICATION_TYPE" = "email" ]; then
     cat >> .env <<ENVEOF
-EMAIL_HOST=${EMAIL_HOST}
-EMAIL_PORT=${EMAIL_PORT}
-EMAIL_SECURE=${EMAIL_SECURE}
-EMAIL_USER=${EMAIL_USER}
-EMAIL_PASSWORD=${EMAIL_PASSWORD}
-EMAIL_FROM=${EMAIL_FROM}
-EMAIL_TO=${EMAIL_TO}
+SMTP_HOST=${SMTP_HOST}
+SMTP_PORT=${SMTP_PORT}
+SMTP_SECURE=${SMTP_SECURE}
+SMTP_USER=${SMTP_USER}
+SMTP_PASSWORD=${SMTP_PASSWORD}
+SMTP_FROM=${SMTP_FROM}
+SMTP_TO=${SMTP_TO}
 ENVEOF
   fi
 

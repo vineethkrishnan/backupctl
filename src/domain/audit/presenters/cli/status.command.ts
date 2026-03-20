@@ -12,7 +12,15 @@ export class StatusCommand extends CommandRunner {
   constructor(private readonly getBackupStatus: GetBackupStatusUseCase) { super(); }
 
   @Option({ flags: '--last <n>', description: 'Show last N entries' })
-  parseLast(value: string): number { return parseInt(value, 10); }
+  parseLast(value: string): number {
+    const parsed = parseInt(value, 10);
+    if (isNaN(parsed) || parsed < 1) {
+      console.error('Error: --last must be a positive integer');
+      process.exitCode = 3;
+      return 10;
+    }
+    return parsed;
+  }
 
   async run(params: string[], options?: StatusOptions): Promise<void> {
     try {

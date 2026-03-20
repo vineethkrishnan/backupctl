@@ -29,7 +29,7 @@ docker exec backupctl rm /data/backups/myproject/.lock
 docker compose restart backupctl
 ```
 
-Startup recovery (`StartupRecoveryService`) runs on every container start and removes stale `.lock` files, so a restart is often the cleanest fix.
+Startup recovery (`RecoverStartupUseCase`) runs on every container start and removes stale `.lock` files, so a restart is often the cleanest fix.
 
 ## Restic Repository Locked
 
@@ -123,7 +123,7 @@ docker compose up -d backupctl-audit-db
 3. **Database not initialized** — run migrations:
 
 ```bash
-docker exec backupctl npx typeorm migration:run -d dist/infrastructure/persistence/audit/data-source.js
+docker exec backupctl npx typeorm migration:run -d dist/db/datasource.js
 ```
 
 **Important:** Backups still succeed when the audit database is down. Audit entries are written to the JSONL fallback file at `/data/backups/.fallback-audit/fallback.jsonl` and automatically replayed when the audit database comes back online (on the next container startup).

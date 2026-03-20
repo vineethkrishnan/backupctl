@@ -1,6 +1,6 @@
 # backupctl Documentation
 
-**backupctl** is a database-agnostic backup orchestration service that manages scheduled, encrypted, deduplicated backups for multiple projects from a single Docker container. Built with NestJS 11 and hexagonal architecture, it supports PostgreSQL, MySQL, and MongoDB — with restic remote storage, GPG encryption, audit logging, crash recovery, and a full CLI.
+**backupctl** is a backup orchestration service for databases, files, or both — managing scheduled, encrypted, deduplicated backups for multiple projects from a single Docker container. Built with NestJS 11 and hexagonal architecture, it supports PostgreSQL, MySQL, and MongoDB databases plus arbitrary file/asset directories — with restic remote storage, GPG encryption, audit logging, crash recovery, and a full CLI.
 
 ## Documentation
 

@@ -82,9 +82,9 @@ Checking prerequisites...
 
   SSH host: u123456.your-storagebox.de
   SSH user: u123456
-  SSH key path [./ssh-keys/id_rsa]:
+  SSH key path [./ssh-keys/id_ed25519]:
   Generate new SSH key pair? [Y/n]: Y
-  ✅ SSH key pair generated at ./ssh-keys/id_rsa
+  ✅ SSH key pair generated at ./ssh-keys/id_ed25519
 
 ── Encryption ───────────────────────────────
 
@@ -134,7 +134,7 @@ Setup complete! Run "backupctl health" to verify.
 |------|----------|
 | `.env` | All secrets and global settings |
 | `config/projects.yml` | Project definitions with `${}` variable references |
-| `ssh-keys/id_rsa` | SSH key pair (if generated) |
+| `ssh-keys/id_ed25519` | SSH key pair (if generated) |
 
 ---
 
@@ -250,7 +250,7 @@ $ ./scripts/backupctl-manage.sh check
   ✅ Docker Compose v2.23.0
   ✅ .env file exists
   ✅ config/projects.yml exists
-  ✅ ssh-keys/id_rsa exists (permissions: 600)
+  ✅ ssh-keys/id_ed25519 exists (permissions: 600)
   ✅ Backup directory /data/backups exists
   ✅ Docker network reachable
 

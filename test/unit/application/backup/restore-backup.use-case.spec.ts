@@ -15,6 +15,7 @@ import { safeExecFile } from '@common/helpers/child-process.util';
 
 jest.mock('fs', () => ({
   readdirSync: jest.fn().mockReturnValue([]),
+  existsSync: jest.fn().mockReturnValue(true),
 }));
 
 // ── Mock child-process.util ─────────────────────────────────────────────
@@ -24,7 +25,7 @@ jest.mock('@common/helpers/child-process.util', () => ({
 }));
 
 const safeExecFileMock = safeExecFile as jest.MockedFunction<typeof safeExecFile>;
-const fsMock = fs as jest.Mocked<typeof fs>;
+const fsMock = fs as jest.Mocked<typeof fs> & { existsSync: jest.Mock };
 
 // ── Test helpers ───────────────────────────────────────────────────────
 
@@ -197,7 +198,10 @@ describe('RestoreBackupUseCase', () => {
   it('decompress runs gunzip on .gz files in target path', async () => {
     const config = buildProjectConfig();
     mockConfigLoader.getProject.mockReturnValue(config);
-    (fsMock.readdirSync as jest.Mock).mockReturnValue(['dump.sql.gz', 'other.sql.gz']);
+    (fsMock.readdirSync as jest.Mock).mockReturnValue([
+      { name: 'dump.sql.gz', isDirectory: () => false },
+      { name: 'other.sql.gz', isDirectory: () => false },
+    ]);
 
     const command = new RestoreBackupCommand({
       projectName: 'test-project',
@@ -208,7 +212,7 @@ describe('RestoreBackupUseCase', () => {
 
     await useCase.execute(command);
 
-    expect(fsMock.readdirSync).toHaveBeenCalledWith('/restore/output');
+    expect(fsMock.readdirSync).toHaveBeenCalledWith('/restore/output', { withFileTypes: true });
     expect(safeExecFileMock).toHaveBeenCalledTimes(2);
     expect(safeExecFileMock).toHaveBeenCalledWith('gunzip', ['/restore/output/dump.sql.gz']);
     expect(safeExecFileMock).toHaveBeenCalledWith('gunzip', ['/restore/output/other.sql.gz']);
@@ -217,7 +221,11 @@ describe('RestoreBackupUseCase', () => {
   it('decompress skips non-.gz files', async () => {
     const config = buildProjectConfig();
     mockConfigLoader.getProject.mockReturnValue(config);
-    (fsMock.readdirSync as jest.Mock).mockReturnValue(['dump.sql.gz', 'readme.txt', 'schema.sql']);
+    (fsMock.readdirSync as jest.Mock).mockReturnValue([
+      { name: 'dump.sql.gz', isDirectory: () => false },
+      { name: 'readme.txt', isDirectory: () => false },
+      { name: 'schema.sql', isDirectory: () => false },
+    ]);
 
     const command = new RestoreBackupCommand({
       projectName: 'test-project',
@@ -273,7 +281,9 @@ describe('RestoreBackupUseCase', () => {
   it('propagates errors from safeExecFile during decompress', async () => {
     const config = buildProjectConfig();
     mockConfigLoader.getProject.mockReturnValue(config);
-    (fsMock.readdirSync as jest.Mock).mockReturnValue(['dump.sql.gz']);
+    (fsMock.readdirSync as jest.Mock).mockReturnValue([
+      { name: 'dump.sql.gz', isDirectory: () => false },
+    ]);
     safeExecFileMock.mockRejectedValue(new Error('gunzip failed: corrupted file'));
 
     const command = new RestoreBackupCommand({

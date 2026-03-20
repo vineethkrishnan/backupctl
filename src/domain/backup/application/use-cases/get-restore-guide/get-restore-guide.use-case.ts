@@ -11,26 +11,38 @@ export class GetRestoreGuideUseCase {
 
   execute(query: GetRestoreGuideQuery): string {
     const config = this.configLoader.getProject(query.projectName);
-    const dbType = config.database.type.toLowerCase();
+
+    if (!config.hasDatabase()) {
+      return 'This project has no database configured — restore guide is only available for database backups.';
+    }
+
+    const db = config.database!;
+    const dbType = db.type.toLowerCase();
 
     const guides: Record<string, string> = {
       postgres: [
-        'Restore steps for PostgreSQL:',
-        `1. pg_restore -h ${config.database.host} -p ${config.database.port} -U ${config.database.user} -d ${config.database.name} <dump_file>`,
+        `Restore steps for PostgreSQL (database: ${db.name}):`,
+        '1. pg_restore -h <HOST> -p <PORT> -U <USER> -d <DBNAME> <dump_file>',
         '2. If compressed: gunzip the file first, then run pg_restore',
         '3. If encrypted: gpg --decrypt <file>.gpg > <file> first',
+        '',
+        'Tip: Connection details are in your projects.yml config.',
       ].join('\n'),
       mysql: [
-        'Restore steps for MySQL:',
-        `1. mysql -h ${config.database.host} -P ${config.database.port} -u ${config.database.user} -p ${config.database.name} < <dump_file>`,
+        `Restore steps for MySQL (database: ${db.name}):`,
+        '1. mysql -h <HOST> -P <PORT> -u <USER> -p <DBNAME> < <dump_file>',
         '2. If compressed: gunzip the file first, then import',
         '3. If encrypted: gpg --decrypt <file>.gpg > <file> first',
+        '',
+        'Tip: Connection details are in your projects.yml config.',
       ].join('\n'),
       mongodb: [
-        'Restore steps for MongoDB:',
-        `1. mongorestore --host ${config.database.host} --port ${config.database.port} -u ${config.database.user} -d ${config.database.name} <dump_directory>`,
+        `Restore steps for MongoDB (database: ${db.name}):`,
+        '1. mongorestore --host <HOST> --port <PORT> -u <USER> -d <DBNAME> <dump_directory>',
         '2. If compressed: the archive will be auto-decompressed by mongorestore',
         '3. If encrypted: gpg --decrypt <file>.gpg > <file> first',
+        '',
+        'Tip: Connection details are in your projects.yml config.',
       ].join('\n'),
     };
 

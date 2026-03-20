@@ -32,25 +32,20 @@ describe('MongoDumpAdapter', () => {
       mockedStatSync.mockReturnValue({ size: 4096 } as fs.Stats);
     });
 
-    it('should build correct mongodump args with --archive and --gzip', async () => {
+    it('should build correct mongodump args with --config and --archive', async () => {
       await adapter.dump('/backups', 'myproject', '20260318_120000');
 
       expect(mockedSafeExecFile).toHaveBeenCalledWith(
         'mongodump',
-        [
-          '--host',
-          'mongo.example.com',
-          '--port',
-          '27017',
-          '--db',
-          'appdb',
-          '--username',
-          'mongouser',
-          '--password',
-          'mongopass',
+        expect.arrayContaining([
+          '--config', '/backups/.mongodump-20260318_120000.conf',
+          '--host', 'mongo.example.com',
+          '--port', '27017',
+          '--db', 'appdb',
+          '--username', 'mongouser',
           '--archive=/backups/myproject_backup_20260318_120000.archive.gz',
           '--gzip',
-        ],
+        ]),
       );
     });
 

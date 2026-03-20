@@ -78,7 +78,7 @@ The dev environment uses `docker-compose.dev.yml` with three containers:
 | Container | Image | Purpose | Port |
 |-----------|-------|---------|------|
 | `backupctl-dev` | `Dockerfile.dev` | App with hot reload | `3100` |
-| `backupctl-audit-db` | `postgres:17-alpine` | Audit database | `5432` |
+| `backupctl-audit-db` | `postgres:16-alpine` | Audit database | `5432` |
 | `backupctl-pgadmin` | `dpage/pgadmin4` | Database browser | `5050` |
 
 The dev Dockerfile:

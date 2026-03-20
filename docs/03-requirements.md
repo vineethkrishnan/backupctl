@@ -109,7 +109,7 @@ A PostgreSQL audit database (separate container) tracks every backup run with re
 
 ### Crash Recovery
 
-`StartupRecoveryService` runs on every container start (`onModuleInit`):
+`RecoverStartupUseCase` runs on every container start (`onModuleInit`):
 
 1. **Orphaned records** — query for `status = 'started'` with `completed_at IS NULL`, mark as `failed` with `error_stage = 'crash_recovery'`
 2. **Orphaned dump files** — scan project directories for dump files not associated with a successful audit record

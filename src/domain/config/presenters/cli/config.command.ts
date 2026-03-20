@@ -28,7 +28,7 @@ export class ConfigShowSubCommand extends CommandRunner {
       const config = this.configLoader.getProject(projectName);
       const masked = {
         name: config.name, enabled: config.enabled, cron: config.cron, timeoutMinutes: config.timeoutMinutes,
-        database: { type: config.database.type, host: config.database.host, port: config.database.port, name: config.database.name, user: config.database.user, password: '********' },
+        database: config.database ? { type: config.database.type, host: config.database.host, port: config.database.port, name: config.database.name, user: config.database.user, password: '********' } : null,
         compression: config.compression, assets: config.assets,
         restic: { repositoryPath: config.restic.repositoryPath, password: '********', snapshotMode: config.restic.snapshotMode },
         retention: config.retention, encryption: config.encryption, hooks: config.hooks, verification: config.verification, notification: config.notification,

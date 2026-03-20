@@ -30,12 +30,12 @@ describe('DumperBootstrapService', () => {
     });
   }
 
-  it('registers postgres, mysql, and mongo dumpers on init', () => {
+  it('registers postgres, mysql, and mongodb dumpers on init', () => {
     service.onModuleInit();
 
     expect(registry.has('postgres')).toBe(true);
     expect(registry.has('mysql')).toBe(true);
-    expect(registry.has('mongo')).toBe(true);
+    expect(registry.has('mongodb')).toBe(true);
   });
 
   it('creates a postgres dumper from project config', () => {
@@ -57,10 +57,10 @@ describe('DumperBootstrapService', () => {
     expect(typeof dumper.dump).toBe('function');
   });
 
-  it('creates a mongo dumper from project config', () => {
+  it('creates a mongodb dumper from project config', () => {
     service.onModuleInit();
 
-    const dumper = registry.create('mongo', buildConfig('mongo'));
+    const dumper = registry.create('mongodb', buildConfig('mongodb'));
 
     expect(dumper).toBeDefined();
     expect(typeof dumper.dump).toBe('function');
@@ -69,6 +69,6 @@ describe('DumperBootstrapService', () => {
   it('getRegisteredTypes returns all three types', () => {
     service.onModuleInit();
 
-    expect(registry.getRegisteredTypes()).toEqual(['postgres', 'mysql', 'mongo']);
+    expect(registry.getRegisteredTypes()).toEqual(['postgres', 'mysql', 'mongodb']);
   });
 });

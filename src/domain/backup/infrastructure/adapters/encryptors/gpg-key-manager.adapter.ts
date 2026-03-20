@@ -7,8 +7,8 @@ import { GpgKeyManagerPort } from '@domain/backup/application/ports/gpg-key-mana
 import { safeExecFile } from '@common/helpers/child-process.util';
 
 @Injectable()
-export class GpgKeyManager implements GpgKeyManagerPort, OnModuleInit {
-  private readonly logger = new Logger(GpgKeyManager.name);
+export class GpgKeyManagerAdapter implements GpgKeyManagerPort, OnModuleInit {
+  private readonly logger = new Logger(GpgKeyManagerAdapter.name);
   private readonly gpgKeysDir: string;
 
   constructor(configService: ConfigService) {

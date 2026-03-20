@@ -170,11 +170,13 @@ describe('JsonlFallbackWriterAdapter', () => {
 
       await adapter.clearReplayed(['entry-1']);
 
+      const tmpFile = `${fallbackFile}.tmp`;
       expect(mockFs.writeFileSync).toHaveBeenCalledWith(
-        fallbackFile,
+        tmpFile,
         expect.stringContaining('entry-2'),
         'utf-8',
       );
+      expect(mockFs.renameSync).toHaveBeenCalledWith(tmpFile, fallbackFile);
     });
 
     it('should delete file when all entries are cleared', async () => {

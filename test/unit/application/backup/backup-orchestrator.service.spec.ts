@@ -625,7 +625,7 @@ describe('RunBackupUseCase', () => {
       expect(mockStorage.sync).toHaveBeenCalledWith(
         [defaultDumpResult.filePath],
         {
-          tags: ['project:test-project', 'db:postgres', 'timestamp:20260318-100000'],
+          tags: ['project:test-project', 'timestamp:20260318-100000', 'db:postgres'],
           snapshotMode: 'combined',
         },
       );
@@ -741,6 +741,49 @@ describe('RunBackupUseCase', () => {
     });
   });
 
+  // ── files-only backup (no database) ────────────────────────────────
+
+  describe('files-only backup (no database)', () => {
+    it('skips dump/verify/encrypt stages and syncs only asset paths', async () => {
+      const config = buildProjectConfig({
+        database: null,
+        assets: { paths: ['/data/uploads', '/data/media'] },
+      });
+      mockConfigLoader.getProject.mockReturnValue(config);
+
+      const results = await service.execute(
+        new RunBackupCommand({ projectName: 'test-project' }),
+      );
+
+      expect(results[0].status).toBe(BackupStatus.Success);
+      expect(results[0].dumpResult).toBeNull();
+      expect(results[0].encrypted).toBe(false);
+      expect(results[0].verified).toBe(false);
+      expect(mockDumper.dump).not.toHaveBeenCalled();
+      expect(mockStorage.sync).toHaveBeenCalledWith(
+        ['/data/uploads', '/data/media'],
+        expect.objectContaining({
+          tags: expect.not.arrayContaining([expect.stringMatching(/^db:/)]),
+        }),
+      );
+    });
+
+    it('dry run skips database dumper check for files-only config', async () => {
+      const config = buildProjectConfig({
+        database: null,
+        assets: { paths: ['/data/uploads'] },
+      });
+      mockConfigLoader.getProject.mockReturnValue(config);
+      mockStorage.listSnapshots.mockResolvedValue([]);
+
+      const report = await service.getDryRunReport('test-project');
+
+      const dumperCheck = report.checks.find((c) => c.name === 'Database dumper');
+      expect(dumperCheck).toBeUndefined();
+      expect(report.allPassed).toBe(true);
+    });
+  });
+
   // ── execute edge cases ──────────────────────────────────────────────
 
   describe('execute edge cases', () => {
@@ -819,19 +862,17 @@ describe('RunBackupUseCase', () => {
       );
     });
 
-    it('captures non-BackupStageError errors with null errorStage', async () => {
+    it('continues backup when trackProgress fails (audit outage must not block backups)', async () => {
       const config = buildProjectConfig();
       mockConfigLoader.getProject.mockReturnValue(config);
-      // Fail on Dump stage's trackProgress (second call), not NotifyStarted (first)
-      mockAuditLog.trackProgress
-        .mockResolvedValueOnce(undefined)
-        .mockRejectedValueOnce(new Error('unexpected'));
+      mockAuditLog.trackProgress.mockRejectedValue(new Error('audit DB down'));
 
       const results = await service.execute(
         new RunBackupCommand({ projectName: 'test-project' }),
       );
 
-      expect(results[0].status).toBe(BackupStatus.Failed);
+      expect(results[0].status).toBe(BackupStatus.Success);
+      expect(mockAuditLog.trackProgress).toHaveBeenCalled();
     });
   });
 });

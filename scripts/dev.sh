@@ -12,6 +12,8 @@ CONTAINER="backupctl-dev"
 DB_CONTAINER="backupctl-audit-db"
 DATASOURCE="src/db/datasource.ts"
 TYPEORM="npx ts-node -r tsconfig-paths/register ./node_modules/typeorm/cli.js"
+SOCAT_PID_FILE="$PROJECT_DIR/.socat.pid"
+SOCAT_LOCAL_PORT=2323
 
 cd "$PROJECT_DIR"
 
@@ -75,6 +77,59 @@ connect_project_networks() {
   done
 }
 
+# ── SSH relay (socat) ──────────────────────────────────────
+# Hetzner Storage Box listens on port 23, which many ISPs block on IPv4.
+# The Colima VM has no IPv6, so we run socat on the Mac host to bridge
+# localhost:2323 (IPv4) → Hetzner (IPv6). The container reaches the host
+# via host.docker.internal:2323.
+
+socat_start() {
+  if ! command -v socat &>/dev/null; then
+    warn "socat not installed — SSH relay skipped (brew install socat)"
+    return
+  fi
+
+  local ssh_host
+  ssh_host=$(grep '^HETZNER_SSH_HOST=' "$PROJECT_DIR/.env" 2>/dev/null | cut -d= -f2)
+  [ -z "$ssh_host" ] && return
+
+  # Resolve AAAA record for IPv6
+  local ipv6
+  ipv6=$(dig +short AAAA "$ssh_host" 2>/dev/null | head -1)
+  if [ -z "$ipv6" ]; then
+    warn "Cannot resolve IPv6 for $ssh_host — SSH relay skipped"
+    return
+  fi
+
+  socat_stop
+
+  socat "TCP4-LISTEN:${SOCAT_LOCAL_PORT},fork,reuseaddr" "TCP6:[${ipv6}]:23" &
+  local pid=$!
+  echo "$pid" > "$SOCAT_PID_FILE"
+  sleep 1
+
+  if kill -0 "$pid" 2>/dev/null; then
+    ok "SSH relay started (localhost:${SOCAT_LOCAL_PORT} → [$ipv6]:23, PID $pid)"
+  else
+    err "SSH relay failed to start"
+    rm -f "$SOCAT_PID_FILE"
+  fi
+}
+
+socat_stop() {
+  if [ -f "$SOCAT_PID_FILE" ]; then
+    local pid
+    pid=$(cat "$SOCAT_PID_FILE")
+    if kill -0 "$pid" 2>/dev/null; then
+      kill "$pid" 2>/dev/null
+      ok "SSH relay stopped (PID $pid)"
+    fi
+    rm -f "$SOCAT_PID_FILE"
+  fi
+  # Also kill any orphaned socat on our port
+  lsof -ti ":${SOCAT_LOCAL_PORT}" 2>/dev/null | xargs -r kill 2>/dev/null || true
+}
+
 # ════════════════════════════════════════════════════════════
 # Commands
 # ════════════════════════════════════════════════════════════
@@ -91,6 +146,7 @@ cmd_up() {
     return
   fi
 
+  socat_start
   dc up --build -d
   connect_project_networks
   echo ""
@@ -113,6 +169,7 @@ cmd_up() {
 cmd_down() {
   echo -e "${BOLD}Stopping dev environment...${RESET}"
   dc down
+  socat_stop
   ok "Dev environment stopped"
 }
 
@@ -121,6 +178,8 @@ cmd_down() {
 cmd_restart() {
   echo -e "${BOLD}Restarting dev environment...${RESET}"
   dc down
+  socat_stop
+  socat_start
   dc up --build -d
   connect_project_networks
   echo ""

@@ -117,7 +117,11 @@ describe('DynamicSchedulerService', () => {
     } as unknown as jest.Mocked<GetBackupStatusUseCase>;
 
     configService = {
-      get: jest.fn().mockReturnValue('0 7 * * *'),
+      get: jest.fn((key: string, defaultValue?: unknown) => {
+        if (key === 'DAILY_SUMMARY_CRON') return defaultValue ?? '0 7 * * *';
+        if (key === 'BACKUPCTL_CLI_MODE') return undefined;
+        return defaultValue;
+      }),
     } as unknown as jest.Mocked<ConfigService>;
 
     service = new DynamicSchedulerService(
@@ -324,7 +328,13 @@ describe('DynamicSchedulerService', () => {
   describe('daily summary registration', () => {
     it('registers daily-summary job with configured cron', async () => {
       configLoader.loadAll.mockReturnValue([]);
-      configService.get.mockReturnValue('30 8 * * *');
+      const customConfigService = {
+        get: jest.fn((key: string, defaultValue?: unknown) => {
+          if (key === 'DAILY_SUMMARY_CRON') return '30 8 * * *';
+          if (key === 'BACKUPCTL_CLI_MODE') return undefined;
+          return defaultValue;
+        }),
+      } as unknown as jest.Mocked<ConfigService>;
 
       service = new DynamicSchedulerService(
         schedulerRegistry,
@@ -333,7 +343,7 @@ describe('DynamicSchedulerService', () => {
         backupLock,
         notifierRegistry,
         getBackupStatus,
-        configService,
+        customConfigService,
       );
 
       await service.onModuleInit();

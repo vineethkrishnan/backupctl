@@ -15,31 +15,31 @@ export class DumperBootstrapService implements OnModuleInit {
   onModuleInit(): void {
     this.registry.register('postgres', (config) =>
       new PostgresDumpAdapter({
-        host: config.database.host,
-        port: config.database.port,
-        name: config.database.name,
-        user: config.database.user,
-        password: config.database.password,
+        host: config.database!.host,
+        port: config.database!.port,
+        name: config.database!.name,
+        user: config.database!.user,
+        password: config.database!.password,
       }),
     );
 
     this.registry.register('mysql', (config) =>
       new MysqlDumpAdapter({
-        host: config.database.host,
-        port: config.database.port,
-        name: config.database.name,
-        user: config.database.user,
-        password: config.database.password,
+        host: config.database!.host,
+        port: config.database!.port,
+        name: config.database!.name,
+        user: config.database!.user,
+        password: config.database!.password,
       }),
     );
 
-    this.registry.register('mongo', (config) =>
+    this.registry.register('mongodb', (config) =>
       new MongoDumpAdapter({
-        host: config.database.host,
-        port: config.database.port,
-        name: config.database.name,
-        user: config.database.user,
-        password: config.database.password,
+        host: config.database!.host,
+        port: config.database!.port,
+        name: config.database!.name,
+        user: config.database!.user,
+        password: config.database!.password,
       }),
     );
   }

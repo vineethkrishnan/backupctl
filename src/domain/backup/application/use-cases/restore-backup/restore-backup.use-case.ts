@@ -29,6 +29,11 @@ export class RestoreBackupUseCase {
     if (command.only === 'db') {
       await storage.restore(command.snapshotId, command.targetPath, [outputDir]);
     } else if (command.only === 'assets') {
+      if (config.assets.paths.length === 0) {
+        throw new Error(
+          `Project "${command.projectName}" has no asset paths configured. Cannot restore with --only assets.`,
+        );
+      }
       await storage.restore(command.snapshotId, command.targetPath, [...config.assets.paths]);
     } else {
       await storage.restore(command.snapshotId, command.targetPath);
@@ -40,11 +45,19 @@ export class RestoreBackupUseCase {
   }
 
   private async decompressFiles(targetPath: string): Promise<void> {
-    const entries = fs.readdirSync(targetPath);
+    await this.decompressRecursive(targetPath);
+  }
+
+  private async decompressRecursive(dirPath: string): Promise<void> {
+    if (!fs.existsSync(dirPath)) return;
+
+    const entries = fs.readdirSync(dirPath, { withFileTypes: true });
     for (const entry of entries) {
-      if (entry.endsWith('.gz')) {
-        const filePath = path.join(targetPath, entry);
-        await safeExecFile('gunzip', [filePath]);
+      const fullPath = path.join(dirPath, entry.name);
+      if (entry.isDirectory()) {
+        await this.decompressRecursive(fullPath);
+      } else if (entry.name.endsWith('.gz') && !entry.name.endsWith('.gpg')) {
+        await safeExecFile('gunzip', [fullPath]);
       }
     }
   }

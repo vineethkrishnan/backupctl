@@ -58,12 +58,13 @@ These are used when a project has no `notification` block in YAML.
 |----------|---------|-------------|
 | `NOTIFICATION_TYPE` | `slack` | Default notification channel: `slack`, `email`, `webhook` |
 | `SLACK_WEBHOOK_URL` | — | Slack incoming webhook URL |
-| `EMAIL_SMTP_HOST` | — | SMTP server hostname |
-| `EMAIL_SMTP_PORT` | `587` | SMTP server port |
-| `EMAIL_SMTP_SECURE` | `true` | Enable TLS/STARTTLS (`true` or `false`) |
-| `EMAIL_TO` | — | Recipient email address |
-| `EMAIL_FROM` | — | Sender email address |
-| `EMAIL_PASSWORD` | — | SMTP authentication password |
+| `SMTP_HOST` | — | SMTP server hostname |
+| `SMTP_PORT` | `587` | SMTP server port |
+| `SMTP_SECURE` | `true` | Enable TLS/STARTTLS (`true` or `false`) |
+| `SMTP_TO` | — | Recipient email address |
+| `SMTP_FROM` | — | Sender email address |
+| `SMTP_USER` | — | SMTP authentication username (if required) |
+| `SMTP_PASSWORD` | — | SMTP authentication password |
 | `WEBHOOK_URL` | — | Webhook endpoint URL |
 
 ### Encryption Defaults
@@ -104,7 +105,11 @@ These are referenced in `projects.yml` via `${LOCABOO_DB_PASSWORD}`.
 
 ## Project Configuration (projects.yml)
 
-The file defines an array of projects under the `projects` key. Each project has the following fields:
+The file defines an array of projects under the `projects` key. Each project must have at least one of `database` or `assets` configured. This supports three backup modes:
+
+- **Database + files** — dumps a database and syncs asset directories
+- **Database only** — dumps a database (no asset files)
+- **Files only** — syncs asset directories (no database dump)
 
 ### Top-Level Fields
 
@@ -118,6 +123,8 @@ The file defines an array of projects under the `projects` key. Each project has
 
 ### Database
 
+Optional. When omitted, the project operates in files-only mode — dump, verify, and encrypt stages are skipped entirely.
+
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | `database.type` | string | yes | Database type: `postgres`, `mysql`, `mongodb` |
@@ -129,6 +136,8 @@ The file defines an array of projects under the `projects` key. Each project has
 
 ### Compression
 
+Only applies when `database` is configured.
+
 | Field | Type | Required | Default | Description |
 |-------|------|----------|---------|-------------|
 | `compression.enabled` | boolean | no | `true` | Whether to compress dumps. Defaults to `true` — a per-project override is only needed to disable |
@@ -137,7 +146,7 @@ The file defines an array of projects under the `projects` key. Each project has
 
 | Field | Type | Required | Default | Description |
 |-------|------|----------|---------|-------------|
-| `assets.paths` | string[] | no | `[]` | Filesystem paths to include in the backup alongside the database dump. Paths that don't exist at backup time are skipped with a warning |
+| `assets.paths` | string[] | no | `[]` | Filesystem paths to include in the backup alongside the database dump (or as the sole backup target for files-only projects). Paths that don't exist at backup time are skipped with a warning |
 
 ### Restic
 
@@ -171,7 +180,7 @@ The file defines an array of projects under the `projects` key. Each project has
 | `hooks.pre_backup` | string | no | Shell command to execute before the backup starts |
 | `hooks.post_backup` | string | no | Shell command to execute after the backup completes |
 
-Hooks run via `child_process.execFile` — no shell injection. Set timeouts apply.
+Hooks run via `child_process.execFile` — no shell injection. Configured timeouts are enforced.
 
 ### Verification
 
@@ -265,7 +274,7 @@ notification:
     smtp_secure: true
     to: devops@company.com
     from: backup@company.com
-    password: ${EMAIL_PASSWORD}
+    password: ${SMTP_PASSWORD}
 ```
 
 The `smtp_secure` field controls TLS: `true` enables TLS/STARTTLS, `false` sends in plain text. Always use `true` in production.
@@ -395,7 +404,7 @@ projects:
         smtp_secure: true
         to: devops@company.com
         from: backup@company.com
-        password: ${EMAIL_PASSWORD}
+        password: ${SMTP_PASSWORD}
 
   # MongoDB with global defaults (no overrides)
   - name: analytics
@@ -424,6 +433,25 @@ projects:
 
     # No encryption block → uses ENCRYPTION_ENABLED from .env
     # No notification block → uses NOTIFICATION_TYPE + config from .env
+
+  # Files-only project (no database) — syncs asset directories only
+  - name: static-assets
+    enabled: true
+    cron: "0 4 * * *"
+
+    assets:
+      paths:
+        - /data/static/uploads
+        - /data/static/media
+
+    restic:
+      repository_path: /backups/static-assets
+      snapshot_mode: combined
+
+    retention:
+      local_days: 14
+      keep_daily: 14
+      keep_weekly: 4
 ```
 
 ## Directory Structure

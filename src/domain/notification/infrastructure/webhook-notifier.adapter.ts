@@ -3,7 +3,7 @@ import { NotifierPort } from '@domain/notification/application/ports/notifier.po
 import { BackupResult } from '@domain/backup/domain/backup-result.model';
 import { BackupStageError } from '@domain/backup/domain/backup-stage-error';
 import { BackupStatus } from '@domain/backup/domain/value-objects/backup-status.enum';
-import { formatFailureText, formatSuccessText, formatDailySummaryText } from './notification-formatter';
+import { formatFailureText, formatSuccessText, formatDailySummaryText } from './notification-formatter.util';
 
 type WebhookEvent =
   | 'backup_started'

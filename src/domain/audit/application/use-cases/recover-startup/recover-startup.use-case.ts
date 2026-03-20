@@ -41,37 +41,41 @@ export class RecoverStartupUseCase implements OnModuleInit {
     configService: ConfigService,
   ) {
     this.baseDir = configService.get<string>('BACKUP_BASE_DIR', '/data/backups');
+    this.isCliMode = configService.get<string>('BACKUPCTL_CLI_MODE') === '1';
   }
 
+  private readonly isCliMode: boolean;
+
   async onModuleInit(): Promise<void> {
-    // Skip recovery for short-lived CLI commands — only run for the HTTP server
-    if (process.env.BACKUPCTL_CLI_MODE === '1') {
+    if (this.isCliMode) {
       return;
     }
 
     this.logger.log('Starting recovery checks...');
 
-    const orphanCount = await this.markOrphanedRuns();
-    const dumpCount = this.cleanOrphanedDumps();
-    const lockCount = await this.cleanStaleLocks();
+    const orphanResult = await this.markOrphanedRuns();
+    const dumpCount = this.cleanOrphanedDumps(orphanResult.projectNames);
+    const lockCount = await this.cleanStaleLocks(orphanResult.projectNames);
     const unlockCount = await this.unlockResticRepos();
     const replayCount = await this.replayFallbackEntries();
     const gpgCount = await this.importGpgKeys();
 
     this.logger.log(
-      `Recovery complete: ${orphanCount} orphaned runs marked, ` +
+      `Recovery complete: ${orphanResult.count} orphaned runs marked, ` +
         `${dumpCount} orphaned dumps cleaned, ` +
         `${lockCount} stale locks cleaned, ${unlockCount} restic repos unlocked, ` +
         `${replayCount} fallback entries replayed, ${gpgCount} GPG keys imported`,
     );
   }
 
-  private async markOrphanedRuns(): Promise<number> {
+  private async markOrphanedRuns(): Promise<{ count: number; projectNames: Set<string> }> {
+    const projectNames = new Set<string>();
     try {
       const orphanedRuns = await this.auditLog.findOrphaned();
       const now = this.clock.now();
 
       for (const orphan of orphanedRuns) {
+        projectNames.add(orphan.projectName);
         const failedResult = new BackupResult({
           ...orphan,
           status: BackupStatus.Failed,
@@ -86,20 +90,23 @@ export class RecoverStartupUseCase implements OnModuleInit {
         this.logger.warn(`Marked ${orphanedRuns.length} orphaned run(s) as failed`);
       }
 
-      return orphanedRuns.length;
+      return { count: orphanedRuns.length, projectNames };
     } catch (error) {
       this.logger.error('Failed to mark orphaned runs', error);
-      return 0;
+      return { count: 0, projectNames };
     }
   }
 
-  private cleanOrphanedDumps(): number {
+  private cleanOrphanedDumps(orphanedProjectNames: Set<string>): number {
     let cleaned = 0;
 
     try {
       const projects = this.configLoader.loadAll();
 
       for (const project of projects) {
+        // Only clean dumps for projects that had orphaned runs
+        if (!orphanedProjectNames.has(project.name)) continue;
+
         const projectDir = path.join(this.baseDir, project.name);
         if (!this.filesystem.exists(projectDir)) continue;
 
@@ -128,23 +135,27 @@ export class RecoverStartupUseCase implements OnModuleInit {
     return cleaned;
   }
 
-  private async cleanStaleLocks(): Promise<number> {
+  private async cleanStaleLocks(orphanedProjectNames: Set<string>): Promise<number> {
     let cleaned = 0;
 
     try {
       const projects = this.configLoader.loadAll();
 
       for (const project of projects) {
-        try {
-          await this.backupLock.release(project.name);
-          cleaned++;
-        } catch {
-          // Lock did not exist — nothing to clean
+        if (!orphanedProjectNames.has(project.name)) continue;
+
+        if (this.backupLock.isLocked(project.name)) {
+          try {
+            await this.backupLock.release(project.name);
+            cleaned++;
+          } catch {
+            // Lock release failed — non-critical
+          }
         }
       }
 
       if (cleaned > 0) {
-        this.logger.warn(`Released ${cleaned} stale lock(s)`);
+        this.logger.warn(`Released ${cleaned} stale lock(s) for orphaned projects`);
       }
     } catch (error) {
       this.logger.error('Failed to clean stale locks', error);

@@ -1005,7 +1005,7 @@ backupctl uses per-project file-based locks to prevent concurrent backups of the
 - **Cron-triggered overlap:** If a scheduled backup fires while a previous run is still active, the new run queues behind it and starts when the lock is released.
 - **CLI-triggered collision:** If you manually trigger `backupctl run <project>` while a backup is already running, the command rejects immediately with exit code `2`.
 - **`run --all`:** Projects are backed up sequentially in the order they appear in `config/projects.yml`. If one project fails, the next project still runs. Exit code `5` indicates partial success.
-- **Stale locks:** If the container crashes mid-backup, `StartupRecoveryService` cleans up orphaned `.lock` files on the next start.
+- **Stale locks:** If the container crashes mid-backup, `RecoverStartupUseCase` cleans up orphaned `.lock` files on the next start.
 
 ### Log Output
 

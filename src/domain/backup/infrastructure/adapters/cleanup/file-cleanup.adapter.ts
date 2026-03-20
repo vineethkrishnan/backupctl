@@ -1,4 +1,4 @@
-import * as fs from 'fs';
+import { promises as fsp } from 'fs';
 import * as path from 'path';
 
 import { Injectable } from '@nestjs/common';
@@ -10,32 +10,32 @@ const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
 @Injectable()
 export class FileCleanupAdapter implements LocalCleanupPort {
-  cleanup(directory: string, retentionDays: number): Promise<CleanupResult> {
-    if (!fs.existsSync(directory)) {
-      return Promise.resolve(new CleanupResult(0, 0));
+  async cleanup(directory: string, retentionDays: number): Promise<CleanupResult> {
+    try {
+      await fsp.access(directory);
+    } catch {
+      return new CleanupResult(0, 0);
     }
 
     const cutoffTime = Date.now() - retentionDays * MS_PER_DAY;
-    const entries = fs.readdirSync(directory);
+    const entries = await fsp.readdir(directory, { withFileTypes: true });
 
     let filesRemoved = 0;
     let spaceFreed = 0;
 
     for (const entry of entries) {
-      const fullPath = path.join(directory, entry);
-      const stats = fs.statSync(fullPath);
+      if (!entry.isFile()) continue;
 
-      if (!stats.isFile()) {
-        continue;
-      }
+      const fullPath = path.join(directory, entry.name);
+      const stats = await fsp.stat(fullPath);
 
       if (stats.mtimeMs < cutoffTime) {
-        fs.unlinkSync(fullPath);
+        await fsp.unlink(fullPath);
         filesRemoved++;
         spaceFreed += stats.size;
       }
     }
 
-    return Promise.resolve(new CleanupResult(filesRemoved, spaceFreed));
+    return new CleanupResult(filesRemoved, spaceFreed);
   }
 }

@@ -14,10 +14,17 @@ export class ResticStorageFactory implements RemoteStorageFactoryPort {
     const sshHost = this.configService.getOrThrow<string>('HETZNER_SSH_HOST');
     const sshUser = this.configService.getOrThrow<string>('HETZNER_SSH_USER');
     const sshKeyPath = this.configService.getOrThrow<string>('HETZNER_SSH_KEY_PATH');
-    const sshPort = this.configService.get<number>('HETZNER_SSH_PORT', 22);
+    const sshPort = parseInt(String(this.configService.get('HETZNER_SSH_PORT', '22')), 10);
     const globalPassword = this.configService.get<string>('RESTIC_PASSWORD', '');
 
     const password = config.restic.password || globalPassword;
+
+    if (!password) {
+      throw new Error(
+        `Restic password not configured for project "${config.name}". ` +
+        'Set restic.password in projects.yml or RESTIC_PASSWORD in .env.',
+      );
+    }
 
     return new ResticStorageAdapter(
       config.restic.repositoryPath,

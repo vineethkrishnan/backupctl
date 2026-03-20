@@ -1,6 +1,6 @@
 # backupctl
 
-Database-agnostic backup orchestration service. NestJS 11, hexagonal architecture, CLI-first.
+Backup orchestration for databases, files, or both. Database-agnostic, NestJS 11, hexagonal architecture, CLI-first.
 
 ## Quick Reference
 
@@ -107,8 +107,7 @@ src/
 │   │   │   │       ├── clear-cache.command.ts
 │   │   │   │       └── clear-cache.use-case.ts
 │   │   │   └── registries/
-│   │   │       ├── dumper.registry.ts
-│   │   │       └── notifier.registry.ts
+│   │   │       └── dumper.registry.ts
 │   │   ├── infrastructure/                    # Adapters implementing ports
 │   │   │   ├── adapters/
 │   │   │   │   ├── dumpers/                   # postgres, mysql, mongo

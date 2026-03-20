@@ -7,6 +7,7 @@ import { ConfigService } from '@nestjs/config';
 import { BackupLockPort } from '@domain/backup/application/ports/backup-lock.port';
 
 const POLL_INTERVAL_MS = 1000;
+const MAX_WAIT_MS = 60 * 60 * 1000; // 1 hour — prevents infinite polling on orphaned locks
 
 @Injectable()
 export class FileBackupLockAdapter implements BackupLockPort {
@@ -42,8 +43,15 @@ export class FileBackupLockAdapter implements BackupLockPort {
   }
 
   async acquireOrQueue(projectName: string): Promise<void> {
+    let waited = 0;
     while (!(await this.acquire(projectName))) {
+      if (waited >= MAX_WAIT_MS) {
+        throw new Error(
+          `Timed out waiting for lock on "${projectName}" after ${MAX_WAIT_MS / 60000} minutes`,
+        );
+      }
       await this.sleep(POLL_INTERVAL_MS);
+      waited += POLL_INTERVAL_MS;
     }
   }
 

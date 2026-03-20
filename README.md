@@ -1,6 +1,6 @@
 <p align="center">
   <strong>backupctl</strong><br>
-  <em>Database-agnostic backup orchestration. One config, all databases, zero babysitting.</em>
+  <em>Backup orchestration for databases, files, or both. One config, zero babysitting.</em>
 </p>
 
 <p align="center">
@@ -14,12 +14,12 @@
 
 ---
 
-backupctl is a standalone Docker service that orchestrates scheduled backups for multiple projects — PostgreSQL, MySQL, MongoDB — with encrypted remote storage via [restic](https://restic.net/), configurable notifications, and a full CLI for day-to-day operations.
+backupctl is a standalone Docker service that orchestrates scheduled backups for multiple projects — databases (PostgreSQL, MySQL, MongoDB), files, or both — with encrypted remote storage via [restic](https://restic.net/), configurable notifications, and a full CLI for day-to-day operations.
 
 ## Highlights
 
-- **Multi-project** — single service manages dozens of databases from one YAML config
-- **Database-agnostic** — PostgreSQL, MySQL, MongoDB out of the box; extensible via adapters
+- **Multi-project** — single service manages dozens of projects from one YAML config
+- **Flexible scope** — back up databases, files, or both per project; PostgreSQL, MySQL, MongoDB out of the box
 - **Restic + Hetzner Storage Box** — encrypted, deduplicated backups over SFTP
 - **GPG encryption** — optional per-project dump encryption before upload
 - **Notifications** — Slack, Email (SMTP/TLS), Webhook (JSON + markdown)
@@ -103,7 +103,7 @@ The full docs live in [`docs/`](docs/README.md):
 | 4   | [Installation](docs/04-installation.md)       | Prerequisites, wizard, manual setup, Docker                |
 | 5   | [Configuration](docs/05-configuration.md)     | `.env` reference, `projects.yml` schema, resolution rules  |
 | 6   | [CLI Reference](docs/06-cli-reference.md)     | All 14 commands with syntax, options, exit codes, examples |
-| 7   | [Bash Scripts](docs/07-bash-scripts.md)       | `install.sh`, `deploy.sh`, `backupctl-manage.sh`           |
+| 7   | [Bash Scripts](docs/07-bash-scripts.md)       | `install.sh`, `dev.sh`, `backupctl-manage.sh`           |
 | 8   | [Backup Flow](docs/08-backup-flow.md)         | 11-step flow, retry, concurrency, recovery, notifications  |
 | 9   | [Restore Guide](docs/09-restore-guide.md)     | Per-DB restore, decrypt, decompress, `--guide`             |
 | 10  | [Cheatsheet](docs/10-cheatsheet.md)           | Daily ops quick reference, one-liners                      |

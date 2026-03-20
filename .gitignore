@@ -52,3 +52,10 @@ Desktop.ini
 tmp/
 temp/
 *.tmp
+
+# Dev tooling
+.socat.pid
+
+# VitePress
+docs/.vitepress/dist/
+docs/.vitepress/cache/

@@ -7,8 +7,10 @@ export class StatusController {
   constructor(private readonly getBackupStatus: GetBackupStatusUseCase) {}
 
   @Get()
-  async getAllStatus(@Query('last') last?: string) {
-    const limit = last ? parseInt(last, 10) : undefined;
+  async getAllStatus(
+    @Query('last') last?: string,
+  ): Promise<{ projects: Awaited<ReturnType<GetBackupStatusUseCase['execute']>> }> {
+    const limit = last ? this.parseLimit(last) : undefined;
     const results = await this.getBackupStatus.execute(
       new GetBackupStatusQuery({ limit }),
     );
@@ -16,11 +18,20 @@ export class StatusController {
   }
 
   @Get(':project')
-  async getProjectStatus(@Param('project') project: string, @Query('last') last?: string) {
-    const limit = last ? parseInt(last, 10) : undefined;
+  async getProjectStatus(
+    @Param('project') project: string,
+    @Query('last') last?: string,
+  ): Promise<{ project: string; history: Awaited<ReturnType<GetBackupStatusUseCase['execute']>> }> {
+    const limit = last ? this.parseLimit(last) : undefined;
     const results = await this.getBackupStatus.execute(
       new GetBackupStatusQuery({ projectName: project, limit }),
     );
     return { project, history: results };
+  }
+
+  private parseLimit(value: string): number {
+    const parsed = parseInt(value, 10);
+    if (isNaN(parsed) || parsed < 1) return 20;
+    return Math.min(parsed, 1000);
   }
 }

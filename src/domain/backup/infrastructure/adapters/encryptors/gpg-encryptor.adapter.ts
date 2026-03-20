@@ -32,6 +32,9 @@ export class GpgEncryptorAdapter implements DumpEncryptorPort {
   }
 
   async decrypt(filePath: string): Promise<string> {
+    if (!filePath.endsWith('.gpg')) {
+      throw new Error(`Cannot decrypt file without .gpg extension: ${filePath}`);
+    }
     const decryptedPath = filePath.replace(/\.gpg$/, '');
 
     await safeExecFile('gpg', [

@@ -4,7 +4,7 @@ import {
   formatFailureText,
   formatSuccessText,
   formatDailySummaryText,
-} from '@domain/notification/infrastructure/notification-formatter';
+} from '@domain/notification/infrastructure/notification-formatter.util';
 import { BackupResult } from '@domain/backup/domain/backup-result.model';
 import { BackupStatus } from '@domain/backup/domain/value-objects/backup-status.enum';
 import { BackupStage } from '@domain/backup/domain/value-objects/backup-stage.enum';

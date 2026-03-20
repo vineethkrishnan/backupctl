@@ -1,4 +1,5 @@
 import * as fs from 'fs';
+import * as path from 'path';
 import { Injectable } from '@nestjs/common';
 import { FileSystemPort } from './filesystem.port';
 
@@ -19,6 +20,10 @@ export class LocalFilesystemAdapter implements FileSystemPort {
   }
 
   removeFile(filePath: string): void {
-    fs.unlinkSync(filePath);
+    const resolved = path.resolve(filePath);
+    if (resolved.includes('..') || resolved.includes('\0')) {
+      throw new Error(`Path traversal detected: ${filePath}`);
+    }
+    fs.unlinkSync(resolved);
   }
 }

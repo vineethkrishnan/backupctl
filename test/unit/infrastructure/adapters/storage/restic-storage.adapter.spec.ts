@@ -132,6 +132,7 @@ describe('ResticStorageAdapter', () => {
         [
           'forget',
           '--prune',
+          '--tag', 'project:myproject',
           '--keep-daily',
           '7',
           '--keep-weekly',

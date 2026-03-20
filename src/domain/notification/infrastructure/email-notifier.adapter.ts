@@ -4,7 +4,7 @@ import { NotifierPort } from '@domain/notification/application/ports/notifier.po
 import { BackupResult } from '@domain/backup/domain/backup-result.model';
 import { BackupStageError } from '@domain/backup/domain/backup-stage-error';
 import { formatDuration } from '@common/helpers/format.util';
-import { extractSuccessDetail, buildDailySummaryEntries } from './notification-formatter';
+import { extractSuccessDetail, buildDailySummaryEntries } from './notification-formatter.util';
 
 export interface SmtpConfig {
   host: string;
@@ -14,12 +14,14 @@ export interface SmtpConfig {
   password: string;
   to: string;
   from: string;
+  timezone?: string;
 }
 
 export class EmailNotifierAdapter implements NotifierPort {
   private readonly transporter: Transporter<SMTPTransport.SentMessageInfo>;
   private readonly to: string;
   private readonly from: string;
+  private readonly timezone: string;
 
   constructor(smtpConfig: SmtpConfig) {
     this.transporter = createTransport({
@@ -33,10 +35,11 @@ export class EmailNotifierAdapter implements NotifierPort {
     });
     this.to = smtpConfig.to;
     this.from = smtpConfig.from;
+    this.timezone = smtpConfig.timezone ?? 'Europe/Berlin';
   }
 
   async notifyStarted(projectName: string): Promise<void> {
-    const time = new Date().toLocaleString('en-GB', { timeZone: 'Europe/Berlin' });
+    const time = new Date().toLocaleString('en-GB', { timeZone: this.timezone });
     const html = `<h2>🔄 Backup started — ${projectName}</h2><p>Time: ${time}</p>`;
     await this.sendMail(`🔄 Backup started — ${projectName}`, html);
   }

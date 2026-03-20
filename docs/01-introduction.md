@@ -46,7 +46,7 @@ Every backup run is tracked in a PostgreSQL audit database with real-time stage 
 
 ### Crash recovery
 
-The `StartupRecoveryService` runs on every container start and handles: marking orphaned "started" records as failed, cleaning orphaned dump files, removing stale `.lock` files, auto-unlocking restic repos, replaying JSONL fallback entries, and auto-importing GPG keys.
+The `RecoverStartupUseCase` runs on every container start and handles: marking orphaned "started" records as failed, cleaning orphaned dump files, removing stale `.lock` files, auto-unlocking restic repos, replaying JSONL fallback entries, and auto-importing GPG keys.
 
 ### 14 CLI commands
 

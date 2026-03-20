@@ -20,6 +20,12 @@ services:
       backupctl-audit-db:
         condition: service_healthy
     restart: unless-stopped
+    stop_grace_period: 120s
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: '2'
 
   backupctl-audit-db:
     container_name: backupctl-audit-db
@@ -38,6 +44,11 @@ services:
       timeout: 3s
       retries: 5
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '1'
 
 volumes:
   backupctl-audit-data:

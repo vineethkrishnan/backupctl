@@ -111,7 +111,7 @@ Choose a global notification channel and enter channel-specific settings.
   DAILY_SUMMARY_CRON [0 8 * * *]:
 ```
 
-For email, the wizard prompts for `EMAIL_SMTP_HOST`, `EMAIL_SMTP_PORT`, `EMAIL_SMTP_SECURE`, `EMAIL_TO`, `EMAIL_FROM`, and `EMAIL_PASSWORD`. For webhook, it prompts for `WEBHOOK_URL`.
+For email, the wizard prompts for `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_TO`, `SMTP_FROM`, and `SMTP_PASSWORD`. For webhook, it prompts for `WEBHOOK_URL`.
 
 ### 7. Encryption
 
@@ -436,7 +436,7 @@ npm run build
 docker compose up -d --build
 
 # Run pending migrations (if any)
-docker exec backupctl npx typeorm migration:run -d dist/infrastructure/persistence/audit/data-source.js
+docker exec backupctl npx typeorm migration:run -d dist/db/datasource.js
 
 # Verify
 docker exec backupctl node dist/cli.js health

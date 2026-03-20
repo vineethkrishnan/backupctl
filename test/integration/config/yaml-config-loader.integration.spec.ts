@@ -142,9 +142,9 @@ describe('YamlConfigLoaderAdapter (integration)', () => {
       expect(result).toHaveLength(1);
       expect(result[0]).toBeInstanceOf(ProjectConfig);
       expect(result[0].name).toBe('locaboo');
-      expect(result[0].database.type).toBe('postgres');
-      expect(result[0].database.host).toBe('db.locaboo.test');
-      expect(result[0].database.port).toBe(5432);
+      expect(result[0].database?.type).toBe('postgres');
+      expect(result[0].database?.host).toBe('db.locaboo.test');
+      expect(result[0].database?.port).toBe(5432);
       expect(result[0].cron).toBe('0 2 * * *');
       expect(result[0].timeoutMinutes).toBe(30);
       expect(result[0].hasTimeout()).toBe(true);
@@ -159,7 +159,7 @@ describe('YamlConfigLoaderAdapter (integration)', () => {
       const adapter = createAdapter();
       const result = adapter.loadAll();
 
-      expect(result[0].database.password).toBe('resolved-db-pass');
+      expect(result[0].database?.password).toBe('resolved-db-pass');
       expect(result[0].restic.password).toBe('resolved-restic-pass');
     });
   });
@@ -238,9 +238,9 @@ describe('YamlConfigLoaderAdapter (integration)', () => {
       const shopify = adapter.getProject('shopify-sync');
 
       expect(locaboo.name).toBe('locaboo');
-      expect(locaboo.database.type).toBe('postgres');
+      expect(locaboo.database?.type).toBe('postgres');
       expect(shopify.name).toBe('shopify-sync');
-      expect(shopify.database.type).toBe('mysql');
+      expect(shopify.database?.type).toBe('mysql');
     });
 
     it('should throw for unknown project', () => {
@@ -291,7 +291,7 @@ describe('YamlConfigLoaderAdapter (integration)', () => {
       const reloaded = adapter.loadAll();
       expect(reloaded).toHaveLength(1);
       expect(reloaded[0].name).toBe('new-project');
-      expect(reloaded[0].database.type).toBe('mongodb');
+      expect(reloaded[0].database?.type).toBe('mongodb');
     });
   });
 });

@@ -28,7 +28,8 @@ export class NotifierBootstrapService implements OnModuleInit {
       this.logger.debug('Slack notifier not configured (SLACK_WEBHOOK_URL missing)');
       return;
     }
-    this.registry.register('slack', new SlackNotifierAdapter(webhookUrl));
+    const timezone = this.configService.get<string>('TIMEZONE', 'Europe/Berlin');
+    this.registry.register('slack', new SlackNotifierAdapter(webhookUrl, timezone));
   }
 
   private registerWebhook(): void {
@@ -57,6 +58,7 @@ export class NotifierBootstrapService implements OnModuleInit {
         password: this.configService.get<string>('SMTP_PASSWORD', ''),
         to: this.configService.get<string>('SMTP_TO', ''),
         from: this.configService.get<string>('SMTP_FROM', 'backupctl@localhost'),
+        timezone: this.configService.get<string>('TIMEZONE', 'Europe/Berlin'),
       }),
     );
   }

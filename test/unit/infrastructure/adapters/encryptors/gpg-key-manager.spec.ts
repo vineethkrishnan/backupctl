@@ -1,5 +1,5 @@
 import { ConfigService } from '@nestjs/config';
-import { GpgKeyManager } from '@domain/backup/infrastructure/adapters/encryptors/gpg-key-manager';
+import { GpgKeyManagerAdapter as GpgKeyManager } from '@domain/backup/infrastructure/adapters/encryptors/gpg-key-manager.adapter';
 
 jest.mock('fs', () => ({
   existsSync: jest.fn(),

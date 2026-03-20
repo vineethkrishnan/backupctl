@@ -286,20 +286,28 @@ cmd_deploy() {
 
   echo "=== backupctl deploy ==="
 
-  echo "[1/4] Building and starting containers..."
+  echo "[1/5] Building and starting containers..."
   if [ -n "$REBUILD" ]; then
     docker compose -f "$COMPOSE_FILE" up -d $REBUILD
   else
     docker compose -f "$COMPOSE_FILE" up -d --build
   fi
 
-  echo "[2/4] Connecting project Docker networks..."
+  echo "[2/5] Connecting project Docker networks..."
   connect_project_networks backupctl
 
-  echo "[3/4] Waiting for services to start..."
+  echo "[3/5] Waiting for services to start..."
   sleep 5
 
-  echo "[4/4] Running health check..."
+  echo "[4/5] Running database migrations..."
+  if ! docker exec backupctl npx typeorm migration:run -d dist/db/datasource.js; then
+    echo "ERROR: Database migrations failed. Rolling back..."
+    docker compose -f "$COMPOSE_FILE" down
+    echo "Fix the migration and re-run: $0 deploy"
+    exit 1
+  fi
+
+  echo "[5/5] Running health check..."
   docker exec backupctl node dist/cli.js health || echo "Health check failed — check logs with: $0 logs"
 
   echo "=== backupctl deployed ==="
@@ -311,17 +319,26 @@ cmd_deploy() {
 cmd_update() {
   echo "=== backupctl update ==="
 
-  echo "[1/4] Pulling latest changes..."
+  echo "[1/5] Pulling latest changes..."
   git pull
 
-  echo "[2/4] Rebuilding containers (includes npm ci + build)..."
+  echo "[2/5] Rebuilding containers (includes npm ci + build)..."
   docker compose -f "$COMPOSE_FILE" up -d --build
 
-  echo "[3/4] Connecting project Docker networks..."
+  echo "[3/5] Connecting project Docker networks..."
   connect_project_networks backupctl
 
-  echo "[4/4] Running health check..."
+  echo "[4/6] Waiting for services to start..."
   sleep 5
+
+  echo "[5/6] Running database migrations..."
+  if ! docker exec backupctl npx typeorm migration:run -d dist/db/datasource.js; then
+    echo "ERROR: Database migrations failed. Check logs with: $0 logs"
+    echo "The previous container version may still be running. Fix the migration and re-run: $0 update"
+    exit 1
+  fi
+
+  echo "[6/6] Running health check..."
   docker exec backupctl node dist/cli.js health || echo "Health check failed — check logs"
 
   echo "=== backupctl updated ==="

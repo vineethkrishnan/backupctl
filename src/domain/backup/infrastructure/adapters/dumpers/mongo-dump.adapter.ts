@@ -21,17 +21,31 @@ export class MongoDumpAdapter implements DatabaseDumperPort {
     const filePath = path.join(outputDir, fileName);
     const startTime = Date.now();
 
-    const args = [
-      '--host', this.config.host,
-      '--port', String(this.config.port),
-      '--db', this.config.name,
-      '--username', this.config.user,
-      '--password', this.config.password,
-      `--archive=${filePath}`,
-      '--gzip',
-    ];
+    fs.mkdirSync(outputDir, { recursive: true });
 
-    await safeExecFile('mongodump', args);
+    // Write temporary config to avoid password in process args
+    const escapedPassword = this.config.password
+      .replace(/\\/g, '\\\\')
+      .replace(/"/g, '\\"');
+    const configContent = `password: "${escapedPassword}"`;
+    const configPath = path.join(outputDir, `.mongodump-${timestamp}.conf`);
+    fs.writeFileSync(configPath, configContent, { mode: 0o600 });
+
+    try {
+      const args = [
+        '--config', configPath,
+        '--host', this.config.host,
+        '--port', String(this.config.port),
+        '--db', this.config.name,
+        '--username', this.config.user,
+        `--archive=${filePath}`,
+        '--gzip',
+      ];
+
+      await safeExecFile('mongodump', args);
+    } finally {
+      try { fs.unlinkSync(configPath); } catch { /* cleanup best-effort */ }
+    }
 
     const stats = fs.statSync(filePath);
     const durationMs = Date.now() - startTime;

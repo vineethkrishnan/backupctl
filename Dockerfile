@@ -3,7 +3,7 @@ FROM node:20-alpine AS builder
 
 WORKDIR /app
 COPY package*.json ./
-RUN npm ci
+RUN npm ci --ignore-scripts
 COPY tsconfig*.json nest-cli.json ./
 COPY src/ ./src/
 RUN npm run build
@@ -21,10 +21,12 @@ RUN apk add --no-cache \
     gnupg \
     fuse3 \
     bzip2 \
-    curl
+    curl \
+    tini
 
 # Install restic
 RUN wget https://github.com/restic/restic/releases/download/v0.17.3/restic_0.17.3_linux_amd64.bz2 \
+    && echo "d3fc3632b7bcc35aae5a3e6f2e1c1f06a6aae9c17800e84cda5cd46af3b0dcbc  restic_0.17.3_linux_amd64.bz2" | sha256sum -c \
     && bunzip2 restic_0.17.3_linux_amd64.bz2 \
     && chmod +x restic_0.17.3_linux_amd64 \
     && mv restic_0.17.3_linux_amd64 /usr/local/bin/restic
@@ -35,14 +37,16 @@ RUN mkdir -p /home/node/.ssh /home/node/.gnupg \
     && chown -R node:node /home/node/.ssh /home/node/.gnupg
 
 WORKDIR /app
+ENV NODE_ENV=production
 COPY package*.json ./
-RUN npm ci --omit=dev
+RUN npm ci --omit=dev --ignore-scripts
 COPY --from=builder /app/dist ./dist/
 RUN chown -R node:node /app
 
 USER node
 
 EXPOSE 3100
-HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 \
   CMD curl -f http://localhost:${APP_PORT:-3100}/health || exit 1
+ENTRYPOINT ["/sbin/tini", "--"]
 CMD ["node", "dist/main.js"]

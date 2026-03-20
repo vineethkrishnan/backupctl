@@ -17,7 +17,15 @@ export class LogsCommand extends CommandRunner {
   ) { super(); }
 
   @Option({ flags: '--last <n>', description: 'Show last N log entries' })
-  parseLast(value: string): number { return parseInt(value, 10); }
+  parseLast(value: string): number {
+    const parsed = parseInt(value, 10);
+    if (isNaN(parsed) || parsed < 1) {
+      console.error('Error: --last must be a positive integer');
+      process.exitCode = 3;
+      return 10;
+    }
+    return parsed;
+  }
 
   @Option({ flags: '--failed', description: 'Show only failed backups' })
   parseFailed(): boolean { return true; }

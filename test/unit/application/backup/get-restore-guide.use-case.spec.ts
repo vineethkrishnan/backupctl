@@ -36,17 +36,20 @@ describe('GetRestoreGuideUseCase', () => {
     useCase = new GetRestoreGuideUseCase(configLoader);
   });
 
-  it('returns postgres restore guide with correct connection details', () => {
+  it('returns postgres restore guide with placeholders instead of credentials', () => {
     configLoader.getProject.mockReturnValue(buildConfig('postgres'));
 
     const guide = useCase.execute(new GetRestoreGuideQuery({ projectName: 'test-project' }));
 
     expect(guide).toContain('PostgreSQL');
     expect(guide).toContain('pg_restore');
-    expect(guide).toContain('db.example.com');
-    expect(guide).toContain('5432');
-    expect(guide).toContain('admin');
+    expect(guide).toContain('<HOST>');
+    expect(guide).toContain('<PORT>');
+    expect(guide).toContain('<USER>');
     expect(guide).toContain('mydb');
+    expect(guide).not.toContain('db.example.com');
+    expect(guide).not.toContain('admin');
+    expect(guide).toContain('projects.yml');
   });
 
   it('returns mysql restore guide', () => {
@@ -87,6 +90,29 @@ describe('GetRestoreGuideUseCase', () => {
     configLoader.getProject.mockImplementation(() => { throw new Error('Project "unknown" not found'); });
 
     expect(() => useCase.execute(new GetRestoreGuideQuery({ projectName: 'unknown' }))).toThrow('not found');
+  });
+
+  it('returns no-database message for files-only projects', () => {
+    const filesOnlyConfig = new ProjectConfig({
+      name: 'static-assets',
+      enabled: true,
+      cron: '0 3 * * *',
+      timeoutMinutes: null,
+      database: null,
+      compression: { enabled: true },
+      assets: { paths: ['/data/uploads'] },
+      restic: { repositoryPath: '/repo', password: 'pass', snapshotMode: 'combined' },
+      retention: new RetentionPolicy(7, 7, 4, 3),
+      encryption: null,
+      hooks: null,
+      verification: { enabled: false },
+      notification: null,
+    });
+    configLoader.getProject.mockReturnValue(filesOnlyConfig);
+
+    const guide = useCase.execute(new GetRestoreGuideQuery({ projectName: 'static-assets' }));
+
+    expect(guide).toContain('no database configured');
   });
 
   it('includes encryption guidance in each guide', () => {

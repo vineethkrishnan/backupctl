@@ -11,10 +11,19 @@ export class ResticCommand extends CommandRunner {
     @Inject(REMOTE_STORAGE_FACTORY) private readonly storageFactory: RemoteStorageFactory,
   ) { super(); }
 
+  private static readonly DESTRUCTIVE_COMMANDS = ['forget', 'key', 'prune', 'migrate', 'init'];
+
   async run(params: string[]): Promise<void> {
     const [projectName, ...resticArgs] = params;
 
     if (!projectName || resticArgs.length === 0) { console.error('Usage: backupctl restic <project> <command> [args...]'); process.exitCode = 1; return; }
+
+    const subCommand = resticArgs[0];
+    if (ResticCommand.DESTRUCTIVE_COMMANDS.includes(subCommand)) {
+      console.error(`Error: "${subCommand}" is a destructive operation. Use the dedicated CLI commands instead (e.g., backupctl prune).`);
+      process.exitCode = 1;
+      return;
+    }
 
     try {
       const config = this.configLoader.getProject(projectName);

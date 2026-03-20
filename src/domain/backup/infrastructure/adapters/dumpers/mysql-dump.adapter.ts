@@ -22,11 +22,12 @@ export class MysqlDumpAdapter implements DatabaseDumperPort {
     const gzFilePath = `${sqlFilePath}.gz`;
     const startTime = Date.now();
 
+    fs.mkdirSync(outputDir, { recursive: true });
+
     const args = [
       '--host', this.config.host,
       '--port', String(this.config.port),
       '--user', this.config.user,
-      `--password=${this.config.password}`,
       '--single-transaction',
       '--quick',
       '--routines',
@@ -34,7 +35,9 @@ export class MysqlDumpAdapter implements DatabaseDumperPort {
       this.config.name,
     ];
 
-    await safeExecFile('mysqldump', args);
+    await safeExecFile('mysqldump', args, {
+      env: { MYSQL_PWD: this.config.password },
+    });
     await safeExecFile('gzip', [sqlFilePath]);
 
     const stats = fs.statSync(gzFilePath);

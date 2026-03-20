@@ -13,7 +13,7 @@ interface RawProjectEntry {
   cron: string;
   timeout_minutes?: number;
   docker_network?: string;
-  database: {
+  database?: {
     type: string;
     host: string;
     port: number;
@@ -114,8 +114,10 @@ export class YamlConfigLoaderAdapter implements ConfigLoaderPort {
         if (!resolved.cron) {
           errors.push(`Project "${resolved.name}": missing required field: cron`);
         }
-        if (!resolved.database) {
-          errors.push(`Project "${resolved.name}": missing required field: database`);
+        const hasDb = !!resolved.database;
+        const hasAssets = Array.isArray(resolved.assets?.paths) && resolved.assets.paths.length > 0;
+        if (!hasDb && !hasAssets) {
+          errors.push(`Project "${resolved.name}": must have at least one of "database" or "assets"`);
         }
         if (!resolved.restic) {
           errors.push(`Project "${resolved.name}": missing required field: restic`);
@@ -185,10 +187,10 @@ export class YamlConfigLoaderAdapter implements ConfigLoaderPort {
 
   private findUnresolvedVars(obj: Record<string, unknown>): string[] {
     const unresolved: string[] = [];
-    const pattern = /\$\{([^}]+)}/g;
 
     const traverse = (value: unknown): void => {
       if (typeof value === 'string') {
+        const pattern = /\$\{([^}]+)}/g;
         let match: RegExpExecArray | null;
         while ((match = pattern.exec(value)) !== null) {
           unresolved.push(match[1]);
@@ -256,7 +258,7 @@ export class YamlConfigLoaderAdapter implements ConfigLoaderPort {
     const retention = new RetentionPolicy(
       resolved.retention.local_days,
       resolved.retention.keep_daily,
-      resolved.retention.keep_weekly,
+      resolved.retention.keep_weekly ?? 0,
       resolved.retention.keep_monthly ?? 0,
     );
 
@@ -266,14 +268,16 @@ export class YamlConfigLoaderAdapter implements ConfigLoaderPort {
       cron: resolved.cron,
       timeoutMinutes: resolved.timeout_minutes ?? null,
       dockerNetwork: resolved.docker_network ?? null,
-      database: {
-        type: resolved.database.type,
-        host: resolved.database.host,
-        port: resolved.database.port,
-        name: resolved.database.name,
-        user: resolved.database.user,
-        password: resolved.database.password,
-      },
+      database: resolved.database
+        ? {
+            type: resolved.database.type,
+            host: resolved.database.host,
+            port: resolved.database.port,
+            name: resolved.database.name,
+            user: resolved.database.user,
+            password: resolved.database.password,
+          }
+        : null,
       compression: { enabled: resolved.compression?.enabled ?? true },
       assets: { paths: resolved.assets?.paths ?? [] },
       restic: {

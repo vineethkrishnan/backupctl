@@ -2,7 +2,7 @@ import axios from 'axios';
 import { NotifierPort } from '@domain/notification/application/ports/notifier.port';
 import { BackupResult } from '@domain/backup/domain/backup-result.model';
 import { BackupStageError } from '@domain/backup/domain/backup-stage-error';
-import { extractSuccessDetail, buildDailySummaryEntries } from './notification-formatter';
+import { extractSuccessDetail, buildDailySummaryEntries } from './notification-formatter.util';
 
 // ── Slack Block Kit types ────────────────────────────
 
@@ -43,10 +43,13 @@ const COLOR = {
 // ── Adapter ──────────────────────────────────────────
 
 export class SlackNotifierAdapter implements NotifierPort {
-  constructor(private readonly webhookUrl: string) {}
+  constructor(
+    private readonly webhookUrl: string,
+    private readonly timezone: string = 'Europe/Berlin',
+  ) {}
 
   async notifyStarted(projectName: string): Promise<void> {
-    const time = new Date().toLocaleString('en-GB', { timeZone: 'Europe/Berlin' });
+    const time = new Date().toLocaleString('en-GB', { timeZone: this.timezone });
 
     await this.post({
       text: `🔄 Backup started — ${projectName}`,

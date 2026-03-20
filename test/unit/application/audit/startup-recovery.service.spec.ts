@@ -168,7 +168,9 @@ describe('RecoverStartupUseCase', () => {
     );
   });
 
-  it('cleans orphaned dump files from project directories', async () => {
+  it('cleans orphaned dump files only for projects with orphaned runs', async () => {
+    const orphan = createOrphanedResult('run-orphan-1', 'locaboo');
+    mockAuditLog.findOrphaned.mockResolvedValue([orphan]);
     const projects = [createProjectConfig('locaboo')];
     mockConfigLoader.loadAll.mockReturnValue(projects);
     mockFilesystem.exists.mockReturnValue(true);
@@ -182,26 +184,31 @@ describe('RecoverStartupUseCase', () => {
     expect(mockFilesystem.removeFile).not.toHaveBeenCalledWith('/data/backups/locaboo/notes.txt');
   });
 
-  it('skips dump cleanup when project directory does not exist', async () => {
+  it('skips dump cleanup when project has no orphaned runs', async () => {
     const projects = [createProjectConfig('newproject')];
     mockConfigLoader.loadAll.mockReturnValue(projects);
-    mockFilesystem.exists.mockReturnValue(false);
+    mockFilesystem.exists.mockReturnValue(true);
+    mockFilesystem.listDirectory.mockReturnValue(['dump.sql.gz']);
 
     await service.onModuleInit();
 
-    expect(mockFilesystem.listDirectory).not.toHaveBeenCalled();
     expect(mockFilesystem.removeFile).not.toHaveBeenCalled();
   });
 
-  it('releases stale locks for all projects', async () => {
-    const projects = [createProjectConfig('locaboo'), createProjectConfig('webapp')];
+  it('releases stale locks only for projects with orphaned runs', async () => {
+    const orphan1 = createOrphanedResult('run-1', 'locaboo');
+    const orphan2 = createOrphanedResult('run-2', 'webapp');
+    mockAuditLog.findOrphaned.mockResolvedValue([orphan1, orphan2]);
+    const projects = [createProjectConfig('locaboo'), createProjectConfig('webapp'), createProjectConfig('untouched')];
     mockConfigLoader.loadAll.mockReturnValue(projects);
+    mockBackupLock.isLocked.mockReturnValue(true);
     mockBackupLock.release.mockResolvedValue(undefined);
 
     await service.onModuleInit();
 
     expect(mockBackupLock.release).toHaveBeenCalledWith('locaboo');
     expect(mockBackupLock.release).toHaveBeenCalledWith('webapp');
+    expect(mockBackupLock.release).not.toHaveBeenCalledWith('untouched');
   });
 
   it('unlocks restic repos for enabled projects (non-fatal on error)', async () => {
@@ -285,6 +292,8 @@ describe('RecoverStartupUseCase', () => {
   });
 
   it('handles dump cleanup failure for individual files gracefully', async () => {
+    const orphan = createOrphanedResult('run-1', 'locaboo');
+    mockAuditLog.findOrphaned.mockResolvedValue([orphan]);
     const projects = [createProjectConfig('locaboo')];
     mockConfigLoader.loadAll.mockReturnValue(projects);
     mockFilesystem.exists.mockReturnValue(true);

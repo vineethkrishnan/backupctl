@@ -1,13 +1,21 @@
 import { registerAs } from '@nestjs/config';
 import { DataSourceOptions } from 'typeorm';
 
+function getAuditDbPassword(): string {
+  const password = process.env.AUDIT_DB_PASSWORD;
+  if (!password && process.env.NODE_ENV === 'production') {
+    throw new Error('AUDIT_DB_PASSWORD is required in production. Set it in .env or environment.');
+  }
+  return password ?? 'audit_secret';
+}
+
 const baseConfig: DataSourceOptions = {
   type: 'postgres',
   host: process.env.AUDIT_DB_HOST ?? 'localhost',
   port: parseInt(process.env.AUDIT_DB_PORT ?? '5432', 10),
   database: process.env.AUDIT_DB_NAME ?? 'backup_audit',
   username: process.env.AUDIT_DB_USER ?? 'audit_user',
-  password: process.env.AUDIT_DB_PASSWORD ?? 'audit_secret',
+  password: getAuditDbPassword(),
   synchronize: false,
 };
 
