@@ -46,6 +46,17 @@ jobs:
             shared
             docker
             deps
+            main
+            backup
+            restore-guide
+            deploy
+            ci
+            commitlint
+            docs
+            security
+            release
+            test
+            lint
           requireScope: false
           subjectPattern: ^(?![A-Z]).+$
           subjectPatternError: |
