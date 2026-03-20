@@ -147,27 +147,78 @@ describe('GetRestoreGuideUseCase', () => {
 
       expect(guide).toContain('Never store the GPG private key on the backup server');
     });
-  });
 
-  describe('mysql guide', () => {
-    it('returns mysql restore command', () => {
-      configLoader.getProject.mockReturnValue(buildConfig({ database: { type: 'mysql', host: 'db', port: 3306, name: 'app', user: 'root', password: 'secret' } }));
+    it('uses .dump extension in decrypt step for postgres', () => {
+      configLoader.getProject.mockReturnValue(buildConfig(encryptedConfig));
 
       const guide = useCase.execute(new GetRestoreGuideQuery({ projectName: 'test-project' }));
 
-      expect(guide).toContain('mysql');
+      expect(guide).toContain('gpg --decrypt <file>.dump.gpg > <file>.dump');
+    });
+
+    it('uses .sql extension in decrypt step for mysql', () => {
+      configLoader.getProject.mockReturnValue(buildConfig({
+        ...encryptedConfig,
+        database: { type: 'mysql', host: 'db', port: 3306, name: 'app', user: 'root', password: 'secret' },
+      }));
+
+      const guide = useCase.execute(new GetRestoreGuideQuery({ projectName: 'test-project' }));
+
+      expect(guide).toContain('gpg --decrypt <file>.sql.gpg > <file>.sql');
+    });
+
+    it('uses .archive.gz extension in decrypt step for mongodb', () => {
+      configLoader.getProject.mockReturnValue(buildConfig({
+        ...encryptedConfig,
+        database: { type: 'mongodb', host: 'db', port: 27017, name: 'app', user: 'root', password: 'secret' },
+      }));
+
+      const guide = useCase.execute(new GetRestoreGuideQuery({ projectName: 'test-project' }));
+
+      expect(guide).toContain('gpg --decrypt <file>.archive.gz.gpg > <file>.archive.gz');
+    });
+  });
+
+  describe('mysql guide', () => {
+    const mysqlConfig = { database: { type: 'mysql', host: 'db', port: 3306, name: 'app', user: 'root', password: 'secret' } };
+
+    it('returns mysql restore command with .sql extension', () => {
+      configLoader.getProject.mockReturnValue(buildConfig(mysqlConfig));
+
+      const guide = useCase.execute(new GetRestoreGuideQuery({ projectName: 'test-project' }));
+
       expect(guide).toContain('mysql -h');
+      expect(guide).toContain('< <file>.sql');
+    });
+
+    it('includes a decompress step for gzipped output', () => {
+      configLoader.getProject.mockReturnValue(buildConfig(mysqlConfig));
+
+      const guide = useCase.execute(new GetRestoreGuideQuery({ projectName: 'test-project' }));
+
+      expect(guide).toContain('Decompress the dump');
+      expect(guide).toContain('gunzip <file>.sql.gz');
+    });
+
+    it('numbers steps correctly: restic → decompress → restore', () => {
+      configLoader.getProject.mockReturnValue(buildConfig(mysqlConfig));
+
+      const guide = useCase.execute(new GetRestoreGuideQuery({ projectName: 'test-project' }));
+
+      expect(guide).toContain('Step 1: Restore snapshot from Restic');
+      expect(guide).toContain('Step 2: Decompress the dump');
+      expect(guide).toContain('Step 3: Restore to database');
     });
   });
 
   describe('mongodb guide', () => {
-    it('returns mongorestore command', () => {
+    it('returns mongorestore command with --gzip --archive flag', () => {
       configLoader.getProject.mockReturnValue(buildConfig({ database: { type: 'mongodb', host: 'db', port: 27017, name: 'app', user: 'root', password: 'secret' } }));
 
       const guide = useCase.execute(new GetRestoreGuideQuery({ projectName: 'test-project' }));
 
-      expect(guide).toContain('mongodb');
       expect(guide).toContain('mongorestore');
+      expect(guide).toContain('--gzip --archive=<file>.archive.gz');
     });
   });
 

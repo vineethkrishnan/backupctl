@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 
-import { RemoteStorageFactory as RemoteStorageFactoryPort } from '@domain/backup/application/ports/remote-storage-factory.port';
+import { RemoteStorageFactoryPort } from '@domain/backup/application/ports/remote-storage-factory.port';
 import { RemoteStoragePort } from '@domain/backup/application/ports/remote-storage.port';
 import { ProjectConfig } from '@domain/config/domain/project-config.model';
 import { ResticStorageAdapter } from './restic-storage.adapter';

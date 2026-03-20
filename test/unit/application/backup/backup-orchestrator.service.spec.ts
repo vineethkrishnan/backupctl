@@ -2,7 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
 
 import { RunBackupUseCase } from '@domain/backup/application/use-cases/run-backup/run-backup.use-case';
-import { RemoteStorageFactory } from '@domain/backup/application/ports/remote-storage-factory.port';
+import { RemoteStorageFactoryPort } from '@domain/backup/application/ports/remote-storage-factory.port';
 import { RunBackupCommand } from '@domain/backup/application/use-cases/run-backup/run-backup.command';
 import { DumperRegistry } from '@domain/backup/application/registries/dumper.registry';
 import { NotifierRegistry } from '@domain/notification/application/registries/notifier.registry';
@@ -207,7 +207,7 @@ describe('RunBackupUseCase', () => {
   let mockEncryptor: jest.Mocked<DumpEncryptorPort>;
   let mockHookExecutor: jest.Mocked<HookExecutorPort>;
   let mockLocalCleanup: jest.Mocked<LocalCleanupPort>;
-  let mockStorageFactory: jest.Mocked<RemoteStorageFactory>;
+  let mockStorageFactory: jest.Mocked<RemoteStorageFactoryPort>;
   let mockFilesystem: jest.Mocked<FileSystemPort>;
   let mockGpgKeyManager: jest.Mocked<GpgKeyManagerPort>;
   let mockDumperRegistry: DumperRegistry;

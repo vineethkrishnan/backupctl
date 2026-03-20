@@ -1,6 +1,6 @@
 import { ResticCommand } from '@domain/backup/presenters/cli/restic.command';
 import { ConfigLoaderPort } from '@domain/config/application/ports/config-loader.port';
-import { RemoteStorageFactory } from '@domain/backup/application/ports/remote-storage-factory.port';
+import { RemoteStorageFactoryPort } from '@domain/backup/application/ports/remote-storage-factory.port';
 import { RemoteStoragePort } from '@domain/backup/application/ports/remote-storage.port';
 import { ProjectConfig } from '@domain/config/domain/project-config.model';
 import { RetentionPolicy } from '@domain/config/domain/retention-policy.model';
@@ -37,7 +37,7 @@ function buildProjectConfig(): ProjectConfig {
 describe('ResticCommand', () => {
   let command: ResticCommand;
   let configLoader: jest.Mocked<ConfigLoaderPort>;
-  let storageFactory: jest.Mocked<RemoteStorageFactory>;
+  let storageFactory: jest.Mocked<RemoteStorageFactoryPort>;
   let storage: jest.Mocked<RemoteStoragePort>;
 
   beforeEach(() => {
@@ -51,7 +51,7 @@ describe('ResticCommand', () => {
 
     storageFactory = {
       create: jest.fn().mockReturnValue(storage),
-    } as unknown as jest.Mocked<RemoteStorageFactory>;
+    } as unknown as jest.Mocked<RemoteStorageFactoryPort>;
 
     command = new ResticCommand(configLoader, storageFactory);
     process.exitCode = undefined;

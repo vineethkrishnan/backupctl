@@ -5,7 +5,7 @@ import { AuditLogPort } from '@domain/audit/application/ports/audit-log.port';
 import { FallbackWriterPort } from '@domain/audit/application/ports/fallback-writer.port';
 import { ConfigLoaderPort } from '@domain/config/application/ports/config-loader.port';
 import { BackupLockPort } from '@domain/backup/application/ports/backup-lock.port';
-import { RemoteStorageFactory } from '@domain/backup/application/ports/remote-storage-factory.port';
+import { RemoteStorageFactoryPort } from '@domain/backup/application/ports/remote-storage-factory.port';
 import { GpgKeyManagerPort } from '@domain/backup/application/ports/gpg-key-manager.port';
 import { ClockPort } from '@common/clock/clock.port';
 import { FileSystemPort } from '@common/filesystem/filesystem.port';
@@ -34,7 +34,7 @@ export class RecoverStartupUseCase implements OnModuleInit {
     @Inject(FALLBACK_WRITER_PORT) private readonly fallbackWriter: FallbackWriterPort,
     @Inject(CONFIG_LOADER_PORT) private readonly configLoader: ConfigLoaderPort,
     @Inject(BACKUP_LOCK_PORT) private readonly backupLock: BackupLockPort,
-    @Inject(REMOTE_STORAGE_FACTORY) private readonly storageFactory: RemoteStorageFactory,
+    @Inject(REMOTE_STORAGE_FACTORY) private readonly storageFactory: RemoteStorageFactoryPort,
     @Inject(CLOCK_PORT) private readonly clock: ClockPort,
     @Inject(FILESYSTEM_PORT) private readonly filesystem: FileSystemPort,
     @Inject(GPG_KEY_MANAGER_PORT) private readonly gpgKeyManager: GpgKeyManagerPort,

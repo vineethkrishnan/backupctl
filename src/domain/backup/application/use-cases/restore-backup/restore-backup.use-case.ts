@@ -4,7 +4,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 
 import { ConfigLoaderPort } from '@domain/config/application/ports/config-loader.port';
-import { RemoteStorageFactory } from '@domain/backup/application/ports/remote-storage-factory.port';
+import { RemoteStorageFactoryPort } from '@domain/backup/application/ports/remote-storage-factory.port';
 import { CONFIG_LOADER_PORT, REMOTE_STORAGE_FACTORY } from '@common/di/injection-tokens';
 import { safeExecFile } from '@common/helpers/child-process.util';
 import { RestoreBackupCommand } from './restore-backup.command';
@@ -15,7 +15,7 @@ export class RestoreBackupUseCase {
 
   constructor(
     @Inject(CONFIG_LOADER_PORT) private readonly configLoader: ConfigLoaderPort,
-    @Inject(REMOTE_STORAGE_FACTORY) private readonly storageFactory: RemoteStorageFactory,
+    @Inject(REMOTE_STORAGE_FACTORY) private readonly storageFactory: RemoteStorageFactoryPort,
     configService: ConfigService,
   ) {
     this.baseDir = configService.get<string>('BACKUP_BASE_DIR', '/data/backups');

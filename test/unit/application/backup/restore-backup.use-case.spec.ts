@@ -4,7 +4,7 @@ import { ConfigService } from '@nestjs/config';
 import { RestoreBackupUseCase } from '@domain/backup/application/use-cases/restore-backup/restore-backup.use-case';
 import { RestoreBackupCommand } from '@domain/backup/application/use-cases/restore-backup/restore-backup.command';
 import { ConfigLoaderPort } from '@domain/config/application/ports/config-loader.port';
-import { RemoteStorageFactory } from '@domain/backup/application/ports/remote-storage-factory.port';
+import { RemoteStorageFactoryPort } from '@domain/backup/application/ports/remote-storage-factory.port';
 import { RemoteStoragePort } from '@domain/backup/application/ports/remote-storage.port';
 import { ProjectConfig } from '@domain/config/domain/project-config.model';
 import { RetentionPolicy } from '@domain/config/domain/retention-policy.model';
@@ -113,7 +113,7 @@ describe('RestoreBackupUseCase', () => {
 
     useCase = new RestoreBackupUseCase(
       mockConfigLoader as unknown as ConfigLoaderPort,
-      mockStorageFactory as unknown as RemoteStorageFactory,
+      mockStorageFactory as unknown as RemoteStorageFactoryPort,
       mockConfigService as unknown as ConfigService,
     );
 

@@ -3,7 +3,7 @@ import { AuditLogPort } from '@domain/audit/application/ports/audit-log.port';
 import { FallbackWriterPort, FallbackEntry } from '@domain/audit/application/ports/fallback-writer.port';
 import { ConfigLoaderPort } from '@domain/config/application/ports/config-loader.port';
 import { BackupLockPort } from '@domain/backup/application/ports/backup-lock.port';
-import { RemoteStorageFactory } from '@domain/backup/application/ports/remote-storage-factory.port';
+import { RemoteStorageFactoryPort } from '@domain/backup/application/ports/remote-storage-factory.port';
 import { RemoteStoragePort } from '@domain/backup/application/ports/remote-storage.port';
 import { GpgKeyManagerPort } from '@domain/backup/application/ports/gpg-key-manager.port';
 import { ClockPort } from '@common/clock/clock.port';
@@ -21,7 +21,7 @@ describe('RecoverStartupUseCase', () => {
   let mockFallbackWriter: jest.Mocked<FallbackWriterPort>;
   let mockConfigLoader: jest.Mocked<ConfigLoaderPort>;
   let mockBackupLock: jest.Mocked<BackupLockPort>;
-  let mockStorageFactory: jest.Mocked<RemoteStorageFactory>;
+  let mockStorageFactory: jest.Mocked<RemoteStorageFactoryPort>;
   let mockStorage: jest.Mocked<RemoteStoragePort>;
   let mockClock: jest.Mocked<ClockPort>;
   let mockFilesystem: jest.Mocked<FileSystemPort>;

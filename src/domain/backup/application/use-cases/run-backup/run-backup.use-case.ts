@@ -8,7 +8,7 @@ import { DumpEncryptorPort } from '@domain/backup/application/ports/dump-encrypt
 import { GpgKeyManagerPort } from '@domain/backup/application/ports/gpg-key-manager.port';
 import { HookExecutorPort } from '@domain/backup/application/ports/hook-executor.port';
 import { LocalCleanupPort } from '@domain/backup/application/ports/local-cleanup.port';
-import { RemoteStorageFactory } from '@domain/backup/application/ports/remote-storage-factory.port';
+import { RemoteStorageFactoryPort } from '@domain/backup/application/ports/remote-storage-factory.port';
 import { AuditLogPort } from '@domain/audit/application/ports/audit-log.port';
 import { FallbackWriterPort } from '@domain/audit/application/ports/fallback-writer.port';
 import { NotifierPort } from '@domain/notification/application/ports/notifier.port';
@@ -76,7 +76,7 @@ export class RunBackupUseCase {
     @Inject(DUMP_ENCRYPTOR_PORT) private readonly encryptor: DumpEncryptorPort,
     @Inject(HOOK_EXECUTOR_PORT) private readonly hookExecutor: HookExecutorPort,
     @Inject(LOCAL_CLEANUP_PORT) private readonly localCleanup: LocalCleanupPort,
-    @Inject(REMOTE_STORAGE_FACTORY) private readonly storageFactory: RemoteStorageFactory,
+    @Inject(REMOTE_STORAGE_FACTORY) private readonly storageFactory: RemoteStorageFactoryPort,
     @Inject(FILESYSTEM_PORT) private readonly filesystem: FileSystemPort,
     @Inject(GPG_KEY_MANAGER_PORT) private readonly gpgKeyManager: GpgKeyManagerPort,
     configService: ConfigService,

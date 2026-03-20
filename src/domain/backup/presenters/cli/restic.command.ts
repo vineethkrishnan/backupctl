@@ -1,14 +1,14 @@
 import { Inject } from '@nestjs/common';
 import { Command, CommandRunner } from 'nest-commander';
 import { ConfigLoaderPort } from '@domain/config/application/ports/config-loader.port';
-import { RemoteStorageFactory } from '@domain/backup/application/ports/remote-storage-factory.port';
+import { RemoteStorageFactoryPort } from '@domain/backup/application/ports/remote-storage-factory.port';
 import { CONFIG_LOADER_PORT, REMOTE_STORAGE_FACTORY } from '@common/di/injection-tokens';
 
 @Command({ name: 'restic', description: 'Execute raw restic command for a project', arguments: '<project> <command> [args...]' })
 export class ResticCommand extends CommandRunner {
   constructor(
     @Inject(CONFIG_LOADER_PORT) private readonly configLoader: ConfigLoaderPort,
-    @Inject(REMOTE_STORAGE_FACTORY) private readonly storageFactory: RemoteStorageFactory,
+    @Inject(REMOTE_STORAGE_FACTORY) private readonly storageFactory: RemoteStorageFactoryPort,
   ) { super(); }
 
   private static readonly DESTRUCTIVE_COMMANDS = ['forget', 'key', 'prune', 'migrate', 'init'];

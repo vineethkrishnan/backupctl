@@ -35,6 +35,7 @@ export class GetRestoreGuideUseCase {
     const lines: string[] = [];
     const isEncrypted = config.hasEncryption();
     const recipient = config.encryption?.recipient;
+    const ext = this.getDumpExtension(dbType);
     let step = 1;
 
     // Header
@@ -50,11 +51,19 @@ export class GetRestoreGuideUseCase {
     lines.push(`  backupctl snapshots ${config.name}`);
     step++;
 
-    // Step 2: Decrypt (only if encryption is enabled)
+    // Step: Decompress (MySQL and MongoDB produce gzipped output)
+    if (dbType === 'mysql') {
+      lines.push('');
+      lines.push(`Step ${step}: Decompress the dump`);
+      lines.push(`  gunzip <file>${ext}.gz`);
+      step++;
+    }
+
+    // Step: Decrypt (only if encryption is enabled)
     if (isEncrypted) {
       lines.push('');
       lines.push(`Step ${step}: Decrypt the dump (GPG-encrypted)`);
-      lines.push('  gpg --decrypt <file>.dump.gpg > <file>.dump');
+      lines.push(`  gpg --decrypt <file>${ext}.gpg > <file>${ext}`);
       if (recipient) {
         lines.push(`  Recipient: ${recipient}`);
       }
@@ -62,7 +71,7 @@ export class GetRestoreGuideUseCase {
       step++;
     }
 
-    // Step 3: Restore to database
+    // Step: Restore to database
     lines.push('');
     lines.push(`Step ${step}: Restore to database`);
     lines.push(`  ${restoreCommand}`);
@@ -82,10 +91,20 @@ export class GetRestoreGuideUseCase {
   private getRestoreCommand(dbType: string, dbName: string): string | null {
     const commands: Record<string, string> = {
       postgres: `pg_restore -h <HOST> -p <PORT> -U <USER> -d ${dbName} <file>.dump`,
-      mysql: `mysql -h <HOST> -P <PORT> -u <USER> -p ${dbName} < <file>.dump`,
-      mongodb: `mongorestore --host <HOST> --port <PORT> -u <USER> -d ${dbName} <dump_directory>`,
+      mysql: `mysql -h <HOST> -P <PORT> -u <USER> -p ${dbName} < <file>.sql`,
+      mongodb: `mongorestore --host <HOST> --port <PORT> -u <USER> -d ${dbName} --gzip --archive=<file>.archive.gz`,
     };
 
     return commands[dbType] ?? null;
+  }
+
+  private getDumpExtension(dbType: string): string {
+    const extensions: Record<string, string> = {
+      postgres: '.dump',
+      mysql: '.sql',
+      mongodb: '.archive.gz',
+    };
+
+    return extensions[dbType] ?? '.dump';
   }
 }
