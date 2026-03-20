@@ -13,6 +13,8 @@ For full details, see the [CLI Reference](06-cli-reference.md).
 
 ## Daily Operations
 
+![backupctl run](/images/09-run-backup.png)
+
 ```bash
 # Run a backup
 backupctl run myproject
@@ -209,6 +211,8 @@ gpg --export --armor your@email.com > gpg-keys/backup.pub
 ```
 
 ## Diagnostics
+
+![backupctl health](/images/01-health.png)
 
 ```bash
 # System health

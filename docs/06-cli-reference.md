@@ -85,6 +85,8 @@ backupctl run --all
 
 **Dry run — all checks pass:**
 
+![backupctl run --dry-run](/images/03-dry-run.png)
+
 ```
 $ backupctl run locaboo --dry-run
 
@@ -120,6 +122,8 @@ Validating config and connectivity without executing backup.
 ```
 
 **Single project backup:**
+
+![backupctl run](/images/09-run-backup.png)
 
 ```
 $ backupctl run locaboo
@@ -209,6 +213,8 @@ backupctl status <project> [--last <n>]
 
 **All projects summary:**
 
+![backupctl status](/images/15-status-all.png)
+
 ```
 $ backupctl status
 
@@ -221,6 +227,8 @@ project-y     2026-03-18 02:00:00   failed    6s        2026-03-19 02:00:00
 ```
 
 **Single project history:**
+
+![backupctl status](/images/05-status.png)
 
 ```
 $ backupctl status locaboo --last 5
@@ -277,6 +285,8 @@ None.
 ### Examples
 
 **Healthy system:**
+
+![backupctl health](/images/01-health.png)
 
 ```
 $ backupctl health
@@ -463,6 +473,8 @@ backupctl snapshots <project> [--last <n>]
 
 **Combined snapshot mode:**
 
+![backupctl snapshots](/images/04-snapshots.png)
+
 ```
 $ backupctl snapshots locaboo --last 5
 
@@ -589,6 +601,8 @@ backupctl logs <project> [--last <n>] [--failed]
 
 **Recent logs:**
 
+![backupctl logs](/images/10-logs.png)
+
 ```
 $ backupctl logs locaboo --last 5
 
@@ -655,6 +669,8 @@ backupctl config import-gpg-key <file>
 
 **Validate — all valid:**
 
+![backupctl config validate](/images/02-config-validate.png)
+
 ```
 $ backupctl config validate
 
@@ -684,6 +700,8 @@ Validating config/projects.yml...
 ```
 
 **Show resolved config (secrets masked):**
+
+![backupctl config show](/images/08-config-show.png)
 
 ```
 $ backupctl config show locaboo
@@ -802,6 +820,8 @@ backupctl cache --clear-all
 
 **Show cache info:**
 
+![backupctl cache](/images/07-cache.png)
+
 ```
 $ backupctl cache locaboo
 
@@ -869,6 +889,8 @@ backupctl restic <project> <cmd> [args...]
 
 **List snapshots:**
 
+![backupctl restic snapshots](/images/13-restic-snapshots.png)
+
 ```
 $ backupctl restic locaboo snapshots
 
@@ -883,6 +905,8 @@ ghi11223  2026-03-16 00:01:12  backupctl   backupctl:combined,project:locaboo   
 ```
 
 **Check repository integrity:**
+
+![backupctl restic check](/images/06-restic-check.png)
 
 ```
 $ backupctl restic locaboo check
@@ -899,6 +923,8 @@ no errors were found
 
 **Repository statistics:**
 
+![backupctl restic stats](/images/11-restic-stats.png)
+
 ```
 $ backupctl restic locaboo stats
 
@@ -912,6 +938,8 @@ Stats in restore-size mode:
 
 **List files in latest snapshot:**
 
+![backupctl restic ls latest](/images/12-restic-ls.png)
+
 ```
 $ backupctl restic locaboo ls latest
 
@@ -924,6 +952,8 @@ snapshot abc12345 of [/data/backups/locaboo] at 2026-03-18 00:01:15
 ```
 
 **Find a specific file across snapshots:**
+
+![backupctl restic find](/images/14-restic-find.png)
 
 ```
 $ backupctl restic locaboo find "*.sql.gz"

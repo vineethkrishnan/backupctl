@@ -60,3 +60,4 @@ _knowledgebase/
 # VitePress
 docs/.vitepress/dist/
 docs/.vitepress/cache/
+_screenshots/
