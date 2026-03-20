@@ -1,5 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { ConfigLoaderPort } from '@domain/config/application/ports/config-loader.port';
+import { ProjectConfig } from '@domain/config/domain/project-config.model';
 import { CONFIG_LOADER_PORT } from '@common/di/injection-tokens';
 import { GetRestoreGuideQuery } from './get-restore-guide.query';
 
@@ -20,35 +21,71 @@ export class GetRestoreGuideUseCase {
     if (!db) {
       return 'This project has no database configured — restore guide is only available for database backups.';
     }
-    const dbType = db.type.toLowerCase();
 
-    const guides: Record<string, string> = {
-      postgres: [
-        `Restore steps for PostgreSQL (database: ${db.name}):`,
-        '1. pg_restore -h <HOST> -p <PORT> -U <USER> -d <DBNAME> <dump_file>',
-        '2. If compressed: gunzip the file first, then run pg_restore',
-        '3. If encrypted: gpg --decrypt <file>.gpg > <file> first',
-        '',
-        'Tip: Connection details are in your projects.yml config.',
-      ].join('\n'),
-      mysql: [
-        `Restore steps for MySQL (database: ${db.name}):`,
-        '1. mysql -h <HOST> -P <PORT> -u <USER> -p <DBNAME> < <dump_file>',
-        '2. If compressed: gunzip the file first, then import',
-        '3. If encrypted: gpg --decrypt <file>.gpg > <file> first',
-        '',
-        'Tip: Connection details are in your projects.yml config.',
-      ].join('\n'),
-      mongodb: [
-        `Restore steps for MongoDB (database: ${db.name}):`,
-        '1. mongorestore --host <HOST> --port <PORT> -u <USER> -d <DBNAME> <dump_directory>',
-        '2. If compressed: the archive will be auto-decompressed by mongorestore',
-        '3. If encrypted: gpg --decrypt <file>.gpg > <file> first',
-        '',
-        'Tip: Connection details are in your projects.yml config.',
-      ].join('\n'),
+    const dbType = db.type.toLowerCase();
+    const restoreCommand = this.getRestoreCommand(dbType, db.name);
+    if (!restoreCommand) {
+      return `No restore guide available for database type: ${dbType}`;
+    }
+
+    return this.buildGuide(config, dbType, db.name, restoreCommand);
+  }
+
+  private buildGuide(config: ProjectConfig, dbType: string, dbName: string, restoreCommand: string): string {
+    const lines: string[] = [];
+    const isEncrypted = config.hasEncryption();
+    const recipient = config.encryption?.recipient;
+    let step = 1;
+
+    // Header
+    lines.push(`Restore Guide for ${config.name} (${dbType} — ${dbName})`);
+    lines.push('═'.repeat(60));
+    lines.push('');
+
+    // Step 1: Restore from Restic
+    lines.push(`Step ${step}: Restore snapshot from Restic`);
+    lines.push(`  backupctl restore ${config.name} <SNAPSHOT_ID> <OUTPUT_PATH>`);
+    lines.push('');
+    lines.push('  To find available snapshots:');
+    lines.push(`  backupctl snapshots ${config.name}`);
+    step++;
+
+    // Step 2: Decrypt (only if encryption is enabled)
+    if (isEncrypted) {
+      lines.push('');
+      lines.push(`Step ${step}: Decrypt the dump (GPG-encrypted)`);
+      lines.push('  gpg --decrypt <file>.dump.gpg > <file>.dump');
+      if (recipient) {
+        lines.push(`  Recipient: ${recipient}`);
+      }
+      lines.push('  ⚠ The private key must be available in your GPG keyring');
+      step++;
+    }
+
+    // Step 3: Restore to database
+    lines.push('');
+    lines.push(`Step ${step}: Restore to database`);
+    lines.push(`  ${restoreCommand}`);
+    step++;
+
+    // Footer
+    lines.push('');
+    lines.push('─'.repeat(60));
+    lines.push('Tip: Connection details are in your projects.yml config.');
+    if (isEncrypted) {
+      lines.push('Tip: Never store the GPG private key on the backup server.');
+    }
+
+    return lines.join('\n');
+  }
+
+  private getRestoreCommand(dbType: string, dbName: string): string | null {
+    const commands: Record<string, string> = {
+      postgres: `pg_restore -h <HOST> -p <PORT> -U <USER> -d ${dbName} <file>.dump`,
+      mysql: `mysql -h <HOST> -P <PORT> -u <USER> -p ${dbName} < <file>.dump`,
+      mongodb: `mongorestore --host <HOST> --port <PORT> -u <USER> -d ${dbName} <dump_directory>`,
     };
 
-    return guides[dbType] ?? `No restore guide available for database type: ${dbType}`;
+    return commands[dbType] ?? null;
   }
 }

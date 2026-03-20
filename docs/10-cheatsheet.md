@@ -1,6 +1,15 @@
 # Cheatsheet
 
-Quick-reference commands for daily backupctl operations. For full details, see the [CLI Reference](06-cli-reference.md).
+Quick-reference commands for daily backupctl operations. All commands below use the `backupctl` CLI shortcut on your host, installed via `scripts/install-cli.sh`.
+
+::: info Without CLI shortcuts
+If you haven't installed CLI shortcuts via `./scripts/install-cli.sh`, prefix all commands with:
+`docker exec backupctl node dist/cli.js` instead of `backupctl`
+
+Example: `docker exec backupctl node dist/cli.js health` instead of `backupctl health`
+:::
+
+For full details, see the [CLI Reference](06-cli-reference.md).
 
 ## Daily Operations
 
@@ -32,16 +41,35 @@ backupctl snapshots myproject
 backupctl snapshots myproject --last 10
 
 # Restore latest
-backupctl restore myproject latest /data/restore/
+backupctl restore myproject latest /tmp/restore
 
 # Restore specific snapshot
-backupctl restore myproject a1b2c3d4 /data/restore/
+backupctl restore myproject a1b2c3d4 /tmp/restore
 
 # Restore DB only + decompress + import guide
-backupctl restore myproject latest /data/restore/ --only db --decompress --guide
+backupctl restore myproject latest /tmp/restore --only db --decompress --guide
 
 # Restore assets only
-backupctl restore myproject latest /data/restore/ --only assets
+backupctl restore myproject latest /tmp/restore --only assets
+```
+
+### Encrypted Backup Restore
+
+```bash
+# 1. Restore encrypted dump from restic
+backupctl restore myproject latest /tmp/restore --only db
+
+# 2. Copy to local machine (that has the private GPG key)
+docker cp backupctl:/tmp/restore/data/backups/myproject/myproject_backup.dump.gpg ./
+
+# 3. Decrypt locally
+gpg --decrypt myproject_backup.dump.gpg > myproject_backup.dump
+
+# 4. Verify dump integrity
+pg_restore --list myproject_backup.dump | head -20
+
+# 5. Import to database
+pg_restore -h localhost -p 5432 -U myuser -d mydb myproject_backup.dump
 ```
 
 ## Configuration
@@ -53,11 +81,22 @@ backupctl config validate
 # Show resolved config (secrets masked)
 backupctl config show myproject
 
-# Reload after editing YAML
+# Reload after editing projects.yml cron schedule
 backupctl config reload
 
 # Import GPG key
-backupctl config import-gpg-key /path/to/key.pub.gpg
+backupctl config import-gpg-key /app/gpg-keys/key.pub
+```
+
+### When to reload vs restart
+
+```bash
+# projects.yml changes (except cron) → nothing needed, re-read on next run
+# projects.yml cron change → reload
+backupctl config reload
+
+# .env changes → container restart
+docker compose up -d --force-recreate backupctl
 ```
 
 ## Maintenance
@@ -82,49 +121,38 @@ backupctl restic myproject snapshots        # list snapshots
 backupctl restic myproject check            # verify repo integrity
 backupctl restic myproject stats            # repo size statistics
 backupctl restic myproject ls latest        # list files in latest snapshot
-backupctl restic myproject find "*.sql.gz"  # find files across snapshots
+backupctl restic myproject find "*.dump"    # find files across snapshots
 backupctl restic myproject unlock           # unlock stuck repository
 backupctl restic myproject init             # initialize new repo
 backupctl restic myproject diff abc def     # diff two snapshots
-backupctl restic myproject mount /mnt       # browse snapshots via FUSE
-backupctl restic myproject dump latest /path/to/file > out.dump  # extract single file
 ```
 
-## CLI Shortcuts
-
-After running `./scripts/install-cli.sh`, you can use `backupctl` and `backupctl-dev` from any directory:
+## First-Time Setup
 
 ```bash
-# Production
+# 1. Create directories on Hetzner Storage Box
+docker exec -i backupctl sftp -i /home/node/.ssh/id_ed25519 \
+  -P 23 -o StrictHostKeyChecking=accept-new \
+  u123456@u123456.your-storagebox.de <<'EOF'
+mkdir backups
+mkdir backups/myproject
+bye
+EOF
+
+# 2. Initialize restic repository
+backupctl restic myproject init
+
+# 3. Run health check
 backupctl health
+
+# 4. Dry run
 backupctl run myproject --dry-run
-backupctl status myproject --last 5
 
-# Development
-backupctl-dev health
-backupctl-dev config show myproject
-backupctl-dev run myproject --dry-run
-```
+# 5. First real backup
+backupctl run myproject
 
-Install shortcuts: `./scripts/install-cli.sh` (or `--user` / `--system` flags).
-
-## Host Scripts
-
-```bash
-./scripts/install.sh                            # first-time setup wizard
-./scripts/install-cli.sh                        # install backupctl/backupctl-dev commands
-./scripts/dev.sh up                             # start dev environment
-./scripts/dev.sh cli health                     # dev CLI commands
-./scripts/dev.sh test                           # run tests
-./scripts/dev.sh analyze                        # static analysis
-./scripts/backupctl-manage.sh deploy             # build + start containers
-./scripts/backupctl-manage.sh deploy --rebuild   # force rebuild + restart
-./scripts/backupctl-manage.sh update             # pull + rebuild + restart
-./scripts/backupctl-manage.sh check              # validate prerequisites
-./scripts/backupctl-manage.sh logs               # tail container logs
-./scripts/backupctl-manage.sh shell              # shell into container
-./scripts/backupctl-manage.sh status             # quick status overview
-./scripts/backupctl-manage.sh backup-dir         # show backup directory sizes
+# 6. Verify
+backupctl snapshots myproject --last 1
 ```
 
 ## Docker Commands
@@ -137,17 +165,17 @@ docker compose down -v               # stop + remove volumes
 docker compose ps                    # check container status
 docker compose logs -f backupctl     # follow application logs
 
-# Without CLI shortcuts — execute commands inside the container
-docker exec backupctl node dist/cli.js health
-docker exec backupctl node dist/cli.js run myproject --dry-run
-docker exec backupctl node dist/cli.js status
-docker exec -it backupctl sh         # interactive shell
+# Shell into container
+docker exec -it backupctl sh
+
+# Container restart (after .env changes)
+docker compose up -d --force-recreate backupctl
 ```
 
 ## Database Import (After Restore)
 
 ```bash
-# PostgreSQL (custom format)
+# PostgreSQL (custom format — the default)
 pg_restore -h localhost -p 5432 -U myuser -d mydb --clean --if-exists restored.dump
 
 # PostgreSQL (plain SQL)
@@ -174,21 +202,20 @@ gpg --decrypt file.dump.gpg > file.dump
 docker exec backupctl gpg --list-keys
 
 # Import a key (inside container)
-docker exec backupctl gpg --import /app/gpg-keys/backup-key.pub.gpg
+docker exec backupctl gpg --import /app/gpg-keys/backup.pub
+
+# Export your public key for the server
+gpg --export --armor your@email.com > gpg-keys/backup.pub
 ```
 
 ## Diagnostics
 
 ```bash
-# System-wide health
+# System health
 backupctl health
 
-# Verbose mode — shows bootstrap, DB connections, debug logs
+# Verbose mode — shows bootstrap details
 backupctl -v health
-backupctl --verbose run myproject --dry-run
-
-# Validate config
-backupctl config validate
 
 # Pre-flight check (no actual backup)
 backupctl run myproject --dry-run
@@ -197,13 +224,27 @@ backupctl run myproject --dry-run
 docker exec backupctl find /data/backups -name ".lock" -ls
 
 # View fallback audit entries
-docker exec backupctl cat /data/backups/.fallback-audit/fallback.jsonl
+docker exec backupctl cat /data/backups/.fallback/fallback.jsonl
 
 # View today's application log
 docker exec backupctl cat /data/backups/.logs/backupctl-$(date +%Y-%m-%d).log
 
 # Force remove a stale lock
 docker exec backupctl rm /data/backups/myproject/.lock
+
+# Check environment variables
+docker exec backupctl env | sort
+
+# Test SSH connectivity to storage box
+docker exec backupctl ssh -F /home/node/.ssh/config \
+  -i /home/node/.ssh/id_ed25519 -p 23 \
+  u123456@u123456.your-storagebox.de ls
+
+# Test database connectivity
+docker exec backupctl pg_isready -h backupctl-audit-db -p 5432
+
+# Verify backup integrity
+backupctl restic myproject check
 ```
 
 ## Exit Codes
@@ -223,11 +264,11 @@ docker exec backupctl rm /data/backups/myproject/.lock
 |------|-------------|
 | `/data/backups/<project>/` | Project backup dumps |
 | `/data/backups/<project>/.lock` | Per-project lock file |
-| `/data/backups/.fallback-audit/fallback.jsonl` | JSONL fallback audit entries |
+| `/data/backups/.fallback/fallback.jsonl` | JSONL fallback audit entries |
 | `/data/backups/.logs/` | Winston log files (daily rotation) |
 | `/app/config/projects.yml` | Project configuration |
 | `/home/node/.ssh/` | SSH keys for restic SFTP |
-| `/app/gpg-keys/` | GPG public/private keys |
+| `/app/gpg-keys/` | GPG public keys |
 
 ## File Locations (Host)
 
@@ -235,12 +276,10 @@ docker exec backupctl rm /data/backups/myproject/.lock
 |------|-------------|
 | `config/projects.yml` | Project configuration (mounted read-only) |
 | `.env` | Global secrets and defaults |
-| `ssh-keys/` | SSH keys (mounted read-only) |
+| `ssh-keys/` | SSH keys + config + known_hosts (mounted read-only) |
 | `gpg-keys/` | GPG keys (mounted read-only) |
 | `scripts/` | Host-side management scripts |
 
-## What's Next
+---
 
-- **Full command details** — [CLI Reference](06-cli-reference.md)
-- **Restore walkthrough** — [Restore Guide](09-restore-guide.md)
-- **Something broken?** — [Troubleshooting](12-troubleshooting.md)
+**Something broken?** — [Troubleshooting](12-troubleshooting.md) | [FAQ](15-faq.md) | **[Report an issue](https://github.com/vineethkrishnan/backupctl/issues/new)**

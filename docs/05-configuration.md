@@ -502,6 +502,12 @@ backupctl config show locaboo
 - Retention values are non-negative
 - GPG recipient is set when encryption is enabled
 
+## Getting Help
+
+- **Config not working?** — Run `backupctl config validate` to check for errors
+- **Need examples?** — See the [Complete Multi-Project Example](#complete-multi-project-example) above
+- **Still stuck?** — **[Report an issue on GitHub](https://github.com/vineethkrishnan/backupctl/issues/new)**
+
 ## What's Next
 
 - **Run commands** — [CLI Reference](06-cli-reference.md) covers all 14 commands with flags and examples.

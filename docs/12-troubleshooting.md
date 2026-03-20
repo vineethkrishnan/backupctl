@@ -420,6 +420,148 @@ docker exec backupctl env | sort
 
 Winston logs use JSON format in production and pretty-printed format in development. Log files are rotated daily and named `backupctl-YYYY-MM-DD.log`.
 
+## Permission Denied on Backup Directory
+
+**Symptom:** Container fails to start or backup fails with:
+
+```
+EACCES: permission denied, mkdir '/data/backups/.logs'
+```
+
+**Why:** The `BACKUP_BASE_DIR` volume is mounted to a host directory owned by root, but the container runs as the `node` user (UID 1000).
+
+**Fix:**
+
+Ensure the host directory exists and is writable:
+
+```bash
+# Create backup directories on the host
+mkdir -p ~/backupctl/data/backups
+
+# Map the host path in docker-compose.yml
+volumes:
+  - /home/youruser/backupctl/data/backups:/data/backups
+```
+
+Or set ownership on the host:
+
+```bash
+sudo chown -R 1000:1000 /data/backups
+```
+
+The container entrypoint automatically creates `.logs` and `.fallback` subdirectories on startup.
+
+---
+
+## Database Migrations Not Run
+
+**Symptom:** The application starts but audit-related operations fail with:
+
+```
+QueryFailedError: relation "backup_log" does not exist
+```
+
+**Why:** The TypeORM migrations haven't been executed. This creates the required database tables.
+
+**Fix:**
+
+Migrations run automatically on container startup via the entrypoint script. If they didn't run (check container logs for the migration output), run them manually:
+
+```bash
+docker exec backupctl npx typeorm migration:run -d dist/db/datasource.js
+```
+
+You should see:
+
+```
+query: SELECT * FROM "migrations" WHERE "name" = '...'
+Migration CreateBackupLogTable has been executed successfully.
+```
+
+---
+
+## Backup Succeeds but No Notification Sent
+
+**Symptom:** Backup completes with `✅ success` but no Slack/email/webhook notification is delivered.
+
+**Why:** The notification channel is not configured. If `notification` is absent from both `projects.yml` and `.env`, notifications are silently disabled.
+
+**Diagnosis:**
+
+```bash
+# Check if notification type is configured
+backupctl run myproject --dry-run
+```
+
+If the dry-run shows "Notifications disabled" instead of a notifier check, no notification channel is set.
+
+**Fix:**
+
+Add notification config to `.env`:
+
+```env
+NOTIFICATION_TYPE=slack
+SLACK_WEBHOOK_URL=https://hooks.slack.com/services/T.../B.../xxx
+```
+
+Or per-project in `projects.yml`:
+
+```yaml
+notification:
+  type: slack
+  config:
+    webhook_url: https://hooks.slack.com/services/T.../B.../xxx
+```
+
+Then restart the container:
+
+```bash
+docker compose restart backupctl
+```
+
+---
+
+## Restic SFTP Failure with "Read-only file system"
+
+**Symptom:**
+
+```
+Fatal: unable to open config file: Lstat: file does not exist
+sftp: "Failure" (SSH_FX_FAILURE)
+```
+
+Or when trying to create directories:
+
+```
+Couldn't create directory: Failure
+```
+
+**Why:** Hetzner Storage Box uses relative paths from the user home directory. Using an absolute path like `/backups/myproject` tries to access the root filesystem, which is read-only.
+
+**Fix:**
+
+Use **relative paths** in `projects.yml`:
+
+```yaml
+restic:
+  repository_path: backups/myproject    # ✅ Relative — correct
+  # repository_path: /backups/myproject # ❌ Absolute — will fail
+```
+
+Create the directory via SFTP using relative paths:
+
+```bash
+docker exec -i backupctl sftp -i /home/node/.ssh/id_ed25519 \
+  -P 23 -o StrictHostKeyChecking=accept-new \
+  u123456@u123456.your-storagebox.de <<'EOF'
+mkdir backups
+mkdir backups/myproject
+bye
+EOF
+```
+
+---
+
 ## Getting More Help
 
 Start with these commands to narrow down the problem:
@@ -442,6 +584,8 @@ backupctl logs myproject --failed
 ```
 
 If the issue is specific to a backup stage, consult [Backup Flow](08-backup-flow.md) to understand what happens at each step and which adapter is involved.
+
+**Still stuck?** — **[Report an issue on GitHub](https://github.com/vineethkrishnan/backupctl/issues/new)**
 
 ## What's Next
 

@@ -417,23 +417,39 @@ projects:
 
 ### 5. SSH Key Setup
 
-Generate an SSH key pair, copy the public key to the Hetzner Storage Box, and scan the host key:
+Generate an SSH key pair, copy the public key to the Hetzner Storage Box, scan the host key, and create an SSH config file:
 
 ```bash
 # Generate key (skip if you already have one)
 ssh-keygen -t ed25519 -f ./ssh-keys/id_ed25519 -N ""
 
-# Copy public key to storage box
-cat ./ssh-keys/id_ed25519.pub | ssh u123456@u123456.your-storagebox.de install-ssh-key
+# Copy public key to storage box (requires the storage box password once)
+cat ./ssh-keys/id_ed25519.pub | ssh -p 23 u123456@u123456.your-storagebox.de install-ssh-key
 
 # Scan host key for non-interactive use
-ssh-keyscan u123456.your-storagebox.de > ./ssh-keys/known_hosts
-
-# Verify connection
-ssh -i ./ssh-keys/id_ed25519 u123456@u123456.your-storagebox.de ls
+ssh-keyscan -p 23 u123456.your-storagebox.de > ./ssh-keys/known_hosts
 ```
 
-The `known_hosts` file is critical. Without it, SSH connections during cron-triggered backups will fail — there is no interactive host key confirmation in non-interactive mode.
+Create an SSH config file at `ssh-keys/config` — this is **required** for restic to find the correct key, port, and known_hosts:
+
+```
+Host u123456.your-storagebox.de
+    User u123456
+    Port 23
+    IdentityFile /home/node/.ssh/id_ed25519
+    UserKnownHostsFile /home/node/.ssh/known_hosts
+    StrictHostKeyChecking accept-new
+```
+
+Verify the connection:
+
+```bash
+ssh -F ./ssh-keys/config -i ./ssh-keys/id_ed25519 -p 23 u123456@u123456.your-storagebox.de ls
+```
+
+::: warning
+The `known_hosts` file and `config` file are both critical. Without them, SSH connections during cron-triggered backups will fail — there is no interactive host key confirmation in non-interactive mode. The `UserKnownHostsFile` directive in the config ensures restic's SSH subprocess uses the scanned host keys.
+:::
 
 ### 6. GPG Keys (Optional)
 
@@ -474,13 +490,41 @@ docker compose up -d --build
 
 ### 8. Initialize Restic Repos
 
-Each project needs a one-time restic repository initialization on the remote storage box:
+Each project needs a one-time restic repository initialization. First, create the directory on the storage box via SFTP, then initialize the restic repo.
+
+**Step 1 — Create the directory on the storage box:**
+
+```bash
+docker exec -i backupctl sftp -i /home/node/.ssh/id_ed25519 \
+  -P 23 -o StrictHostKeyChecking=accept-new \
+  u123456@u123456.your-storagebox.de <<'EOF'
+mkdir backups
+mkdir backups/locaboo
+bye
+EOF
+```
+
+::: tip
+Hetzner Storage Box paths must be **relative** (e.g., `backups/locaboo`, not `/backups/locaboo`). The storage box chroots to the user's home directory, so `/backups` refers to a read-only system path.
+:::
+
+**Step 2 — Initialize the restic repository:**
 
 ```bash
 docker exec backupctl node dist/cli.js restic locaboo init
 ```
 
-Repeat for each project defined in `projects.yml`.
+Expected output:
+
+```
+created restic repository at sftp:u123456@u123456.your-storagebox.de:backups/locaboo
+
+Please note that knowledge of your password is required to access
+the repository. Losing your password means that your data is
+irrecoverably lost.
+```
+
+Repeat both steps for each project defined in `projects.yml`.
 
 ### 9. Run Health Check
 
@@ -592,6 +636,15 @@ cd .. && rm -rf backupctl
 ```
 
 Remote restic snapshots on the Hetzner Storage Box are not affected by uninstalling the local service. To remove remote data, connect to the storage box directly and delete the repository directories.
+
+## Getting Help
+
+If you run into issues during installation:
+
+1. Check the [Troubleshooting](12-troubleshooting.md) guide for common errors
+2. Review the [FAQ](15-faq.md) for setup-specific issues (SSH, GPG, restic, Docker networking)
+3. Run `backupctl health` and `backupctl run <project> --dry-run` to diagnose connectivity
+4. **[Report an issue on GitHub](https://github.com/vineethkrishnan/backupctl/issues/new)** if you're stuck
 
 ## What's Next
 

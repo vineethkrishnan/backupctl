@@ -4,300 +4,399 @@
 
 backupctl extracts backup files from restic snapshots — it does **not** automatically import data into your database. This is a deliberate design decision: automatic imports risk overwriting production data, and every database engine has its own import nuances that require operator judgment.
 
-Restoring a backup is a two-step process:
+The restore process depends on whether your backup is **encrypted** or **unencrypted**:
 
-1. **Extract** — use `backupctl restore` to pull files from a restic snapshot to a local directory
-2. **Import** — manually import the extracted dump into your database using the appropriate tool
+| Backup Type | Steps |
+|-------------|-------|
+| Unencrypted | Restore from restic → Import to database |
+| GPG-encrypted | Restore from restic → Decrypt with GPG → Import to database |
 
-The `--guide` flag prints database-specific import instructions tailored to each project's configured database type, so you never have to look up the syntax yourself.
+::: info Command notation
+All commands below use the `backupctl` CLI shortcut (installed via `scripts/install-cli.sh`). If you haven't installed it, prefix commands with `docker exec backupctl node dist/cli.js` instead.
+
+Example: `docker exec backupctl node dist/cli.js snapshots myproject` instead of `backupctl snapshots myproject`
+:::
+
+The `--guide` flag prints a config-aware restore guide tailored to your project's exact setup (database type, encryption status, GPG recipient).
+
+---
 
 ## Quick Restore
 
-Restore the most recent snapshot:
+**Unencrypted backup:**
 
 ```bash
-backupctl restore myproject latest /data/restore/
+# Restore latest snapshot
+backupctl restore myproject latest /tmp/restore
+
+# Restore + decompress + show import guide
+backupctl restore myproject latest /tmp/restore --only db --decompress --guide
 ```
 
-Restore a specific snapshot by ID:
+**Encrypted backup:**
 
 ```bash
-backupctl restore myproject a1b2c3d4 /data/restore/
+# Step 1: Restore from restic (gets the .dump.gpg file)
+backupctl restore myproject latest /tmp/restore --only db
+
+# Step 2: Copy .gpg file to a machine that has the private key
+docker cp backupctl:/tmp/restore/myproject_backup_20260320.dump.gpg ./
+
+# Step 3: Decrypt with your private GPG key
+gpg --decrypt myproject_backup_20260320.dump.gpg > myproject_backup_20260320.dump
+
+# Step 4: Import to database
+pg_restore -h localhost -p 5432 -U myuser -d mydb myproject_backup_20260320.dump
 ```
 
-Restore with auto-decompress and import instructions:
+---
+
+## Step-by-Step: Unencrypted Backup
+
+### 1. Find the snapshot
 
 ```bash
-backupctl restore myproject latest /data/restore/ --only db --decompress --guide
+backupctl snapshots myproject --last 5
 ```
 
-## Step-by-Step Restore
+Output:
 
-### 1. Identify the snapshot
+```
+Snapshots for myproject:
 
-List recent snapshots to find the one you need:
+ID          Time                        Tags
+────────────────────────────────────────────────────────────────────────
+35ba0d0439  2026-03-20T02:00:27Z        project:myproject, db:postgres
+aa4e3c4dae  2026-03-19T02:00:37Z        project:myproject, db:postgres
+```
+
+Note the snapshot ID (e.g., `35ba0d0439`).
+
+### 2. Restore from restic
 
 ```bash
-backupctl snapshots myproject --last 10
+backupctl restore myproject 35ba0d0439 /tmp/restore
 ```
 
-Each snapshot shows a short ID, timestamp, and tags. Note the snapshot ID for the next step.
-
-### 2. Restore files from the snapshot
-
-Extract the snapshot contents to a local directory:
+### 3. Check restored files
 
 ```bash
-backupctl restore myproject <snapshot-id> /data/restore/
+docker exec backupctl ls -la /tmp/restore/
 ```
 
-The restore directory will contain the database dump file and, if the project backs up assets, the asset files in their original directory structure.
+You should see a `.dump` file (PostgreSQL custom format, already compressed internally).
 
-### 3. Decrypt (if GPG encryption was enabled)
-
-If the project has GPG encryption configured, the dump file will have a `.gpg` extension. Decrypt it before importing:
+### 4. Import to database
 
 ```bash
-gpg --decrypt restored_file.dump.gpg > restored_file.dump
+# PostgreSQL
+pg_restore -h <HOST> -p <PORT> -U <USER> -d <DBNAME> /tmp/restore/myproject_backup_20260320.dump
+
+# MySQL
+mysql -h <HOST> -P <PORT> -u <USER> -p <DBNAME> < /tmp/restore/myproject_backup_20260320.sql
+
+# MongoDB
+mongorestore --host <HOST> --port <PORT> -u <USER> -d <DBNAME> --gzip --archive=/tmp/restore/myproject_backup_20260320.archive
 ```
 
-Alternatively, use `--decompress` during restore to handle decryption and decompression automatically:
+### 5. Clean up
 
 ```bash
-backupctl restore myproject <snapshot-id> /data/restore/ --decompress
+docker exec backupctl rm -rf /tmp/restore
 ```
 
-### 4. Decompress (if not using --decompress)
+---
 
-If you skipped the `--decompress` flag, decompress manually:
+## Step-by-Step: Encrypted Backup (GPG)
+
+When GPG encryption is enabled, the backup flow produces a `.dump.gpg` file instead of a plain `.dump`. The file is encrypted with the **public key** configured in your project. You need the corresponding **private key** to decrypt it.
+
+::: danger Important
+**Never store the GPG private key on the backup server.** The private key should remain on a secure machine (your workstation, a hardware key, or a dedicated restore server). This ensures that even if the backup server is compromised, the attacker cannot decrypt your backups.
+:::
+
+### 1. Find the snapshot
 
 ```bash
-# For .gz files
-gunzip restored_file.sql.gz
-
-# For .dump files (PostgreSQL custom format) — no decompression needed
-# pg_restore handles the format natively
+backupctl snapshots myproject --last 5
 ```
 
-### 5. Import into the database
-
-This is the manual step. See the [Database Import Instructions](#database-import-instructions) section below for commands specific to each database type, or use `--guide` to have backupctl print them for you:
+### 2. Restore the encrypted dump from restic
 
 ```bash
-backupctl restore myproject latest /data/restore/ --guide
+backupctl restore myproject aa4e3c4dae /tmp/restore --only db
 ```
+
+### 3. Copy the encrypted file to your local machine
+
+The `.dump.gpg` file needs to be decrypted on a machine that has the GPG private key:
+
+```bash
+# Copy from the container to the Docker host
+docker cp backupctl:/tmp/restore/data/backups/myproject/myproject_backup_20260320.dump.gpg /tmp/
+
+# If accessing a remote server, copy to your local machine
+scp user@server:/tmp/myproject_backup_20260320.dump.gpg ./
+```
+
+### 4. Decrypt with GPG
+
+On the machine with the private key:
+
+```bash
+gpg --decrypt myproject_backup_20260320.dump.gpg > myproject_backup_20260320.dump
+```
+
+Expected output:
+
+```
+gpg: encrypted with rsa4096 key, ID CF7D15E776A1FD1E, created 2026-03-18
+      "Your Name <your@email.com>"
+```
+
+### 5. Verify the decrypted dump
+
+Before importing, verify the dump is valid and not corrupted:
+
+```bash
+# PostgreSQL: list table of contents
+pg_restore --list myproject_backup_20260320.dump | head -20
+
+# Check file size is reasonable
+ls -lh myproject_backup_20260320.dump
+```
+
+### 6. Verify integrity (optional but recommended)
+
+Compare the SHA-256 checksum of the decrypted dump against the original (if you still have the pre-encryption `.dump` on the server):
+
+```bash
+# On the server
+docker exec backupctl sha256sum /data/backups/myproject/myproject_backup_20260320.dump
+
+# On your local machine
+shasum -a 256 myproject_backup_20260320.dump
+```
+
+Both checksums should be identical, confirming zero corruption through the encrypt → restic → restore → decrypt chain.
+
+### 7. Import to database
+
+```bash
+pg_restore -h localhost -p 5432 -U myuser -d mydb myproject_backup_20260320.dump
+```
+
+### 8. Clean up
+
+```bash
+# On your local machine
+rm myproject_backup_20260320.dump myproject_backup_20260320.dump.gpg
+
+# On the server
+docker exec backupctl rm -rf /tmp/restore
+```
+
+---
+
+## Using --guide for Config-Aware Instructions
+
+The `--guide` flag generates restore instructions tailored to your project's configuration. It reads the project config and adjusts the steps based on whether encryption is enabled, which database type is configured, and which GPG recipient to use.
+
+```bash
+backupctl restore myproject latest /tmp/restore --guide
+```
+
+**Example output for an encrypted PostgreSQL project:**
+
+```
+Restore Guide for myproject (postgres — mydb)
+════════════════════════════════════════════════════════════
+
+Step 1: Restore snapshot from Restic
+  backupctl restore myproject <SNAPSHOT_ID> <OUTPUT_PATH>
+
+  To find available snapshots:
+  backupctl snapshots myproject
+
+Step 2: Decrypt the dump (GPG-encrypted)
+  gpg --decrypt <file>.dump.gpg > <file>.dump
+  Recipient: your@email.com
+  ⚠ The private key must be available in your GPG keyring
+
+Step 3: Restore to database
+  pg_restore -h <HOST> -p <PORT> -U <USER> -d mydb <file>.dump
+
+────────────────────────────────────────────────────────────
+Tip: Connection details are in your projects.yml config.
+Tip: Never store the GPG private key on the backup server.
+```
+
+**Example output for an unencrypted project:**
+
+```
+Restore Guide for myproject (postgres — mydb)
+════════════════════════════════════════════════════════════
+
+Step 1: Restore snapshot from Restic
+  backupctl restore myproject <SNAPSHOT_ID> <OUTPUT_PATH>
+
+  To find available snapshots:
+  backupctl snapshots myproject
+
+Step 2: Restore to database
+  pg_restore -h <HOST> -p <PORT> -U <USER> -d mydb <file>.dump
+
+────────────────────────────────────────────────────────────
+Tip: Connection details are in your projects.yml config.
+```
+
+---
 
 ## Restore Options
 
 ### `--only db`
 
-Restore only the database dump file, skipping any backed-up asset files. Useful when you only need the database and want to avoid pulling large asset directories.
+Restore only the database dump file, skipping asset directories:
 
 ```bash
-backupctl restore myproject latest /data/restore/ --only db
+backupctl restore myproject latest /tmp/restore --only db
 ```
 
 ### `--only assets`
 
-Restore only the asset files, skipping the database dump. Useful for recovering uploaded files, media, or other non-database content.
+Restore only asset files, skipping the database dump:
 
 ```bash
-backupctl restore myproject latest /data/restore/ --only assets
+backupctl restore myproject latest /tmp/restore --only assets
 ```
 
 ### `--decompress`
 
-Automatically decompress (and decrypt, if applicable) files after restore. Handles `.gz` decompression via gunzip and `.gpg` decryption via GPG.
+Automatically decompress (and decrypt, if applicable) files after restore:
 
 ```bash
-backupctl restore myproject latest /data/restore/ --decompress
+backupctl restore myproject latest /tmp/restore --decompress
 ```
 
-### `--guide`
-
-Print step-by-step import instructions tailored to the project's configured database type. Includes the exact commands with placeholders filled in from the project config.
+### Combine all options
 
 ```bash
-backupctl restore myproject latest /data/restore/ --guide
+backupctl restore myproject latest /tmp/restore --only db --decompress --guide
 ```
 
-You can combine all options:
+---
 
-```bash
-backupctl restore myproject latest /data/restore/ --only db --decompress --guide
-```
-
-## Database Import Instructions
+## Database Import Commands
 
 ### PostgreSQL
 
-From a `.dump` file (custom format — the default for PostgreSQL backups):
+**Custom format (`.dump`) — the default:**
 
 ```bash
-pg_restore -h localhost -p 5432 -U myuser -d mydb --clean --if-exists restored_file.dump
-```
+# Restore into existing database (drops and recreates objects)
+pg_restore -h localhost -p 5432 -U myuser -d mydb --clean --if-exists restored.dump
 
-The `--clean` flag drops existing objects before recreating them. `--if-exists` prevents errors if objects don't exist yet. To restore into a fresh database, omit `--clean`:
+# Restore into a fresh database
+pg_restore -h localhost -p 5432 -U myuser -d mydb --create restored.dump
 
-```bash
-pg_restore -h localhost -p 5432 -U myuser -d mydb --create restored_file.dump
-```
-
-From a `.sql` file (plain text format):
-
-```bash
-psql -h localhost -p 5432 -U myuser -d mydb < restored_file.sql
+# List contents without importing (useful for verification)
+pg_restore --list restored.dump
 ```
 
 ### MySQL
 
-Decompress the dump first (MySQL backups are gzipped SQL):
-
 ```bash
-gunzip restored_file.sql.gz
-```
+# Decompress first
+gunzip restored.sql.gz
 
-Then import:
+# Import
+mysql -h localhost -P 3306 -u myuser -p mydb < restored.sql
 
-```bash
-mysql -h localhost -P 3306 -u myuser -p mydb < restored_file.sql
-```
-
-For large databases, consider disabling foreign key checks to speed up the import:
-
-```bash
-mysql -h localhost -P 3306 -u myuser -p mydb -e "SET FOREIGN_KEY_CHECKS=0; SOURCE restored_file.sql; SET FOREIGN_KEY_CHECKS=1;"
+# For large databases, disable FK checks for speed
+mysql -h localhost -P 3306 -u myuser -p mydb \
+  -e "SET FOREIGN_KEY_CHECKS=0; SOURCE restored.sql; SET FOREIGN_KEY_CHECKS=1;"
 ```
 
 ### MongoDB
 
-From an archive file (the default for MongoDB backups):
-
 ```bash
+# From archive
 mongorestore --host localhost --port 27017 -u myuser -d mydb \
-  --gzip --archive=restored_file.archive
-```
+  --gzip --archive=restored.archive
 
-From a directory dump:
-
-```bash
+# From directory
 mongorestore --host localhost --port 27017 -u myuser -d mydb \
   --gzip restored_directory/
-```
 
-To drop the existing collection data before restoring:
-
-```bash
+# Drop existing data before restoring
 mongorestore --host localhost --port 27017 -u myuser -d mydb \
-  --gzip --drop --archive=restored_file.archive
+  --gzip --drop --archive=restored.archive
 ```
 
-## Encrypted Backups
+---
 
-If GPG encryption was enabled for the project, dump files are encrypted before being synced to remote storage. The file will have a `.gpg` extension (e.g., `myproject_backup_20260318_030000.dump.gpg`).
+## Selective Restore (Combined vs Separate Snapshots)
 
-### Manual decryption
+### Combined mode (default)
+
+Both database dump and assets in one snapshot. Use `--only` to filter:
 
 ```bash
-gpg --decrypt restored_file.dump.gpg > restored_file.dump
+backupctl restore myproject latest /tmp/restore --only db
+backupctl restore myproject latest /tmp/restore --only assets
 ```
 
-The GPG private key corresponding to the configured recipient must be available in your keyring. If restoring inside the container, keys from the mounted `gpg-keys/` directory are auto-imported on startup.
+### Separate mode
 
-### Automatic decryption with --decompress
-
-The `--decompress` flag handles both GPG decryption and gzip decompression in the correct order:
+Database and assets are in separate snapshots. Filter by tag using restic directly:
 
 ```bash
-backupctl restore myproject latest /data/restore/ --decompress
-```
-
-This is the recommended approach — it handles the decryption/decompression pipeline without manual steps.
-
-## Selective Restore
-
-### Combined snapshots (DB + assets in one snapshot)
-
-When a project backs up both the database and assets together, use `--only` to filter:
-
-```bash
-# Database dump only
-backupctl restore myproject latest /data/restore/ --only db
-
-# Asset files only
-backupctl restore myproject latest /data/restore/ --only assets
-```
-
-### Separate snapshots (tagged by type)
-
-If the project uses separate snapshot modes, filter by tag using restic directly:
-
-```bash
+# List only DB snapshots
 backupctl restic myproject snapshots --tag db
+
+# List only asset snapshots
 backupctl restic myproject snapshots --tag assets
 ```
 
-Then restore the specific snapshot by ID:
+Then restore the specific snapshot by ID.
+
+---
+
+## Direct Restic Restore
+
+For advanced scenarios beyond what the `restore` command provides:
 
 ```bash
-backupctl restore myproject <db-snapshot-id> /data/restore/
+# Restore with path filters
+backupctl restic myproject restore <snapshot-id> \
+  --target /tmp/restore --include "/data/backups/myproject"
+
+# Dump a single file to stdout
+backupctl restic myproject dump latest \
+  /data/backups/myproject/myproject_backup_20260320.dump > restored.dump
+
+# Diff two snapshots
+backupctl restic myproject diff abc123 def456
 ```
 
-## Direct Restic Usage
-
-For advanced restore scenarios beyond what the `restore` command provides, use the restic passthrough:
-
-### Restore with path filters
-
-```bash
-backupctl restic myproject restore <snapshot-id> --target /data/restore/ \
-  --include "/data/backups/myproject"
-```
-
-### Browse snapshots via FUSE mount
-
-Mount a restic repository to explore snapshots interactively:
-
-```bash
-backupctl restic myproject mount /mnt/browse
-```
-
-Then browse the mounted directory to find files across all snapshots. Unmount when done:
-
-```bash
-umount /mnt/browse
-```
-
-### Dump a single file to stdout
-
-Extract a single file without a full restore:
-
-```bash
-backupctl restic myproject dump latest /data/backups/myproject/myproject_backup_20260318_030000.dump \
-  > restored.dump
-```
-
-### Diff two snapshots
-
-Compare what changed between two snapshots:
-
-```bash
-backupctl restic myproject diff a1b2c3d4 e5f6g7h8
-```
+---
 
 ## Safety Checklist
 
 Before importing a restored dump into any database:
 
-1. **Verify the target** — confirm you are connected to the correct database host and database name. Double-check connection strings.
-2. **Back up the current state** — take a fresh backup of the database you're about to overwrite. Even a quick `pg_dump` or `mysqldump` gives you a rollback path.
-3. **Restore to staging first** — if the restore is not urgent, import into a staging environment to verify the data before touching production.
-4. **Check dump integrity** — for PostgreSQL custom format, run `pg_restore --list restored_file.dump` to verify the dump is readable. For SQL files, check the file size is reasonable and not truncated.
-5. **Plan for downtime** — large database imports can take significant time. Schedule a maintenance window if the database serves live traffic.
-6. **Communicate** — notify your team before performing a production restore. Use the project's notification channel if appropriate.
+1. **Verify the target** — confirm you are connected to the correct database host and name
+2. **Back up the current state** — take a fresh dump before overwriting anything
+3. **Restore to staging first** — if not urgent, verify in a staging environment first
+4. **Check dump integrity** — for PostgreSQL: `pg_restore --list restored.dump`
+5. **Plan for downtime** — large imports take time, schedule a maintenance window
+6. **Communicate** — notify your team before performing a production restore
 
-## What's Next
+---
 
-- **Restore not working?** — [Troubleshooting](12-troubleshooting.md) covers common restore issues and diagnostics.
-- **Need the exact command syntax?** — [CLI Reference](06-cli-reference.md) has full details on `restore`, `snapshots`, and `restic` commands.
-- **Quick commands** — [Cheatsheet](10-cheatsheet.md) has copy-paste restore commands.
+## Getting Help
+
+- **Restore not working?** — Check [Troubleshooting](12-troubleshooting.md) for common restore issues
+- **Need exact command syntax?** — [CLI Reference](06-cli-reference.md) has full `restore`, `snapshots`, and `restic` details
+- **Quick commands** — [Cheatsheet](10-cheatsheet.md) for copy-paste restore commands
+- **Still stuck?** — **[Report an issue on GitHub](https://github.com/vineethkrishnan/backupctl/issues/new)**
