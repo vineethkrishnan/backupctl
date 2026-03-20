@@ -1,6 +1,6 @@
 {
   "name": "backupctl",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "description": "Backup orchestration for databases, files, or both",
   "engines": {
     "node": ">=20.0.0 <22"
