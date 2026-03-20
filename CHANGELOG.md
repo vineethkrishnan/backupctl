@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.4](https://github.com/vineethkrishnan/backupctl/compare/v0.1.3...v0.1.4) (2026-03-20)
+
+
+### Bug Fixes
+
+* **docker:** resolve ARM64 and fresh deployment issues ([#18](https://github.com/vineethkrishnan/backupctl/issues/18)) ([60c31a8](https://github.com/vineethkrishnan/backupctl/commit/60c31a8e9f3023930d1409e4e651f303d12f493a))
+
 ## [0.1.3](https://github.com/vineethkrishnan/backupctl/compare/v0.1.2...v0.1.3) (2026-03-20)
 
 
