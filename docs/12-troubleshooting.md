@@ -449,7 +449,7 @@ Or set ownership on the host:
 sudo chown -R 1000:1000 /data/backups
 ```
 
-The container entrypoint automatically creates `.logs` and `.fallback` subdirectories on startup.
+The container entrypoint automatically creates `.logs` and `.fallback-audit` subdirectories on startup.
 
 ---
 

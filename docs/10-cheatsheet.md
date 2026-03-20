@@ -224,7 +224,7 @@ backupctl run myproject --dry-run
 docker exec backupctl find /data/backups -name ".lock" -ls
 
 # View fallback audit entries
-docker exec backupctl cat /data/backups/.fallback/fallback.jsonl
+docker exec backupctl cat /data/backups/.fallback-audit/fallback.jsonl
 
 # View today's application log
 docker exec backupctl cat /data/backups/.logs/backupctl-$(date +%Y-%m-%d).log
@@ -264,7 +264,7 @@ backupctl restic myproject check
 |------|-------------|
 | `/data/backups/<project>/` | Project backup dumps |
 | `/data/backups/<project>/.lock` | Per-project lock file |
-| `/data/backups/.fallback/fallback.jsonl` | JSONL fallback audit entries |
+| `/data/backups/.fallback-audit/fallback.jsonl` | JSONL fallback audit entries |
 | `/data/backups/.logs/` | Winston log files (daily rotation) |
 | `/app/config/projects.yml` | Project configuration |
 | `/home/node/.ssh/` | SSH keys for restic SFTP |
