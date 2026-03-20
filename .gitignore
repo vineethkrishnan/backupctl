@@ -55,6 +55,7 @@ temp/
 
 # Dev tooling
 .socat.pid
+_knowledgebase/
 
 # VitePress
 docs/.vitepress/dist/

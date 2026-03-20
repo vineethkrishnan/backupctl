@@ -712,7 +712,7 @@ assets:
     - /data/locaboo/assets
 
 restic:
-  repository_path: /backups/locaboo
+  repository_path: backups/locaboo
   password: ********
   snapshot_mode: combined
 

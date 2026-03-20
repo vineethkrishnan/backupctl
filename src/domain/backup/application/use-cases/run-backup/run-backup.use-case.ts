@@ -193,12 +193,15 @@ export class RunBackupUseCase {
       }
     }
 
-    try {
-      const notificationType = config.notification?.type ?? 'slack';
-      this.notifierRegistry.resolve(notificationType);
-      checks.push({ name: 'Notifier', passed: true, message: `Adapter found for notification type: ${notificationType}` });
-    } catch (error) {
-      checks.push({ name: 'Notifier', passed: false, message: (error as Error).message });
+    if (config.notification) {
+      try {
+        this.notifierRegistry.resolve(config.notification.type);
+        checks.push({ name: 'Notifier', passed: true, message: `Adapter found for notification type: ${config.notification.type}` });
+      } catch (error) {
+        checks.push({ name: 'Notifier', passed: false, message: (error as Error).message });
+      }
+    } else {
+      checks.push({ name: 'Notifier', passed: true, message: 'Notifications disabled (no config)' });
     }
 
     try {
@@ -275,7 +278,7 @@ export class RunBackupUseCase {
       timeoutHandle = setTimeout(
         () => {
           notifier
-            .notifyWarning(config.name, `Backup exceeded ${timeoutMinutes} minute timeout`)
+            ?.notifyWarning(config.name, `Backup exceeded ${timeoutMinutes} minute timeout`)
             .catch((warningError) => {
               this.logger.error(`Timeout warning notification failed: ${String(warningError)}`);
             });
@@ -297,12 +300,14 @@ export class RunBackupUseCase {
 
     try {
       // Notification failure must not block the backup — log and continue
-      try {
-        await this.executeStage(BackupStage.NotifyStarted, runId, async () => {
-          await notifier.notifyStarted(config.name);
-        });
-      } catch (notifyError) {
-        this.logger.error(`Start notification failed, continuing backup: ${String(notifyError)}`);
+      if (notifier) {
+        try {
+          await this.executeStage(BackupStage.NotifyStarted, runId, async () => {
+            await notifier.notifyStarted(config.name);
+          });
+        } catch (notifyError) {
+          this.logger.error(`Start notification failed, continuing backup: ${String(notifyError)}`);
+        }
       }
 
       const preBackup = config.hooks?.preBackup;
@@ -423,7 +428,9 @@ export class RunBackupUseCase {
     });
 
     await this.finalizeAudit(runId, result);
-    await this.finalizeNotification(notifier, config.name, result);
+    if (notifier) {
+      await this.finalizeNotification(notifier, config.name, result);
+    }
 
     return result;
   }
@@ -527,15 +534,15 @@ export class RunBackupUseCase {
     }
   }
 
-  private resolveNotifier(config: ProjectConfig): NotifierPort {
-    const notificationType = config.notification?.type ?? 'slack';
-    return this.notifierRegistry.resolve(notificationType);
+  private resolveNotifier(config: ProjectConfig): NotifierPort | null {
+    if (!config.notification) return null;
+    return this.notifierRegistry.resolve(config.notification.type);
   }
 
   private buildSyncPaths(
     dumpResult: DumpResult | null,
     config: ProjectConfig,
-    notifier: NotifierPort,
+    notifier: NotifierPort | null,
   ): string[] {
     const syncPaths: string[] = [];
 
@@ -550,7 +557,7 @@ export class RunBackupUseCase {
         } else {
           this.logger.warn(`Asset path not found, skipping: ${assetPath}`);
           notifier
-            .notifyWarning(config.name, `Missing asset path: ${assetPath}`)
+            ?.notifyWarning(config.name, `Missing asset path: ${assetPath}`)
             .catch((warningError) => {
               this.logger.error(`Warning notification failed: ${String(warningError)}`);
             });

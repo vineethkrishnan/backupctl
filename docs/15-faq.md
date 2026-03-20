@@ -147,11 +147,7 @@ docker exec backupctl node dist/cli.js restic myproject init
 **Also check the repository path format.** Hetzner Storage Boxes use relative paths from the user's home directory:
 
 ```yaml
-# Wrong — absolute path doesn't resolve correctly
-restic:
-  repository_path: /backups/myproject
-
-# Correct — relative path from storage box home
+# Relative to the storage box user's home (avoid a leading slash, e.g. not `/backups/...`)
 restic:
   repository_path: backups/myproject
 ```

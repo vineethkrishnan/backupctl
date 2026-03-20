@@ -405,7 +405,7 @@ projects:
       password: ${LOCABOO_DB_PASSWORD}
 
     restic:
-      repository_path: /backups/locaboo
+      repository_path: backups/locaboo
       snapshot_mode: combined
 
     retention:
