@@ -120,7 +120,7 @@ Also available in [`docs/`](docs/README.md):
 | 9   | [Restore Guide](docs/09-restore-guide.md)     | Per-DB restore, decrypt, decompress, `--guide`             |
 | 10  | [Cheatsheet](docs/10-cheatsheet.md)           | Daily ops quick reference, one-liners                      |
 | 11  | [Adding Adapters](docs/11-adding-adapters.md) | Extending with new DB engines, notifiers, storage backends |
-| 12  | [Troubleshooting](docs/12-troubleshooting.md) | Common issues, debug commands, log locations               |
+| 12  | [Troubleshooting](docs/12-troubleshooting.md) | Common issues, debug commands, log locations.               |
 
 ## Tech Stack
 
