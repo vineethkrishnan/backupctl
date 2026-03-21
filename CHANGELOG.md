@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.8](https://github.com/vineethkrishnan/backupctl/compare/v0.1.7...v0.1.8) (2026-03-21)
+
+
+### Features
+
+* **ci:** use GitHub App token for verified release-please commits ([4113f7f](https://github.com/vineethkrishnan/backupctl/commit/4113f7f4c7d1dbde1dcd78f2a1b33753ea18315c))
+
+
+### Bug Fixes
+
+* **ci:** use global git config for GPG signing in release workflow ([6c02ab8](https://github.com/vineethkrishnan/backupctl/commit/6c02ab846b18e7e3230ce6e391966a267fddf90a))
+
 ## [0.1.7](https://github.com/vineethkrishnan/backupctl/compare/v0.1.6...v0.1.7) (2026-03-20)
 
 
