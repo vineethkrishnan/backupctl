@@ -15,7 +15,7 @@
 ---
 
 <p align="center">
-  <img src="docs/assets/hero.gif" alt="backupctl demo" width="720">
+  <img src="docs/public/images/09-run-backup.png" alt="backupctl demo" width="720">
 </p>
 
 backupctl is a standalone Docker service that orchestrates scheduled backups for multiple projects — databases (PostgreSQL, MySQL, MongoDB), files, or both — with encrypted remote storage via [restic](https://restic.net/), configurable notifications, and a full CLI for day-to-day operations.

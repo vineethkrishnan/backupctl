@@ -53,8 +53,6 @@ Without verbose, the CLI only shows warnings and errors during bootstrap. With v
 
 ## run
 
-<img src="./assets/cli-run.gif" alt="backupctl run" width="720">
-
 Trigger a backup for a single project or all enabled projects. Supports dry run mode for pre-flight validation without executing the actual backup.
 
 ### Syntax
@@ -151,8 +149,6 @@ Exit code: 2
 
 ## status
 
-<img src="./assets/cli-status.gif" alt="backupctl status" width="720">
-
 Display backup status for all projects or detailed history for a single project.
 
 ### Syntax
@@ -204,8 +200,6 @@ $ backupctl status locaboo
 
 ## health
 
-<img src="./assets/cli-health.gif" alt="backupctl health" width="720">
-
 Run comprehensive health checks against all infrastructure dependencies. No arguments required.
 
 ### Syntax
@@ -254,8 +248,6 @@ Exit code: 1
 ---
 
 ## restore
-
-<img src="./assets/cli-restore.gif" alt="backupctl restore" width="720">
 
 Restore files from a restic snapshot to a target directory. Supports selective restore (`--only db` or `--only assets`) and provides human-readable import instructions with `--guide`.
 
@@ -376,8 +368,6 @@ Restoring files...
 
 ## snapshots
 
-<img src="./assets/cli-snapshots.gif" alt="backupctl snapshots" width="720">
-
 List restic snapshots for a project. Displays snapshot ID, timestamp, tags, and size.
 
 ### Syntax
@@ -428,8 +418,6 @@ Showing 5 of 56 snapshots. Repository size: 2.4 GB
 ---
 
 ## prune
-
-<img src="./assets/cli-prune.gif" alt="backupctl prune" width="720">
 
 Manually trigger restic prune for a project or all projects. Applies the retention policy defined in the project's YAML config.
 
@@ -492,8 +480,6 @@ $ backupctl prune --all
 
 ## logs
 
-<img src="./assets/cli-logs.gif" alt="backupctl logs" width="720">
-
 Query the audit trail for a project's backup history.
 
 ### Syntax
@@ -543,8 +529,6 @@ Showing 3 of 3 failed runs.
 ---
 
 ## config
-
-<img src="./assets/cli-config.gif" alt="backupctl config" width="720">
 
 Manage project configuration: validate syntax, display resolved config, reload from disk, and import GPG keys.
 
@@ -630,8 +614,6 @@ Importing GPG key from /app/gpg-keys/locaboo-backup.pub...
 
 ## cache
 
-<img src="./assets/cli-cache.gif" alt="backupctl cache" width="720">
-
 View or clear the restic cache for a project. Useful when restic operations are slow or the cache is corrupted.
 
 ### Syntax
@@ -690,8 +672,6 @@ Clearing restic cache for all projects...
 ---
 
 ## restic
-
-<img src="./assets/cli-restic.gif" alt="backupctl restic" width="720">
 
 Execute restic commands directly against a project's repository. The repository path, password, and SFTP credentials are injected automatically from the project's config — you only supply the restic subcommand and its arguments.
 
@@ -775,8 +755,6 @@ When finished, press Ctrl-C or send SIGINT to quit.
 ---
 
 ## upgrade
-
-<img src="./assets/cli-upgrade.gif" alt="backupctl upgrade" width="720">
 
 Check for available updates and display upgrade instructions. This command queries the GitHub Releases API, compares against the currently installed version, and shows how to upgrade if a newer release exists.
 
