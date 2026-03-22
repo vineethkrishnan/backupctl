@@ -18,11 +18,14 @@ Set WindowBar Colorful
 Hide
 Type "alias backupctl='docker exec backupctl-dev npx ts-node -r tsconfig-paths/register src/cli.ts'"
 Enter
-Sleep 1s
+Sleep 500ms
+Type "clear"
+Enter
+Sleep 500ms
 Show
 
 # Show restore guide
-Type "backupctl restore locaboo latest /tmp/restore --guide"
+Type "backupctl restore ayunis-locaboo latest /tmp/restore --guide"
 Enter
 Sleep 6s
 

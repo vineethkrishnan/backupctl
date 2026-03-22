@@ -1,5 +1,5 @@
 # ── Build stage ───────────────────────────────────────────
-FROM node:20-alpine AS builder
+FROM node:20-alpine3.21 AS builder
 
 WORKDIR /app
 COPY package*.json ./
@@ -9,11 +9,12 @@ COPY src/ ./src/
 RUN npm run build
 
 # ── Production stage ──────────────────────────────────────
-FROM node:20-alpine
+FROM node:20-alpine3.21
 
-RUN apk add --no-cache \
+RUN apk upgrade --no-cache \
+    && apk add --no-cache \
     --repository=https://dl-cdn.alpinelinux.org/alpine/edge/main \
-    --repository=https://dl-cdn.alpinelinux.org/alpine/v3.20/community \
+    --repository=https://dl-cdn.alpinelinux.org/alpine/v3.21/community \
     postgresql17-client \
     mariadb-client \
     mongodb-tools \
@@ -27,10 +28,10 @@ RUN apk add --no-cache \
 # Install restic (multi-arch)
 ARG TARGETARCH
 RUN RESTIC_ARCH=$(case "${TARGETARCH}" in arm64) echo "arm64" ;; *) echo "amd64" ;; esac) \
-    && wget https://github.com/restic/restic/releases/download/v0.17.3/restic_0.17.3_linux_${RESTIC_ARCH}.bz2 \
-    && bunzip2 restic_0.17.3_linux_${RESTIC_ARCH}.bz2 \
-    && chmod +x restic_0.17.3_linux_${RESTIC_ARCH} \
-    && mv restic_0.17.3_linux_${RESTIC_ARCH} /usr/local/bin/restic
+    && wget https://github.com/restic/restic/releases/download/v0.18.1/restic_0.18.1_linux_${RESTIC_ARCH}.bz2 \
+    && bunzip2 restic_0.18.1_linux_${RESTIC_ARCH}.bz2 \
+    && chmod +x restic_0.18.1_linux_${RESTIC_ARCH} \
+    && mv restic_0.18.1_linux_${RESTIC_ARCH} /usr/local/bin/restic
 
 # Run as non-root — SSH keys mounted to /home/node/.ssh
 RUN mkdir -p /home/node/.ssh /home/node/.gnupg \

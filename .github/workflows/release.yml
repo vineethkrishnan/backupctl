@@ -123,6 +123,22 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+  dockerhub-description:
+    name: Update Docker Hub Description
+    needs: release-please
+    if: needs.release-please.outputs.release_created
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Update Docker Hub description
+        uses: peter-evans/dockerhub-description@v4
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+          repository: vineethnkrishnan/backupctl
+          short-description: "Multi-DB backup orchestration: Restic + GPG, scheduled, encrypted, audited. One YAML."
+
   deploy-docs:
     name: Deploy Docs (Cloudflare Pages)
     needs: release-please
