@@ -14,6 +14,10 @@
 
 ---
 
+<p align="center">
+  <img src="docs/assets/hero.gif" alt="backupctl demo" width="720">
+</p>
+
 backupctl is a standalone Docker service that orchestrates scheduled backups for multiple projects — databases (PostgreSQL, MySQL, MongoDB), files, or both — with encrypted remote storage via [restic](https://restic.net/), configurable notifications, and a full CLI for day-to-day operations.
 
 ## Highlights
@@ -27,7 +31,7 @@ backupctl is a standalone Docker service that orchestrates scheduled backups for
 - **Retry with backoff** — configurable exponential retry for transient failures
 - **Audit trail** — every run tracked in PostgreSQL with real-time stage progress
 - **Crash recovery** — orphan detection, lock cleanup, fallback replay on startup
-- **14 CLI commands** — backup, restore, status, health, snapshots, prune, logs, config, cache, restic passthrough
+- **15 CLI commands** — backup, restore, status, health, snapshots, prune, logs, config, cache, restic passthrough, upgrade
 - **Dry run** — validates config, adapters, connectivity, disk, and GPG before a real run
 - **Zero-edit install** — interactive wizard generates `.env`, SSH keys, and project config
 
@@ -71,6 +75,7 @@ backupctl logs <project> [--failed]    # query audit log
 backupctl config validate|show|reload  # config management
 backupctl cache <project> [--clear]    # restic cache management
 backupctl restic <project> <cmd>       # restic passthrough
+backupctl upgrade                     # check for updates
 ```
 
 Inside Docker: `docker exec backupctl node dist/cli.js <command>`
@@ -114,7 +119,7 @@ Also available in [`docs/`](docs/README.md):
 | 3   | [Requirements](docs/03-requirements.md)       | PRD summary, goals, non-goals, audit schema                |
 | 4   | [Installation](docs/04-installation.md)       | Prerequisites, wizard, manual setup, Docker                |
 | 5   | [Configuration](docs/05-configuration.md)     | `.env` reference, `projects.yml` schema, resolution rules  |
-| 6   | [CLI Reference](docs/06-cli-reference.md)     | All 14 commands with syntax, options, exit codes, examples |
+| 6   | [CLI Reference](docs/06-cli-reference.md)     | All 15 commands with syntax, options, exit codes, examples |
 | 7   | [Bash Scripts](docs/07-bash-scripts.md)       | `install.sh`, `dev.sh`, `backupctl-manage.sh`           |
 | 8   | [Backup Flow](docs/08-backup-flow.md)         | 11-step flow, retry, concurrency, recovery, notifications  |
 | 9   | [Restore Guide](docs/09-restore-guide.md)     | Per-DB restore, decrypt, decompress, `--guide`             |

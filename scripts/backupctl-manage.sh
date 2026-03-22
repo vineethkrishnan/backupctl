@@ -14,7 +14,8 @@ usage() {
   echo "  setup              Interactive first-time setup"
   echo "  check              Verify prerequisites"
   echo "  deploy [--rebuild] Build and start containers"
-  echo "  update             Pull latest, rebuild, migrate, restart"
+  echo "  upgrade            Pull latest, rebuild, migrate, restart"
+  echo "  update             Alias for upgrade"
   echo "  logs               Tail container logs"
   echo "  shell              Open shell in backupctl container"
   echo "  backup-dir         Show backup directory sizes"
@@ -314,34 +315,39 @@ cmd_deploy() {
 }
 
 # ──────────────────────────────────────────────
-# update: Pull latest, rebuild, restart
+# upgrade: Pull latest, rebuild, restart
 # ──────────────────────────────────────────────
-cmd_update() {
-  echo "=== backupctl update ==="
+cmd_upgrade() {
+  echo "=== backupctl upgrade ==="
 
-  echo "[1/5] Pulling latest changes..."
+  echo "[1/7] Pulling latest changes..."
   git pull
 
-  echo "[2/5] Rebuilding containers (includes npm ci + build)..."
+  echo "[2/7] Rebuilding containers (includes npm ci + build)..."
   docker compose -f "$COMPOSE_FILE" up -d --build
 
-  echo "[3/5] Connecting project Docker networks..."
+  echo "[3/7] Connecting project Docker networks..."
   connect_project_networks backupctl
 
-  echo "[4/6] Waiting for services to start..."
+  echo "[4/7] Waiting for services to start..."
   sleep 5
 
-  echo "[5/6] Running database migrations..."
+  echo "[5/7] Running database migrations..."
   if ! docker exec backupctl npx typeorm migration:run -d dist/db/datasource.js; then
     echo "ERROR: Database migrations failed. Check logs with: $0 logs"
-    echo "The previous container version may still be running. Fix the migration and re-run: $0 update"
+    echo "The previous container version may still be running. Fix the migration and re-run: $0 upgrade"
     exit 1
   fi
 
-  echo "[6/6] Running health check..."
+  echo "[6/7] Running health check..."
   docker exec backupctl node dist/cli.js health || echo "Health check failed — check logs"
 
-  echo "=== backupctl updated ==="
+  # Clear upgrade cache so the next CLI check fetches fresh release info
+  echo "[7/7] Clearing upgrade check cache..."
+  BACKUP_BASE_DIR=$(grep -oP '(?<=BACKUP_BASE_DIR=).+' "$PROJECT_DIR/.env" 2>/dev/null || echo "/data/backups")
+  rm -f "${BACKUP_BASE_DIR}/.upgrade-info"
+
+  echo "=== backupctl upgraded ==="
 }
 
 # ──────────────────────────────────────────────
@@ -403,7 +409,8 @@ case "${1:-}" in
   setup)      cmd_setup ;;
   check)      cmd_check ;;
   deploy)     cmd_deploy "$2" ;;
-  update)     cmd_update ;;
+  upgrade)    cmd_upgrade ;;
+  update)     cmd_upgrade ;;
   logs)       cmd_logs ;;
   shell)      cmd_shell ;;
   backup-dir) cmd_backup_dir ;;

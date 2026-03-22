@@ -597,10 +597,10 @@ docker exec backupctl node dist/cli.js health
 ### From source (management script)
 
 ```bash
-./scripts/backupctl-manage.sh update
+./scripts/backupctl-manage.sh upgrade
 ```
 
-This pulls the latest code, rebuilds the container, runs any pending migrations, and performs a health check.
+This pulls the latest code, rebuilds the container, runs any pending migrations, performs a health check, and clears the upgrade check cache. (`update` is accepted as an alias.)
 
 ### From source (manual)
 

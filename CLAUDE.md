@@ -125,7 +125,8 @@ src/
 │   │   │       ├── snapshots.command.ts
 │   │   │       ├── prune.command.ts
 │   │   │       ├── cache.command.ts
-│   │   │       └── restic.command.ts
+│   │   │       ├── restic.command.ts
+│   │   │       └── upgrade.command.ts
 │   │   └── backup.module.ts                   # NestJS module barrel
 │   │
 │   ├── audit/                                 # Audit module
@@ -202,9 +203,12 @@ src/
 │   ├── helpers/
 │   │   ├── child-process.util.ts              # Safe execFile wrapper
 │   │   └── format.util.ts                     # Byte/duration/timestamp formatting
-│   └── clock/
-│       ├── clock.port.ts                      # Shared clock port interface
-│       └── system-clock.adapter.ts            # System clock implementation
+│   ├── clock/
+│   │   ├── clock.port.ts                      # Shared clock port interface
+│   │   └── system-clock.adapter.ts            # System clock implementation
+│   └── upgrade/
+│       ├── upgrade-info.model.ts              # Upgrade info interface
+│       └── upgrade-check.service.ts           # GitHub release check + cache
 │
 ├── config/
 │   └── typeorm.config.ts                      # Env-aware TypeORM config (dev/prod)
@@ -220,7 +224,7 @@ src/
 └── cli.ts                                     # CLI entry point
 
 scripts/                                       # Host-side ONLY
-├── backupctl-manage.sh                        # setup, check, deploy, update, logs, shell
+├── backupctl-manage.sh                        # setup, check, deploy, upgrade, logs, shell
 └── dev.sh                                     # Dev environment: up, down, cli, test, lint, migrations
 ```
 
@@ -276,6 +280,7 @@ Modules may only import another module's **`application/ports/`** or **`domain/`
 | `TIMEZONE` env var | Default `Europe/Berlin`. Used in file names, audit, notifications, logs |
 | Webhook JSON + markdown | `{ event, project, text (markdown), data (structured) }` |
 | `smtp_secure` field | Explicit TLS control for email notifier |
+| Upgrade check in `common/upgrade/` | Cross-cutting, not a domain module. Checks GitHub Releases API, caches in `${BACKUP_BASE_DIR}/.upgrade-info`. Suppressed in dev mode, non-TTY, or `BACKUPCTL_NO_UPDATE_CHECK=1`. `cli.ts` uses `createWithoutRunning` + `runApplication` to hook post-command notice |
 
 ### Config Resolution Order
 
@@ -332,6 +337,7 @@ npm run format
 # Docker (via host scripts)
 scripts/backupctl-manage.sh deploy           # build + start
 scripts/backupctl-manage.sh deploy --rebuild # rebuild + restart
+scripts/backupctl-manage.sh upgrade          # pull latest, rebuild, migrate, clear upgrade cache
 scripts/backupctl-manage.sh setup            # interactive first-time setup
 scripts/backupctl-manage.sh check            # validate prerequisites
 
@@ -392,6 +398,7 @@ test/
 - **Adapters:** Command construction, output parsing, tagging, TLS, markdown payload
 - **Persistence:** Insert+update audit, JSONL append/read/clear, .lock create/check/remove
 - **CLI:** Arg parsing, exit codes (0-5), --dry-run, --only, --decompress, --guide, --clear
+- **Upgrade check:** GitHub API fetch + semver comparison, cache file read/write/clear, suppression rules (dev mode, non-TTY, env opt-out), notice formatting
 - **Do NOT test:** NestJS module wiring, simple getters/setters, library plumbing
 
 ### Mocking Strategy
@@ -401,6 +408,8 @@ test/
 - Mock `axios` for Slack/webhook notifiers
 - Mock `nodemailer` for email notifier
 - Mock TypeORM repository for audit repository
+- Mock global `fetch` for `UpgradeCheckService` (GitHub API)
+- Mock `fs` read/write for upgrade cache file operations
 - All outbound ports mocked in use case tests via DI tokens
 - `ClockPort` mock for deterministic timestamps
 
@@ -433,7 +442,7 @@ Presenter (CLI/HTTP) → map args → Command/Query → UseCase.execute(command)
 - **Queries** (read operations): `{action}.query.ts` — plain data carrier, constructor with params object
 - **Use cases**: single `execute(command/query)` method per class
 - **Validation**: happens at the presenter boundary (CLI arg parsing / HTTP DTO with class-validator), NOT in Commands/Queries
-- **No user input**: use cases like `RecoverStartupUseCase` and `CheckHealthUseCase` skip the pattern
+- **No user input**: use cases like `RecoverStartupUseCase` and `CheckHealthUseCase` skip the pattern. `UpgradeCommand` also skips — it delegates directly to `UpgradeCheckService`
 - **Repositories**: `{Technology}{Entity}Repository` — e.g. `TypeormAuditLogRepository`
 - **Records** (TypeORM entities): `{Entity}Record` — e.g. `BackupLogRecord`
 - **Commands** (CLI): `{Action}Command` — e.g. `RunCommand`, `HealthCommand`, `ConfigCommand`
@@ -534,7 +543,7 @@ Explain **why**, not obvious **what**. No comments on self-evident code.
 
 ## CLI Commands
 
-14 commands via `backupctl <command>`:
+15 commands via `backupctl <command>`:
 
 | Command | Description |
 |---------|-------------|
@@ -548,6 +557,7 @@ Explain **why**, not obvious **what**. No comments on self-evident code.
 | `config validate / show / reload / import-gpg-key <file>` | Config management |
 | `cache <project> [--clear] / --clear-all` | Restic cache management |
 | `restic <project> <cmd> [args...]` | Restic passthrough |
+| `upgrade` | Check for updates and show upgrade instructions |
 
 ### Exit Codes
 
@@ -578,3 +588,4 @@ Host scripts: `scripts/backupctl-manage.sh` (prod), `scripts/dev.sh` (dev)
 - `node_modules/`, `dist/`
 - `*.sql.gz`, `*.gpg` (backup artifacts)
 - `*.lock` (backup lock files)
+- `.upgrade-info` (upgrade check cache — lives on Docker volume)

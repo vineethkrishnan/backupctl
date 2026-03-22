@@ -14,7 +14,7 @@ All scripts are designed to be run from the project root directory.
 
 ### Docker Network Auto-Connect
 
-Both `dev.sh` and `backupctl-manage.sh` automatically connect the backupctl container to Docker networks declared in `config/projects.yml` via the `docker_network` field. This happens on `up`, `restart`, `deploy`, and `update` commands. See [Configuration](05-configuration.md) for details on the `docker_network` field.
+Both `dev.sh` and `backupctl-manage.sh` automatically connect the backupctl container to Docker networks declared in `config/projects.yml` via the `docker_network` field. This happens on `up`, `restart`, `deploy`, and `upgrade` commands. See [Configuration](05-configuration.md) for details on the `docker_network` field.
 
 ---
 
@@ -216,7 +216,7 @@ scripts/dev.sh analyze strict         # Strict type-safety (eslint)
 
 ## scripts/backupctl-manage.sh
 
-Production management script for deployment and day-to-day operations. Handles setup, deploy, update, and diagnostics.
+Production management script for deployment and day-to-day operations. Handles setup, deploy, upgrade, and diagnostics.
 
 ### Usage
 
@@ -285,22 +285,25 @@ Rebuilding backupctl (no cache)...
 Deploy complete (rebuilt).
 ```
 
-#### update
+#### upgrade
 
-Pull the latest code, rebuild the image, and restart. Useful for applying updates from the repository.
+Pull the latest code, rebuild the image, restart, and clear the upgrade check cache. This is the recommended way to apply updates from the repository.
 
 ```
-$ ./scripts/backupctl-manage.sh update
+$ ./scripts/backupctl-manage.sh upgrade
 
-=== backupctl update ===
+=== backupctl upgrade ===
 
   Pulling latest changes... done (3 files changed)
   Rebuilding image... done
   Restarting containers... done
   Running health check... ✅ passed
+  Clearing upgrade check cache... done
 
-Update complete.
+=== backupctl upgraded ===
 ```
+
+`update` is accepted as an alias for `upgrade`.
 
 #### logs
 
@@ -397,7 +400,7 @@ Next scheduled:
 | TypeORM migrations | `scripts/dev.sh migrate:run` |
 | Production deploy after config change | `backupctl-manage.sh deploy` |
 | Force production rebuild | `backupctl-manage.sh deploy --rebuild` |
-| Apply code updates (prod) | `backupctl-manage.sh update` |
+| Apply code updates (prod) | `backupctl-manage.sh upgrade` |
 | Check prod prerequisites | `backupctl-manage.sh check` |
 | Debug production container | `backupctl-manage.sh shell` |
 | Monitor disk usage (prod) | `backupctl-manage.sh backup-dir` |
@@ -437,8 +440,7 @@ scripts/dev.sh analyze                   # full static analysis
 
 ```bash
 cd /opt/backupctl
-git pull
-./scripts/backupctl-manage.sh update
+./scripts/backupctl-manage.sh upgrade
 ```
 
 ---
