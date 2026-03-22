@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.9](https://github.com/vineethkrishnan/backupctl/compare/v0.1.8...v0.1.9) (2026-03-22)
+
+
+### Features
+
+* **cli:** add upgrade check with notifications and VHS terminal recordings ([#29](https://github.com/vineethkrishnan/backupctl/issues/29)) ([deb2883](https://github.com/vineethkrishnan/backupctl/commit/deb288346773c3a45f6e0a2c48daec466cf61c60))
+
 ## [0.1.8](https://github.com/vineethkrishnan/backupctl/compare/v0.1.7...v0.1.8) (2026-03-21)
 
 
