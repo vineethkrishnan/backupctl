@@ -5,6 +5,54 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.12](https://github.com/vineethkrishnan/backupctl/compare/v0.1.11...v0.1.12) (2026-03-22)
+
+
+### Features
+
+* **ci:** use GitHub App token for verified release-please commits ([4113f7f](https://github.com/vineethkrishnan/backupctl/commit/4113f7f4c7d1dbde1dcd78f2a1b33753ea18315c))
+* CLI shortcuts, verbose mode, Docker fixes, and documentation overhaul ([c22e14f](https://github.com/vineethkrishnan/backupctl/commit/c22e14f4e302e0f0db7fd2aaa7bca685250472a5))
+* **cli:** add upgrade check with notifications and VHS terminal recordings ([#29](https://github.com/vineethkrishnan/backupctl/issues/29)) ([deb2883](https://github.com/vineethkrishnan/backupctl/commit/deb288346773c3a45f6e0a2c48daec466cf61c60))
+* **docker:** publish to Docker Hub and add remote installer ([ebb175c](https://github.com/vineethkrishnan/backupctl/commit/ebb175c477213a3b48d4a2b4d89388b889a4bd87))
+* initial release of backupctl v0.1.0 ([918d60f](https://github.com/vineethkrishnan/backupctl/commit/918d60f48a02fb3b33e31b1ca660880384b91f7e))
+* **notifiers:** add BackupType, human-friendly mode labels, deduplicate Slack text (BCTL-18) ([#23](https://github.com/vineethkrishnan/backupctl/issues/23)) ([f0f126b](https://github.com/vineethkrishnan/backupctl/commit/f0f126b6a61d2d34b2103230542ce7ce1f99f116))
+* production hardening, security fixes, and socat SSH relay ([a976869](https://github.com/vineethkrishnan/backupctl/commit/a976869ed369b6ac07e4f9916f9d8810a6153315))
+
+
+### Bug Fixes
+
+* **ci:** add permissions to commitlint workflow and group dependabot PRs ([ab8efa5](https://github.com/vineethkrishnan/backupctl/commit/ab8efa5d82cc76689eae57bd8dda9b369f7f485c))
+* **ci:** correct Docker Hub username to vineethnkrishnan ([5feef47](https://github.com/vineethkrishnan/backupctl/commit/5feef47d8c13a114040b5757b0278c84a404f270))
+* **ci:** move release-please config files to repo root ([1852cfc](https://github.com/vineethkrishnan/backupctl/commit/1852cfcab4440f90ac848a24de45d5f3b20a55b8))
+* **ci:** resolve ESLint warnings and correct restic SHA256 checksum ([feda3fa](https://github.com/vineethkrishnan/backupctl/commit/feda3fae6a071f8de1c1cdee40f4c1c1a7baf657))
+* **ci:** use global git config for GPG signing in release workflow ([6c02ab8](https://github.com/vineethkrishnan/backupctl/commit/6c02ab846b18e7e3230ce6e391966a267fddf90a))
+* **deploy:** multi-stage Dockerfile, NestJS module wiring, install wizard UX ([55325d5](https://github.com/vineethkrishnan/backupctl/commit/55325d5c5aa3cc36b081be59503f608d89ece796))
+* **docker:** resolve ARM64 and fresh deployment issues ([#18](https://github.com/vineethkrishnan/backupctl/issues/18)) ([60c31a8](https://github.com/vineethkrishnan/backupctl/commit/60c31a8e9f3023930d1409e4e651f303d12f493a))
+* **docs:** re-record GIFs with correct project name ([#32](https://github.com/vineethkrishnan/backupctl/issues/32)) ([a84fcdd](https://github.com/vineethkrishnan/backupctl/commit/a84fcdda4b4d140e96da33904b6806198eb4a546))
+* **docs:** use relative paths for GIF assets in CLI reference ([6fb8478](https://github.com/vineethkrishnan/backupctl/commit/6fb847826358284a574a7959a7f806e182a7c17b))
+
+
+### Refactoring
+
+* hexagonal architecture, dev environment, and infra improvements ([66c275d](https://github.com/vineethkrishnan/backupctl/commit/66c275d43990def27fd7e6bf40bc562f17636363))
+
+
+### Documentation
+
+* add VitePress site with Cloudflare Pages deployment ([c20b94f](https://github.com/vineethkrishnan/backupctl/commit/c20b94f07c91248f54a4ce7198ce9674cbfc7ccf))
+* **cli:** add terminal screenshots from staging server ([#25](https://github.com/vineethkrishnan/backupctl/issues/25)) ([c31705f](https://github.com/vineethkrishnan/backupctl/commit/c31705f20855dc17eb59e3c933caee8f85036fee))
+* comprehensive documentation overhaul with battle-tested commands ([#20](https://github.com/vineethkrishnan/backupctl/issues/20)) ([a669ffd](https://github.com/vineethkrishnan/backupctl/commit/a669ffd68970abaf9d6227227d7ce52b1118b595))
+* **installation:** add full docker-compose.yml to manual setup ([0f4b447](https://github.com/vineethkrishnan/backupctl/commit/0f4b447849dbdfef7ee40696f10e43df28989efe))
+* **installation:** add quick install via Docker Hub and remote installer ([d45fb15](https://github.com/vineethkrishnan/backupctl/commit/d45fb1559d3a6fcc8ba283d81700b977ab1e92ab))
+
+
+### CI/CD
+
+* **commitlint:** add main and other missing scopes ([#22](https://github.com/vineethkrishnan/backupctl/issues/22)) ([2b999a9](https://github.com/vineethkrishnan/backupctl/commit/2b999a9f14071d6f9affc05be1b77e91d20a6354))
+* consolidate deployment jobs into release workflow ([d070110](https://github.com/vineethkrishnan/backupctl/commit/d07011098c6531c01f68fd17ee1ec122439b6c63))
+* move deployment workflows to release-only triggers ([0e355a8](https://github.com/vineethkrishnan/backupctl/commit/0e355a8027651839ea6d65a17c73b18ef119c807))
+* update action versions and opt into Node.js 24 ([cd59821](https://github.com/vineethkrishnan/backupctl/commit/cd598210a232ec54bf016d99289453e0c2f95a2c))
+
 ## [0.1.11](https://github.com/vineethkrishnan/backupctl/compare/v0.1.10...v0.1.11) (2026-03-22)
 
 
