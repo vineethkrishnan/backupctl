@@ -976,6 +976,74 @@ The public key is auto-imported on every container startup from the `gpg-keys/` 
 
 ---
 
+### How Do I Temporarily Pause Backups for a Project?
+
+**Question:** I need to disable scheduled backups for a project without removing its configuration.
+
+Set `enabled: false` in `config/projects.yml`:
+
+```yaml
+projects:
+  - name: locaboo
+    enabled: false    # Pauses scheduled and --all backups
+    cron: "0 0 * * *"
+    # ... rest of config
+```
+
+Then reload the config:
+
+```bash
+backupctl config reload
+```
+
+**What gets paused:**
+
+- Scheduled (cron) backups for this project
+- `backupctl run --all` skips this project
+- `backupctl prune --all` skips this project
+- `backupctl cache --clear-all` skips this project
+
+**What still works:**
+
+- `backupctl run locaboo` — manual single-project runs still work, so you can do ad-hoc backups while paused
+- `backupctl snapshots locaboo` — you can still browse existing snapshots
+- `backupctl restore locaboo ...` — restores from existing snapshots still work
+
+To re-enable, set `enabled: true` and reload config again.
+
+---
+
+### How Do I Check for Updates?
+
+**Question:** How do I know if a newer version of backupctl is available?
+
+backupctl automatically checks for updates on the first CLI command after each deployment. If a newer version is available, a notice appears after the command output:
+
+```
+  ┌──────────────────────────────────────────────────────┐
+  │  Update available: v0.1.8 → v0.2.0                  │
+  │  Run on host: backupctl-manage.sh upgrade            │
+  └──────────────────────────────────────────────────────┘
+```
+
+You can also check manually:
+
+```bash
+backupctl upgrade
+```
+
+To perform the upgrade, run on the **host machine** (not inside the container):
+
+```bash
+backupctl-manage.sh upgrade
+```
+
+This pulls the latest code, rebuilds the container, runs database migrations, and clears the upgrade check cache.
+
+**Disable automatic checks:** Set `BACKUPCTL_NO_UPDATE_CHECK=1` in your `.env` file.
+
+---
+
 ## Getting Help
 
 If you've checked this FAQ and the [Troubleshooting](12-troubleshooting.md) guide and are still stuck:
@@ -987,5 +1055,5 @@ If you've checked this FAQ and the [Troubleshooting](12-troubleshooting.md) guid
 
 - **Runtime troubleshooting** — [Troubleshooting](12-troubleshooting.md) covers issues after initial setup.
 - **Configuration reference** — [Configuration](05-configuration.md) for all `.env` and `projects.yml` options.
-- **CLI commands** — [CLI Reference](06-cli-reference.md) for all 14 commands.
+- **CLI commands** — [CLI Reference](06-cli-reference.md) for all 15 commands.
 - **Daily operations** — [Cheatsheet](10-cheatsheet.md) for copy-paste commands.

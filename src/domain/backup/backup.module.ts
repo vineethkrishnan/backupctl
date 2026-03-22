@@ -24,6 +24,7 @@ import { SnapshotsCommand } from './presenters/cli/snapshots.command';
 import { PruneCommand } from './presenters/cli/prune.command';
 import { CacheCommand } from './presenters/cli/cache.command';
 import { ResticCommand } from './presenters/cli/restic.command';
+import { UpgradeCommand } from './presenters/cli/upgrade.command';
 
 import {
   DUMPER_REGISTRY,
@@ -63,6 +64,7 @@ import {
     PruneCommand,
     CacheCommand,
     ResticCommand,
+    UpgradeCommand,
   ],
   exports: [
     RunBackupUseCase,

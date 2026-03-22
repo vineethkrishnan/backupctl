@@ -3,6 +3,7 @@ import { Global, Module } from '@nestjs/common';
 import { SystemClockAdapter } from '@common/clock/system-clock.adapter';
 import { LocalFilesystemAdapter } from '@common/filesystem/local-filesystem.adapter';
 import { EnvValidationService } from '@common/validation/env-validation.service';
+import { UpgradeCheckService } from '@common/upgrade/upgrade-check.service';
 import { FileBackupLockAdapter } from '@domain/backup/infrastructure/adapters/lock/file-backup-lock.adapter';
 import { ResticStorageFactory } from '@domain/backup/infrastructure/adapters/storage/restic-storage.factory';
 import { GpgKeyManagerAdapter } from '@domain/backup/infrastructure/adapters/encryptors/gpg-key-manager.adapter';
@@ -19,6 +20,7 @@ import {
 @Module({
   providers: [
     EnvValidationService,
+    UpgradeCheckService,
     { provide: CLOCK_PORT, useClass: SystemClockAdapter },
     { provide: FILESYSTEM_PORT, useClass: LocalFilesystemAdapter },
     { provide: BACKUP_LOCK_PORT, useClass: FileBackupLockAdapter },
@@ -31,6 +33,7 @@ import {
     BACKUP_LOCK_PORT,
     REMOTE_STORAGE_FACTORY,
     GPG_KEY_MANAGER_PORT,
+    UpgradeCheckService,
   ],
 })
 export class SharedInfraModule {}

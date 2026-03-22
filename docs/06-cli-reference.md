@@ -1,6 +1,6 @@
 # CLI Reference
 
-backupctl provides 14 commands for managing backups, restores, health checks, configuration, and direct restic access. Every command returns structured exit codes suitable for scripting and CI/CD pipelines.
+backupctl provides 15 commands for managing backups, restores, health checks, configuration, upgrades, and direct restic access. Every command returns structured exit codes suitable for scripting and CI/CD pipelines.
 
 ## Entry Points
 
@@ -52,6 +52,8 @@ Without verbose, the CLI only shows warnings and errors during bootstrap. With v
 ---
 
 ## run
+
+<img src="assets/cli-run.gif" alt="backupctl run" width="720">
 
 Trigger a backup for a single project or all enabled projects. Supports dry run mode for pre-flight validation without executing the actual backup.
 
@@ -149,6 +151,8 @@ Exit code: 2
 
 ## status
 
+<img src="assets/cli-status.gif" alt="backupctl status" width="720">
+
 Display backup status for all projects or detailed history for a single project.
 
 ### Syntax
@@ -200,6 +204,8 @@ $ backupctl status locaboo
 
 ## health
 
+<img src="assets/cli-health.gif" alt="backupctl health" width="720">
+
 Run comprehensive health checks against all infrastructure dependencies. No arguments required.
 
 ### Syntax
@@ -248,6 +254,8 @@ Exit code: 1
 ---
 
 ## restore
+
+<img src="assets/cli-restore.gif" alt="backupctl restore" width="720">
 
 Restore files from a restic snapshot to a target directory. Supports selective restore (`--only db` or `--only assets`) and provides human-readable import instructions with `--guide`.
 
@@ -368,6 +376,8 @@ Restoring files...
 
 ## snapshots
 
+<img src="assets/cli-snapshots.gif" alt="backupctl snapshots" width="720">
+
 List restic snapshots for a project. Displays snapshot ID, timestamp, tags, and size.
 
 ### Syntax
@@ -418,6 +428,8 @@ Showing 5 of 56 snapshots. Repository size: 2.4 GB
 ---
 
 ## prune
+
+<img src="assets/cli-prune.gif" alt="backupctl prune" width="720">
 
 Manually trigger restic prune for a project or all projects. Applies the retention policy defined in the project's YAML config.
 
@@ -480,6 +492,8 @@ $ backupctl prune --all
 
 ## logs
 
+<img src="assets/cli-logs.gif" alt="backupctl logs" width="720">
+
 Query the audit trail for a project's backup history.
 
 ### Syntax
@@ -529,6 +543,8 @@ Showing 3 of 3 failed runs.
 ---
 
 ## config
+
+<img src="assets/cli-config.gif" alt="backupctl config" width="720">
 
 Manage project configuration: validate syntax, display resolved config, reload from disk, and import GPG keys.
 
@@ -614,6 +630,8 @@ Importing GPG key from /app/gpg-keys/locaboo-backup.pub...
 
 ## cache
 
+<img src="assets/cli-cache.gif" alt="backupctl cache" width="720">
+
 View or clear the restic cache for a project. Useful when restic operations are slow or the cache is corrupted.
 
 ### Syntax
@@ -672,6 +690,8 @@ Clearing restic cache for all projects...
 ---
 
 ## restic
+
+<img src="assets/cli-restic.gif" alt="backupctl restic" width="720">
 
 Execute restic commands directly against a project's repository. The repository path, password, and SFTP credentials are injected automatically from the project's config — you only supply the restic subcommand and its arguments.
 
@@ -754,6 +774,92 @@ When finished, press Ctrl-C or send SIGINT to quit.
 
 ---
 
+## upgrade
+
+<img src="assets/cli-upgrade.gif" alt="backupctl upgrade" width="720">
+
+Check for available updates and display upgrade instructions. This command queries the GitHub Releases API, compares against the currently installed version, and shows how to upgrade if a newer release exists.
+
+### Syntax
+
+```
+backupctl upgrade
+```
+
+### Behavior
+
+1. Clears any cached upgrade information
+2. Queries the [GitHub releases](https://github.com/vineethkrishnan/backupctl/releases) for the latest version
+3. Compares the latest release against the installed version
+4. If an update is available, shows the release URL and upgrade instructions
+5. If already on the latest version, confirms it
+
+### Exit Codes
+
+| Code | Meaning |
+|------|---------|
+| `0` | Check completed successfully |
+| `4` | Connectivity error (GitHub API unreachable) |
+
+### Examples
+
+**Update available:**
+
+```
+$ backupctl upgrade
+
+Current version:  v0.1.8
+Latest version:   v0.2.0
+
+A new version is available!
+Release: https://github.com/vineethkrishnan/backupctl/releases/tag/v0.2.0
+
+To upgrade, run on the host machine:
+
+  backupctl-manage.sh upgrade
+```
+
+**Already up to date:**
+
+```
+$ backupctl upgrade
+
+Current version:  v0.2.0
+Latest version:   v0.2.0
+
+You are on the latest version.
+```
+
+### Automatic Upgrade Notifications
+
+backupctl automatically checks for updates on the first CLI command after each deployment. If a newer version is available, a notice appears at the end of the command output:
+
+```
+  ┌──────────────────────────────────────────────────────┐
+  │  Update available: v0.1.8 → v0.2.0                  │
+  │  Run on host: backupctl-manage.sh upgrade            │
+  └──────────────────────────────────────────────────────┘
+```
+
+The check result is cached in `${BACKUP_BASE_DIR}/.upgrade-info` so subsequent commands read from cache without hitting the GitHub API.
+
+**Suppressed when:**
+
+- Development mode (`NODE_ENV=development`)
+- Non-interactive output (piped or redirected stderr)
+- Opt-out via `BACKUPCTL_NO_UPDATE_CHECK=1`
+- Scheduled (cron) backups — these use the HTTP entry point, not the CLI
+
+**To upgrade after seeing the notice**, run on the host machine:
+
+```bash
+backupctl-manage.sh upgrade
+```
+
+This pulls the latest code, rebuilds the container, runs migrations, and clears the upgrade check cache.
+
+---
+
 ## Global Behaviors
 
 ### Exit Codes
@@ -766,7 +872,7 @@ All commands follow a consistent exit code scheme:
 | `1` | General failure | All commands |
 | `2` | Backup already in progress (lock held) | `run` |
 | `3` | Configuration validation error | `run`, `status`, `restore`, `snapshots`, `prune`, `logs`, `config`, `cache`, `restic` |
-| `4` | Connectivity error (DB, SSH, restic) | `run`, `health`, `restore`, `snapshots`, `prune`, `logs`, `restic` |
+| `4` | Connectivity error (DB, SSH, restic) | `run`, `health`, `restore`, `snapshots`, `prune`, `logs`, `restic`, `upgrade` |
 | `5` | Partial success | `run --all`, `prune --all` |
 
 Use exit codes for scripting:
