@@ -18,16 +18,19 @@ Set WindowBar Colorful
 Hide
 Type "alias backupctl='docker exec backupctl-dev npx ts-node -r tsconfig-paths/register src/cli.ts'"
 Enter
-Sleep 1s
+Sleep 500ms
+Type "clear"
+Enter
+Sleep 500ms
 Show
 
 # Show cache info
-Type "backupctl cache locaboo"
+Type "backupctl cache ayunis-locaboo"
 Enter
 Sleep 4s
 
 # Clear cache
-Type "backupctl cache locaboo --clear"
+Type "backupctl cache ayunis-locaboo --clear"
 Enter
 Sleep 4s
 

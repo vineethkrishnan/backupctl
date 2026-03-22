@@ -19,7 +19,10 @@ Set WindowBar Colorful
 Hide
 Type "alias backupctl='docker exec backupctl-dev npx ts-node -r tsconfig-paths/register src/cli.ts'"
 Enter
-Sleep 1s
+Sleep 500ms
+Type "clear"
+Enter
+Sleep 500ms
 Show
 
 # Health check
@@ -28,22 +31,22 @@ Enter
 Sleep 5s
 
 # Dry run
-Type "backupctl run locaboo --dry-run"
+Type "backupctl run ayunis-locaboo --dry-run"
 Enter
 Sleep 6s
 
 # Real backup
-Type "backupctl run locaboo"
+Type "backupctl run ayunis-locaboo"
 Enter
 Sleep 10s
 
 # List snapshots
-Type "backupctl snapshots locaboo --last 3"
+Type "backupctl snapshots ayunis-locaboo --last 3"
 Enter
 Sleep 5s
 
 # Restore guide
-Type "backupctl restore locaboo latest /tmp/restore --guide"
+Type "backupctl restore ayunis-locaboo latest /tmp/restore --guide"
 Enter
 Sleep 6s
 
