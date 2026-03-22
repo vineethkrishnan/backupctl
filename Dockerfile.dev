@@ -1,25 +1,20 @@
 # ── Development image ─────────────────────────────────────
 # Full toolchain + hot reload via NestJS watch mode
-FROM node:20-alpine3.21
+FROM node:20-alpine3.22
 
 RUN apk upgrade --no-cache \
     && apk add --no-cache \
     --repository=https://dl-cdn.alpinelinux.org/alpine/edge/main \
-    --repository=https://dl-cdn.alpinelinux.org/alpine/v3.21/community \
+    --repository=https://dl-cdn.alpinelinux.org/alpine/edge/community \
+    --repository=https://dl-cdn.alpinelinux.org/alpine/v3.22/community \
     postgresql17-client \
     mariadb-client \
     mongodb-tools \
     openssh-client \
     gnupg \
+    restic \
     fuse3 \
-    bzip2 \
     curl
-
-# Install restic
-RUN wget https://github.com/restic/restic/releases/download/v0.18.1/restic_0.18.1_linux_amd64.bz2 \
-    && bunzip2 restic_0.18.1_linux_amd64.bz2 \
-    && chmod +x restic_0.18.1_linux_amd64 \
-    && mv restic_0.18.1_linux_amd64 /usr/local/bin/restic
 
 # Run as non-root — SSH keys mounted to /home/node/.ssh
 RUN mkdir -p /home/node/.ssh /home/node/.gnupg \
@@ -28,6 +23,7 @@ RUN mkdir -p /home/node/.ssh /home/node/.gnupg \
 
 WORKDIR /app
 
+RUN npm install -g npm@latest
 COPY package*.json ./
 RUN npm ci
 
