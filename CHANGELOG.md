@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.11](https://github.com/vineethkrishnan/backupctl/compare/v0.1.10...v0.1.11) (2026-03-22)
+
+
+### Bug Fixes
+
+* **docs:** re-record GIFs with correct project name ([#32](https://github.com/vineethkrishnan/backupctl/issues/32)) ([a84fcdd](https://github.com/vineethkrishnan/backupctl/commit/a84fcdda4b4d140e96da33904b6806198eb4a546))
+
 ## [0.1.10](https://github.com/vineethkrishnan/backupctl/compare/v0.1.9...v0.1.10) (2026-03-22)
 
 
