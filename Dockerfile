@@ -1,4 +1,4 @@
-# ── Build stage ───────────────────────────────────────────
+# ── Build stage: NestJS ────────────────────────────────────
 FROM node:20-alpine3.22 AS builder
 
 WORKDIR /app
@@ -8,23 +8,48 @@ COPY tsconfig*.json nest-cli.json ./
 COPY src/ ./src/
 RUN npm run build
 
+# ── Build stage: restic with patched dependencies ─────────
+FROM golang:1.26-alpine AS restic-builder
+
+RUN apk add --no-cache git
+WORKDIR /build
+RUN git clone --branch v0.18.1 --depth 1 https://github.com/restic/restic.git .
+RUN go get golang.org/x/crypto@latest \
+    && go get golang.org/x/net@latest \
+    && go get google.golang.org/grpc@latest \
+    && go get google.golang.org/protobuf@latest \
+    && go get go.opentelemetry.io/otel/sdk@latest \
+    && go get go.opentelemetry.io/otel/sdk/metric@latest \
+    && go mod tidy
+RUN CGO_ENABLED=0 go build -tags disable_grpc_modules -ldflags "-s -w" -o /restic ./cmd/restic
+
+# ── Production dependencies (clean layer, no npm cache) ───
+FROM node:20-alpine3.22 AS deps
+
+RUN npm install -g npm@latest
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci --omit=dev --ignore-scripts && npm cache clean --force
+
 # ── Production stage ──────────────────────────────────────
 FROM node:20-alpine3.22
 
 RUN apk upgrade --no-cache \
     && apk add --no-cache \
     --repository=https://dl-cdn.alpinelinux.org/alpine/edge/main \
-    --repository=https://dl-cdn.alpinelinux.org/alpine/edge/community \
     --repository=https://dl-cdn.alpinelinux.org/alpine/v3.22/community \
     postgresql17-client \
     mariadb-client \
     mongodb-tools \
     openssh-client \
     gnupg \
-    restic \
     fuse3 \
     curl \
-    tini
+    tini \
+    && rm -rf /usr/local/lib/node_modules/npm /usr/local/bin/npm /usr/local/bin/npx \
+    && rm -rf /root/.npm
+
+COPY --from=restic-builder /restic /usr/local/bin/restic
 
 # Run as non-root — SSH keys mounted to /home/node/.ssh
 RUN mkdir -p /home/node/.ssh /home/node/.gnupg \
@@ -33,9 +58,7 @@ RUN mkdir -p /home/node/.ssh /home/node/.gnupg \
 
 WORKDIR /app
 ENV NODE_ENV=production
-RUN npm install -g npm@latest
-COPY package*.json ./
-RUN npm ci --omit=dev --ignore-scripts
+COPY --from=deps /app/node_modules ./node_modules/
 COPY --from=builder /app/dist ./dist/
 COPY scripts/docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh \
