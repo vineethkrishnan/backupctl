@@ -258,9 +258,9 @@ main() {
   echo ""
   echo -e "  ${BOLD}Usage:${RESET}"
   echo -e "    ${CYAN}${PROD_CMD} health${RESET}                    ${DIM}# production${RESET}"
-  echo -e "    ${CYAN}${PROD_CMD} run locaboo --dry-run${RESET}     ${DIM}# production${RESET}"
+  echo -e "    ${CYAN}${PROD_CMD} run vinsware --dry-run${RESET}     ${DIM}# production${RESET}"
   echo -e "    ${CYAN}${DEV_CMD} health${RESET}                ${DIM}# development${RESET}"
-  echo -e "    ${CYAN}${DEV_CMD} config show locaboo${RESET}   ${DIM}# development${RESET}"
+  echo -e "    ${CYAN}${DEV_CMD} config show vinsware${RESET}   ${DIM}# development${RESET}"
   echo ""
 }
 

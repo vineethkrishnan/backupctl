@@ -41,7 +41,7 @@ describe('StatusController', () => {
 
   describe('getAllStatus', () => {
     it('should return all project statuses', async () => {
-      const mockResults = [createMockResult('locaboo'), createMockResult('shopify')];
+      const mockResults = [createMockResult('vinsware'), createMockResult('shopify')];
       getBackupStatus.execute.mockResolvedValue(mockResults);
 
       const response = await controller.getAllStatus();
@@ -75,24 +75,24 @@ describe('StatusController', () => {
 
   describe('getProjectStatus', () => {
     it('should return specific project history', async () => {
-      const mockResults = [createMockResult('locaboo')];
+      const mockResults = [createMockResult('vinsware')];
       getBackupStatus.execute.mockResolvedValue(mockResults);
 
-      const response = await controller.getProjectStatus('locaboo');
+      const response = await controller.getProjectStatus('vinsware');
 
       expect(getBackupStatus.execute).toHaveBeenCalledWith(
-        expect.objectContaining({ projectName: 'locaboo', limit: undefined }),
+        expect.objectContaining({ projectName: 'vinsware', limit: undefined }),
       );
-      expect(response).toEqual({ project: 'locaboo', history: mockResults });
+      expect(response).toEqual({ project: 'vinsware', history: mockResults });
     });
 
     it('should pass parsed limit for project status', async () => {
       getBackupStatus.execute.mockResolvedValue([]);
 
-      await controller.getProjectStatus('locaboo', '10');
+      await controller.getProjectStatus('vinsware', '10');
 
       expect(getBackupStatus.execute).toHaveBeenCalledWith(
-        expect.objectContaining({ projectName: 'locaboo', limit: 10 }),
+        expect.objectContaining({ projectName: 'vinsware', limit: 10 }),
       );
     });
   });

@@ -48,6 +48,10 @@ interface RawProjectEntry {
     type: string;
     config: Record<string, unknown>;
   };
+  monitor?: {
+    type: string;
+    config: Record<string, unknown>;
+  };
 }
 
 interface RawYamlConfig {
@@ -132,6 +136,22 @@ export class YamlConfigLoaderAdapter implements ConfigLoaderPort {
             errors.push(
               `Project "${resolved.name}": invalid cron expression "${resolved.cron}" (expected 5 fields)`,
             );
+          }
+        }
+
+        if (resolved.monitor) {
+          if (!resolved.monitor.type) {
+            errors.push(`Project "${resolved.name}": monitor missing required field: type`);
+          }
+          if (resolved.monitor.type === 'uptime-kuma') {
+            const pushToken = resolved.monitor.config?.push_token;
+            if (!pushToken) {
+              errors.push(`Project "${resolved.name}": monitor type "uptime-kuma" requires config.push_token`);
+            }
+            const kumaBaseUrl = this.configService.get<string>('UPTIME_KUMA_BASE_URL');
+            if (!kumaBaseUrl) {
+              errors.push(`Project "${resolved.name}": monitor type "uptime-kuma" requires UPTIME_KUMA_BASE_URL in .env`);
+            }
           }
         }
       }
@@ -301,6 +321,7 @@ export class YamlConfigLoaderAdapter implements ConfigLoaderPort {
         : null,
       verification: { enabled: resolved.verification?.enabled ?? false },
       notification: resolved.notification ?? null,
+      monitor: resolved.monitor ?? null,
     });
   }
 }

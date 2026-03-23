@@ -55,6 +55,27 @@ describe('HealthCommand', () => {
     expect(console.log).toHaveBeenCalledWith(expect.stringContaining('42 GB free'));
   });
 
+  it('should print Uptime Kuma line when configured', async () => {
+    checkHealth.execute.mockResolvedValue(
+      new HealthCheckResult(true, true, 50, true, true, true, 3600, true, true, true),
+    );
+
+    await command.run([]);
+
+    expect(console.log).toHaveBeenCalledWith(expect.stringContaining('Uptime Kuma'));
+  });
+
+  it('should not print Uptime Kuma when not configured', async () => {
+    checkHealth.execute.mockResolvedValue(
+      new HealthCheckResult(true, true, 50, true, true, true, 3600),
+    );
+
+    await command.run([]);
+
+    const printed = (console.log as jest.Mock).mock.calls.map((call) => String(call[0])).join('\n');
+    expect(printed).not.toContain('Uptime Kuma');
+  });
+
   it('should set exit code 1 on error', async () => {
     checkHealth.execute.mockRejectedValue(new Error('Health check failed'));
 

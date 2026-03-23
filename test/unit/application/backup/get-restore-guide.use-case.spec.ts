@@ -19,6 +19,7 @@ function buildConfig(overrides: Partial<ProjectConfigParams> = {}): ProjectConfi
     hooks: null,
     verification: { enabled: false },
     notification: null,
+    monitor: null,
     ...overrides,
   });
 }

@@ -187,15 +187,15 @@ The `BackupLog` entity tracks every backup run:
 ### Backup Started
 
 ```
-🔄 Backup started — locaboo
+🔄 Backup started — vinsware
 Time: 2026-03-18 00:00:00 IST
 ```
 
 ### Backup Success
 
 ```
-✅ Backup completed — locaboo
-DB: locaboo_db | Dump: 245 MB | Encrypted: Yes | Verified: Yes
+✅ Backup completed — vinsware
+DB: vinsware_db | Dump: 245 MB | Encrypted: Yes | Verified: Yes
 Snapshot: a1b2c3d4 | Mode: combined
 New files: 12 | Changed: 3 | Added: 52 MB
 Pruned: 2 snapshots | Local cleaned: 1 file
@@ -205,17 +205,17 @@ Duration: 3m 12s
 ### Backup Failed
 
 ```
-❌ Backup failed — locaboo
+❌ Backup failed — vinsware
 Stage: restic sync | Retry: 3/3
 Error: connection timeout to storage box
-Dump file: /data/backups/locaboo/backup_2026-03-18_000000.sql.gz
+Dump file: /data/backups/vinsware/backup_2026-03-18_000000.sql.gz
 Duration: 5m 42s
 ```
 
 ### Backup Timeout Warning
 
 ```
-⚠️ Backup timeout warning — locaboo
+⚠️ Backup timeout warning — vinsware
 Elapsed: 35m | Timeout threshold: 30m
 Current stage: restic sync
 Backup is still running — this is a warning, not a failure.
@@ -226,7 +226,7 @@ Backup is still running — this is a warning, not a failure.
 ```
 📊 Daily Backup Summary — 2026-03-18
 
-✅ locaboo      — 245 MB — 3m 12s — a1b2c3d4
+✅ vinsware      — 245 MB — 3m 12s — a1b2c3d4
 ✅ project-x    — 128 MB — 1m 45s — e5f6g7h8
 ❌ project-y    — FAILED — restic sync timeout
 
@@ -240,11 +240,11 @@ The webhook notifier POSTs `application/json` with a `text` field containing the
 ```json
 {
   "event": "backup_success",
-  "project": "locaboo",
-  "text": "✅ Backup completed — locaboo\nDB: locaboo_db | Dump: 245 MB ...",
+  "project": "vinsware",
+  "text": "✅ Backup completed — vinsware\nDB: vinsware_db | Dump: 245 MB ...",
   "data": {
     "run_id": "uuid",
-    "project_name": "locaboo",
+    "project_name": "vinsware",
     "status": "success",
     "snapshot_id": "a1b2c3d4",
     "dump_size_bytes": 257949696,

@@ -184,26 +184,26 @@ An interactive loop that builds `config/projects.yml` one project at a time.
 [8/10] Project configuration
   Add a project? [Y/n]: Y
 
-  Project name: locaboo
-  Docker network (empty = host/default): locaboo_locaboo-network
+  Project name: vinsware
+  Docker network (empty = host/default): vinsware_vinsware-network
   Database type (postgres|mysql|mongodb): postgres
-  Database host: postgres-locaboo
+  Database host: postgres-vinsware
   Database port [5432]:
-  Database name: locaboo_db
+  Database name: vinsware_db
   Database user: backup_user
   Database password: ********
   Cron schedule [0 2 * * *]: 0 0 * * *
   Timeout minutes (blank for none): 30
-  Restic repo path [/backups/locaboo]:
+  Restic repo path [/backups/vinsware]:
   Restic password (blank for global):
   Snapshot mode (combined|separate) [combined]:
-  Asset paths (comma-separated, blank for none): /data/locaboo/uploads, /data/locaboo/assets
+  Asset paths (comma-separated, blank for none): /data/vinsware/uploads, /data/vinsware/assets
   Enable verification? [Y/n]:
-  Pre-backup hook (blank for none): curl -s http://locaboo-app:3000/maintenance/on
-  Post-backup hook (blank for none): curl -s http://locaboo-app:3000/maintenance/off
+  Pre-backup hook (blank for none): curl -s http://vinsware-app:3000/maintenance/on
+  Post-backup hook (blank for none): curl -s http://vinsware-app:3000/maintenance/off
   Notification override? [y/N]:
 
-  ✓ locaboo added.
+  ✓ vinsware added.
 
   Add another project? [Y/n]: N
 ```
@@ -231,10 +231,10 @@ Optionally builds the Docker image, starts containers, runs migrations, initiali
   Starting containers... done.
   Waiting for audit DB... ready.
   Running migrations... done.
-  Initializing restic repo for locaboo... done.
+  Initializing restic repo for vinsware... done.
   Running health check...
     ✓ Audit DB: connected
-    ✓ Restic (locaboo): accessible
+    ✓ Restic (vinsware): accessible
     ✓ Disk: 42 GB free (threshold: 5 GB)
     ✓ SSH: connected
 ```
@@ -261,7 +261,7 @@ After installation:
 
 ```bash
 backupctl health                       # instead of: docker exec backupctl node dist/cli.js health
-backupctl run locaboo --dry-run        # instead of: docker exec backupctl node dist/cli.js run locaboo --dry-run
+backupctl run vinsware --dry-run        # instead of: docker exec backupctl node dist/cli.js run vinsware --dry-run
 backupctl-dev health                   # instead of: scripts/dev.sh cli health
 ```
 
@@ -380,7 +380,7 @@ HETZNER_SSH_USER=u123456
 RESTIC_PASSWORD=<generate-a-strong-password>
 
 # At least one project DB password
-LOCABOO_DB_PASSWORD=<db-password>
+VINSWARE_DB_PASSWORD=<db-password>
 ```
 
 All other variables have sensible defaults. See [Configuration](05-configuration.md) for the full reference.
@@ -391,21 +391,21 @@ Create `config/projects.yml` with at least one project:
 
 ```yaml
 projects:
-  - name: locaboo
+  - name: vinsware
     enabled: true
     cron: "0 2 * * *"
-    docker_network: locaboo_locaboo-network  # optional — Docker network where DB lives
+    docker_network: vinsware_vinsware-network  # optional — Docker network where DB lives
 
     database:
       type: postgres
-      host: postgres-locaboo
+      host: postgres-vinsware
       port: 5432
-      name: locaboo_db
+      name: vinsware_db
       user: backup_user
-      password: ${LOCABOO_DB_PASSWORD}
+      password: ${VINSWARE_DB_PASSWORD}
 
     restic:
-      repository_path: backups/locaboo
+      repository_path: backups/vinsware
       snapshot_mode: combined
 
     retention:
@@ -499,25 +499,25 @@ docker exec -i backupctl sftp -i /home/node/.ssh/id_ed25519 \
   -P 23 -o StrictHostKeyChecking=accept-new \
   u123456@u123456.your-storagebox.de <<'EOF'
 mkdir backups
-mkdir backups/locaboo
+mkdir backups/vinsware
 bye
 EOF
 ```
 
 ::: tip
-Hetzner Storage Box paths must be **relative** (e.g., `backups/locaboo`, not `/backups/locaboo`). The storage box chroots to the user's home directory, so `/backups` refers to a read-only system path.
+Hetzner Storage Box paths must be **relative** (e.g., `backups/vinsware`, not `/backups/vinsware`). The storage box chroots to the user's home directory, so `/backups` refers to a read-only system path.
 :::
 
 **Step 2 — Initialize the restic repository:**
 
 ```bash
-docker exec backupctl node dist/cli.js restic locaboo init
+docker exec backupctl node dist/cli.js restic vinsware init
 ```
 
 Expected output:
 
 ```
-created restic repository at sftp:u123456@u123456.your-storagebox.de:backups/locaboo
+created restic repository at sftp:u123456@u123456.your-storagebox.de:backups/vinsware
 
 Please note that knowledge of your password is required to access
 the repository. Losing your password means that your data is
@@ -539,7 +539,7 @@ Expected output:
 ```
 Health Check Results:
   Audit DB:        ✓ connected
-  Restic (locaboo): ✓ accessible
+  Restic (vinsware): ✓ accessible
   Disk space:      ✓ 42 GB free (threshold: 5 GB)
   SSH:             ✓ connected to u123456.your-storagebox.de
 ```
@@ -549,7 +549,7 @@ Health Check Results:
 Run a dry-run backup to validate the full configuration without executing any destructive operations:
 
 ```bash
-docker exec backupctl node dist/cli.js run locaboo --dry-run
+docker exec backupctl node dist/cli.js run vinsware --dry-run
 ```
 
 This validates config loading, database connectivity, restic repo access, SSH connectivity, disk space, and GPG key availability (if encryption is enabled).
@@ -560,16 +560,16 @@ After installation is complete, verify the system end-to-end:
 
 ```bash
 # Trigger a real backup
-docker exec backupctl node dist/cli.js run locaboo
+docker exec backupctl node dist/cli.js run vinsware
 
 # Check backup status
-docker exec backupctl node dist/cli.js status locaboo
+docker exec backupctl node dist/cli.js status vinsware
 
 # View audit logs
-docker exec backupctl node dist/cli.js logs locaboo --last 1
+docker exec backupctl node dist/cli.js logs vinsware --last 1
 
 # Confirm snapshots exist on remote storage
-docker exec backupctl node dist/cli.js snapshots locaboo --last 1
+docker exec backupctl node dist/cli.js snapshots vinsware --last 1
 ```
 
 The cron scheduler starts automatically when the container boots. Backups will run on their configured schedules without further intervention.

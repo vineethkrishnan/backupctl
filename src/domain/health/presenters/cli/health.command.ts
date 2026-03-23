@@ -23,6 +23,9 @@ export class HealthCommand extends CommandRunner {
       this.printCheck('SSH connection', result.sshConnected);
       this.printCheck('SSH auth', result.sshAuthenticated);
       this.printCheck('Restic repos', result.resticReposHealthy);
+      if (result.uptimeKumaConfigured) {
+        this.printCheck('Uptime Kuma', result.uptimeKumaConnected);
+      }
       console.log(`  Uptime: ${formatDuration(result.uptime * 1000)}`);
 
       if (!isHealthy) {

@@ -10,21 +10,21 @@ jest.setTimeout(30000);
 
 function buildTestYaml(overrides: Record<string, unknown> = {}): string {
   const project = {
-    name: 'locaboo',
+    name: 'vinsware',
     enabled: true,
     cron: '0 2 * * *',
     timeout_minutes: 30,
     database: {
       type: 'postgres',
-      host: 'db.locaboo.test',
+      host: 'db.vinsware.test',
       port: 5432,
-      name: 'locaboo_prod',
-      user: 'locaboo_user',
-      password: '${LOCABOO_DB_PASSWORD}',
+      name: 'vinsware_prod',
+      user: 'vinsware_user',
+      password: '${VINSWARE_DB_PASSWORD}',
     },
-    assets: { paths: ['/data/locaboo/uploads'] },
+    assets: { paths: ['/data/vinsware/uploads'] },
     restic: {
-      repository_path: 'sftp:storage:/backups/locaboo',
+      repository_path: 'sftp:storage:/backups/vinsware',
       password: '${RESTIC_PASSWORD}',
       snapshot_mode: 'combined',
     },
@@ -44,18 +44,18 @@ function buildTestYaml(overrides: Record<string, unknown> = {}): string {
 function buildMultiProjectYaml(): string {
   const projects = [
     {
-      name: 'locaboo',
+      name: 'vinsware',
       cron: '0 2 * * *',
       database: {
         type: 'postgres',
-        host: 'db.locaboo.test',
+        host: 'db.vinsware.test',
         port: 5432,
-        name: 'locaboo_prod',
-        user: 'locaboo_user',
+        name: 'vinsware_prod',
+        user: 'vinsware_user',
         password: 'plain-pass',
       },
       restic: {
-        repository_path: 'sftp:storage:/backups/locaboo',
+        repository_path: 'sftp:storage:/backups/vinsware',
         password: 'restic-pass',
       },
       retention: { local_days: 7, keep_daily: 7, keep_weekly: 4 },
@@ -132,7 +132,7 @@ describe('YamlConfigLoaderAdapter (integration)', () => {
 
   describe('loadAll', () => {
     it('should load YAML and create ProjectConfig objects', () => {
-      setEnvVar('LOCABOO_DB_PASSWORD', 'test-secret-123');
+      setEnvVar('VINSWARE_DB_PASSWORD', 'test-secret-123');
       setEnvVar('RESTIC_PASSWORD', 'restic-secret');
       fs.writeFileSync(tempConfigPath, buildTestYaml());
 
@@ -141,9 +141,9 @@ describe('YamlConfigLoaderAdapter (integration)', () => {
 
       expect(result).toHaveLength(1);
       expect(result[0]).toBeInstanceOf(ProjectConfig);
-      expect(result[0].name).toBe('locaboo');
+      expect(result[0].name).toBe('vinsware');
       expect(result[0].database?.type).toBe('postgres');
-      expect(result[0].database?.host).toBe('db.locaboo.test');
+      expect(result[0].database?.host).toBe('db.vinsware.test');
       expect(result[0].database?.port).toBe(5432);
       expect(result[0].cron).toBe('0 2 * * *');
       expect(result[0].timeoutMinutes).toBe(30);
@@ -152,7 +152,7 @@ describe('YamlConfigLoaderAdapter (integration)', () => {
     });
 
     it('should resolve ${VAR_NAME} placeholders from environment', () => {
-      setEnvVar('LOCABOO_DB_PASSWORD', 'resolved-db-pass');
+      setEnvVar('VINSWARE_DB_PASSWORD', 'resolved-db-pass');
       setEnvVar('RESTIC_PASSWORD', 'resolved-restic-pass');
       fs.writeFileSync(tempConfigPath, buildTestYaml());
 
@@ -166,7 +166,7 @@ describe('YamlConfigLoaderAdapter (integration)', () => {
 
   describe('env fallbacks', () => {
     it('should fall back to env defaults when notification block is missing', () => {
-      setEnvVar('LOCABOO_DB_PASSWORD', 'pass');
+      setEnvVar('VINSWARE_DB_PASSWORD', 'pass');
       setEnvVar('RESTIC_PASSWORD', 'rpass');
       fs.writeFileSync(tempConfigPath, buildTestYaml());
 
@@ -183,7 +183,7 @@ describe('YamlConfigLoaderAdapter (integration)', () => {
     });
 
     it('should fall back to env defaults for missing encryption', () => {
-      setEnvVar('LOCABOO_DB_PASSWORD', 'pass');
+      setEnvVar('VINSWARE_DB_PASSWORD', 'pass');
       setEnvVar('RESTIC_PASSWORD', 'rpass');
       fs.writeFileSync(tempConfigPath, buildTestYaml());
 
@@ -205,7 +205,7 @@ describe('YamlConfigLoaderAdapter (integration)', () => {
 
   describe('validate', () => {
     it('should return isValid:true for valid config', () => {
-      setEnvVar('LOCABOO_DB_PASSWORD', 'pass');
+      setEnvVar('VINSWARE_DB_PASSWORD', 'pass');
       setEnvVar('RESTIC_PASSWORD', 'rpass');
       fs.writeFileSync(tempConfigPath, buildTestYaml());
 
@@ -217,7 +217,7 @@ describe('YamlConfigLoaderAdapter (integration)', () => {
     });
 
     it('should return errors for unresolved env vars', () => {
-      delete process.env.LOCABOO_DB_PASSWORD;
+      delete process.env.VINSWARE_DB_PASSWORD;
       delete process.env.RESTIC_PASSWORD;
       fs.writeFileSync(tempConfigPath, buildTestYaml());
 
@@ -225,7 +225,63 @@ describe('YamlConfigLoaderAdapter (integration)', () => {
       const result = adapter.validate();
 
       expect(result.isValid).toBe(false);
-      expect(result.errors.some((e) => e.includes('LOCABOO_DB_PASSWORD'))).toBe(true);
+      expect(result.errors.some((e) => e.includes('VINSWARE_DB_PASSWORD'))).toBe(true);
+    });
+
+    it('should return error when monitor is missing type', () => {
+      setEnvVar('VINSWARE_DB_PASSWORD', 'pass');
+      setEnvVar('RESTIC_PASSWORD', 'rpass');
+      fs.writeFileSync(tempConfigPath, buildTestYaml({
+        monitor: { config: { push_token: 'tok-123' } },
+      }));
+
+      const adapter = createAdapter();
+      const result = adapter.validate();
+
+      expect(result.isValid).toBe(false);
+      expect(result.errors.some((e) => e.includes('monitor missing required field: type'))).toBe(true);
+    });
+
+    it('should return error when uptime-kuma monitor is missing push_token', () => {
+      setEnvVar('VINSWARE_DB_PASSWORD', 'pass');
+      setEnvVar('RESTIC_PASSWORD', 'rpass');
+      fs.writeFileSync(tempConfigPath, buildTestYaml({
+        monitor: { type: 'uptime-kuma', config: {} },
+      }));
+
+      const adapter = createAdapter({ UPTIME_KUMA_BASE_URL: 'https://kuma.example.com' });
+      const result = adapter.validate();
+
+      expect(result.isValid).toBe(false);
+      expect(result.errors.some((e) => e.includes('requires config.push_token'))).toBe(true);
+    });
+
+    it('should return error when uptime-kuma monitor is missing UPTIME_KUMA_BASE_URL', () => {
+      setEnvVar('VINSWARE_DB_PASSWORD', 'pass');
+      setEnvVar('RESTIC_PASSWORD', 'rpass');
+      fs.writeFileSync(tempConfigPath, buildTestYaml({
+        monitor: { type: 'uptime-kuma', config: { push_token: 'tok-123' } },
+      }));
+
+      const adapter = createAdapter();
+      const result = adapter.validate();
+
+      expect(result.isValid).toBe(false);
+      expect(result.errors.some((e) => e.includes('requires UPTIME_KUMA_BASE_URL'))).toBe(true);
+    });
+
+    it('should pass validation for valid uptime-kuma monitor config', () => {
+      setEnvVar('VINSWARE_DB_PASSWORD', 'pass');
+      setEnvVar('RESTIC_PASSWORD', 'rpass');
+      fs.writeFileSync(tempConfigPath, buildTestYaml({
+        monitor: { type: 'uptime-kuma', config: { push_token: 'tok-123' } },
+      }));
+
+      const adapter = createAdapter({ UPTIME_KUMA_BASE_URL: 'https://kuma.example.com' });
+      const result = adapter.validate();
+
+      expect(result.isValid).toBe(true);
+      expect(result.errors).toHaveLength(0);
     });
   });
 
@@ -234,11 +290,11 @@ describe('YamlConfigLoaderAdapter (integration)', () => {
       fs.writeFileSync(tempConfigPath, buildMultiProjectYaml());
 
       const adapter = createAdapter();
-      const locaboo = adapter.getProject('locaboo');
+      const vinsware = adapter.getProject('vinsware');
       const shopify = adapter.getProject('shopify-sync');
 
-      expect(locaboo.name).toBe('locaboo');
-      expect(locaboo.database?.type).toBe('postgres');
+      expect(vinsware.name).toBe('vinsware');
+      expect(vinsware.database?.type).toBe('postgres');
       expect(shopify.name).toBe('shopify-sync');
       expect(shopify.database?.type).toBe('mysql');
     });

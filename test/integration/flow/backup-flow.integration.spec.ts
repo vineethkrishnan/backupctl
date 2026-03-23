@@ -47,6 +47,7 @@ import {
   FILESYSTEM_PORT,
   GPG_KEY_MANAGER_PORT,
   REMOTE_STORAGE_FACTORY,
+  HEARTBEAT_MONITOR_PORT,
 } from '@common/di/injection-tokens';
 
 jest.setTimeout(30000);
@@ -55,7 +56,7 @@ jest.setTimeout(30000);
 
 function buildTestConfig(overrides: Partial<ProjectConfig> = {}): ProjectConfig {
   return new ProjectConfig({
-    name: 'locaboo',
+    name: 'vinsware',
     enabled: true,
     cron: '0 2 * * *',
     timeoutMinutes: null,
@@ -63,14 +64,14 @@ function buildTestConfig(overrides: Partial<ProjectConfig> = {}): ProjectConfig 
       type: 'postgres',
       host: 'localhost',
       port: 5432,
-      name: 'locaboo_prod',
-      user: 'locaboo_user',
+      name: 'vinsware_prod',
+      user: 'vinsware_user',
       password: 'test-pass',
     },
     compression: { enabled: true },
     assets: { paths: [] },
     restic: {
-      repositoryPath: 'sftp:storage:/backups/locaboo',
+      repositoryPath: 'sftp:storage:/backups/vinsware',
       password: 'restic-pass',
       snapshotMode: 'combined',
     },
@@ -79,6 +80,7 @@ function buildTestConfig(overrides: Partial<ProjectConfig> = {}): ProjectConfig 
     hooks: null,
     verification: { enabled: false },
     notification: { type: 'slack', config: {} },
+    monitor: null,
     ...overrides,
   });
 }
@@ -222,7 +224,7 @@ describe('RunBackupUseCase (integration flow)', () => {
   const configLoader: ConfigLoaderPort = {
     loadAll: () => [testConfig],
     getProject: (name: string) => {
-      if (name === 'locaboo') return testConfig;
+      if (name === 'vinsware') return testConfig;
       throw new Error(`Project "${name}" not found in configuration`);
     },
     validate: (): ValidationResult => ({ isValid: true, errors: [] }),
@@ -233,7 +235,7 @@ describe('RunBackupUseCase (integration flow)', () => {
     tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'backupctl-flow-test-'));
 
     mockDumper = {
-      dump: jest.fn().mockResolvedValue(new DumpResult('/data/backups/locaboo/dump.sql.gz', 1024000, 5000)),
+      dump: jest.fn().mockResolvedValue(new DumpResult('/data/backups/vinsware/dump.sql.gz', 1024000, 5000)),
       verify: jest.fn().mockResolvedValue(true),
     };
 
@@ -257,8 +259,8 @@ describe('RunBackupUseCase (integration flow)', () => {
     };
 
     mockEncryptor = {
-      encrypt: jest.fn().mockResolvedValue('/data/backups/locaboo/dump.sql.gz.gpg'),
-      decrypt: jest.fn().mockResolvedValue('/data/backups/locaboo/dump.sql.gz'),
+      encrypt: jest.fn().mockResolvedValue('/data/backups/vinsware/dump.sql.gz.gpg'),
+      decrypt: jest.fn().mockResolvedValue('/data/backups/vinsware/dump.sql.gz'),
     };
 
     mockHookExecutor = {
@@ -299,6 +301,7 @@ describe('RunBackupUseCase (integration flow)', () => {
         { provide: REMOTE_STORAGE_FACTORY, useValue: storageFactory },
         { provide: FILESYSTEM_PORT, useValue: { exists: () => true, diskFreeGb: () => 20, listDirectory: () => [], removeFile: () => undefined } satisfies FileSystemPort },
         { provide: GPG_KEY_MANAGER_PORT, useValue: { importKey: jest.fn(), importAllFromDirectory: jest.fn().mockResolvedValue([]), listKeys: jest.fn().mockResolvedValue(''), hasKey: jest.fn().mockResolvedValue(true) } satisfies GpgKeyManagerPort },
+        { provide: HEARTBEAT_MONITOR_PORT, useValue: { sendHeartbeat: jest.fn().mockResolvedValue(undefined), checkConnectivity: jest.fn().mockResolvedValue(true) } },
       ],
     }).compile();
 
@@ -315,14 +318,14 @@ describe('RunBackupUseCase (integration flow)', () => {
   // ── Happy path ──────────────────────────────────────────────────────
 
   it('should complete full backup flow: dump → sync → prune → cleanup → audit → notify', async () => {
-    const [result] = await orchestrator.execute(new RunBackupCommand({ projectName: 'locaboo' }));
+    const [result] = await orchestrator.execute(new RunBackupCommand({ projectName: 'vinsware' }));
 
     expect(result.status).toBe(BackupStatus.Success);
-    expect(result.projectName).toBe('locaboo');
+    expect(result.projectName).toBe('vinsware');
     expect(result.durationMs).toBeGreaterThanOrEqual(0);
 
     // Verify each step was called
-    expect(mockNotifier.notifyStarted).toHaveBeenCalledWith('locaboo');
+    expect(mockNotifier.notifyStarted).toHaveBeenCalledWith('vinsware');
     expect(mockDumper.dump).toHaveBeenCalled();
     expect(mockStorage.sync).toHaveBeenCalled();
     expect(mockStorage.prune).toHaveBeenCalled();
@@ -337,29 +340,29 @@ describe('RunBackupUseCase (integration flow)', () => {
     expect(auditLog.records[0].result).not.toBeNull();
 
     // Verify lock was released
-    expect(backupLock.isLocked('locaboo')).toBe(false);
+    expect(backupLock.isLocked('vinsware')).toBe(false);
   });
 
   // ── Lock prevents concurrent backup ────────────────────────────────
 
   it('should prevent concurrent backup via lock', async () => {
     // Manually acquire the lock
-    await backupLock.acquire('locaboo');
+    await backupLock.acquire('vinsware');
 
-    await expect(orchestrator.execute(new RunBackupCommand({ projectName: 'locaboo' }))).rejects.toThrow(
-      'Backup already in progress for locaboo',
+    await expect(orchestrator.execute(new RunBackupCommand({ projectName: 'vinsware' }))).rejects.toThrow(
+      'Backup already in progress for vinsware',
     );
 
     // Release for cleanup
-    await backupLock.release('locaboo');
+    await backupLock.release('vinsware');
   });
 
   // ── Dry run ────────────────────────────────────────────────────────
 
   it('should not execute backup steps during dry run', async () => {
-    const [result] = await orchestrator.execute(new RunBackupCommand({ projectName: 'locaboo', isDryRun: true }));
+    const [result] = await orchestrator.execute(new RunBackupCommand({ projectName: 'vinsware', isDryRun: true }));
 
-    expect(result.projectName).toBe('locaboo');
+    expect(result.projectName).toBe('vinsware');
     expect(result.runId).toBe('dry-run');
     expect(result.status).toBe(BackupStatus.Success);
 
@@ -379,10 +382,10 @@ describe('RunBackupUseCase (integration flow)', () => {
       if (callCount < 3) {
         throw new Error('pg_dump connection refused');
       }
-      return new DumpResult('/data/backups/locaboo/dump.sql.gz', 1024000, 5000);
+      return new DumpResult('/data/backups/vinsware/dump.sql.gz', 1024000, 5000);
     });
 
-    const [result] = await orchestrator.execute(new RunBackupCommand({ projectName: 'locaboo' }));
+    const [result] = await orchestrator.execute(new RunBackupCommand({ projectName: 'vinsware' }));
 
     expect(result.status).toBe(BackupStatus.Success);
     // First call + 2 retries = 3 total calls
@@ -395,7 +398,7 @@ describe('RunBackupUseCase (integration flow)', () => {
   it('should fail after exhausting retries', async () => {
     mockDumper.dump.mockRejectedValue(new Error('pg_dump persistent failure'));
 
-    const [result] = await orchestrator.execute(new RunBackupCommand({ projectName: 'locaboo' }));
+    const [result] = await orchestrator.execute(new RunBackupCommand({ projectName: 'vinsware' }));
 
     expect(result.status).toBe(BackupStatus.Failed);
     expect(result.errorStage).toBe(BackupStage.Dump);
@@ -405,7 +408,7 @@ describe('RunBackupUseCase (integration flow)', () => {
     expect(mockNotifier.notifyFailure).toHaveBeenCalled();
 
     // Verify lock was still released
-    expect(backupLock.isLocked('locaboo')).toBe(false);
+    expect(backupLock.isLocked('vinsware')).toBe(false);
   });
 
   // ── Audit records stages ──────────────────────────────────────────
@@ -413,7 +416,7 @@ describe('RunBackupUseCase (integration flow)', () => {
   it('should track progress through audit log stages', async () => {
     const trackSpy = jest.spyOn(auditLog, 'trackProgress');
 
-    await orchestrator.execute(new RunBackupCommand({ projectName: 'locaboo' }));
+    await orchestrator.execute(new RunBackupCommand({ projectName: 'vinsware' }));
 
     expect(trackSpy).toHaveBeenCalledWith(expect.any(String), BackupStage.NotifyStarted);
     expect(trackSpy).toHaveBeenCalledWith(expect.any(String), BackupStage.Dump);
@@ -425,13 +428,13 @@ describe('RunBackupUseCase (integration flow)', () => {
   // ── Sync receives correct paths and tags ──────────────────────────
 
   it('should pass dump file path and tags to storage sync', async () => {
-    await orchestrator.execute(new RunBackupCommand({ projectName: 'locaboo' }));
+    await orchestrator.execute(new RunBackupCommand({ projectName: 'vinsware' }));
 
     expect(mockStorage.sync).toHaveBeenCalledWith(
-      ['/data/backups/locaboo/dump.sql.gz'],
+      ['/data/backups/vinsware/dump.sql.gz'],
       expect.objectContaining({
         tags: expect.arrayContaining([
-          'project:locaboo',
+          'project:vinsware',
           'db:postgres',
         ]),
         snapshotMode: 'combined',

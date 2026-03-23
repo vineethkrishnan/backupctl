@@ -60,6 +60,7 @@ src/
 │   │   │   │   ├── dump-encryptor.port.ts
 │   │   │   │   ├── local-cleanup.port.ts
 │   │   │   │   ├── hook-executor.port.ts
+│   │   │   │   ├── heartbeat-monitor.port.ts
 │   │   │   │   └── backup-lock.port.ts
 │   │   │   ├── use-cases/                     # One dir per action
 │   │   │   │   ├── run-backup/
@@ -81,6 +82,7 @@ src/
 │   │   │   │   ├── encryptors/                # gpg
 │   │   │   │   ├── cleanup/                   # file cleanup
 │   │   │   │   ├── hooks/                     # shell hooks
+│   │   │   │   ├── monitors/                  # uptime-kuma heartbeat
 │   │   │   │   └── lock/                      # file-based .lock
 │   │   │   └── scheduler/
 │   │   │       └── dynamic-scheduler.service.ts
@@ -368,6 +370,7 @@ The main module. Orchestrates the 11-step backup flow.
 | `FileCleanupAdapter` | `LocalCleanupPort` | Node.js `fs` |
 | `ShellHookExecutorAdapter` | `HookExecutorPort` | `child_process.execFile` |
 | `FileBackupLockAdapter` | `BackupLockPort` | Node.js `fs` (`.lock` files) |
+| `UptimeKumaHeartbeatAdapter` | `HeartbeatMonitorPort` | Uptime Kuma Push API (HTTP) |
 
 ### audit/ — Audit Trail Module
 
@@ -402,7 +405,7 @@ Tracks every backup run with real-time stage progress.
 
 ### health/ — Health Check Module
 
-**Use Case:** `CheckHealthUseCase` — checks audit DB, disk space, SSH, restic repos
+**Use Case:** `CheckHealthUseCase` — checks audit DB, disk space, SSH, restic repos, Uptime Kuma connectivity
 
 ---
 

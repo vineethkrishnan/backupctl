@@ -83,6 +83,7 @@ src/
 │   │   │   │   ├── dump-encryptor.port.ts
 │   │   │   │   ├── local-cleanup.port.ts
 │   │   │   │   ├── hook-executor.port.ts
+│   │   │   │   ├── heartbeat-monitor.port.ts
 │   │   │   │   └── backup-lock.port.ts
 │   │   │   ├── use-cases/                    # One directory per action, each with Command/Query + UseCase
 │   │   │   │   ├── run-backup/
@@ -115,6 +116,7 @@ src/
 │   │   │   │   ├── encryptors/                # gpg + key manager
 │   │   │   │   ├── cleanup/                   # file cleanup
 │   │   │   │   ├── hooks/                     # shell hook executor
+│   │   │   │   ├── monitors/                  # uptime-kuma heartbeat
 │   │   │   │   └── lock/                      # file-based .lock
 │   │   │   └── scheduler/
 │   │   │       └── dynamic-scheduler.service.ts
@@ -343,7 +345,7 @@ scripts/backupctl-manage.sh check            # validate prerequisites
 
 # Inside container
 docker exec backupctl node dist/cli.js health
-docker exec backupctl node dist/cli.js run locaboo --dry-run
+docker exec backupctl node dist/cli.js run vinsware --dry-run
 
 # Migrations
 scripts/dev.sh migrate:run                    # run pending
@@ -508,7 +510,7 @@ Explain **why**, not obvious **what**. No comments on self-evident code.
 - **CLI collision:** rejects with exit code `2`
 - **`run --all`:** sequential, continues on individual failure (exit code `5` if partial)
 
-## Backup Flow (11 Steps)
+## Backup Flow (13 Steps)
 
 ```
  0. BackupLockPort.acquire()

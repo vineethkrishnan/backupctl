@@ -18,6 +18,7 @@ function buildConfig(): ProjectConfig {
     hooks: null,
     verification: { enabled: false },
     notification: null,
+    monitor: null,
   });
 }
 

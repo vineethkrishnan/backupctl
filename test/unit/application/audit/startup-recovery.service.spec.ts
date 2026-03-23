@@ -45,6 +45,7 @@ describe('RecoverStartupUseCase', () => {
       hooks: null,
       verification: { enabled: false },
       notification: null,
+      monitor: null,
     });
 
   const createOrphanedResult = (runId: string, projectName: string): BackupResult =>
@@ -153,7 +154,7 @@ describe('RecoverStartupUseCase', () => {
   });
 
   it('marks orphaned runs as failed', async () => {
-    const orphan = createOrphanedResult('run-orphan-1', 'locaboo');
+    const orphan = createOrphanedResult('run-orphan-1', 'vinsware');
     mockAuditLog.findOrphaned.mockResolvedValue([orphan]);
 
     await service.onModuleInit();
@@ -170,19 +171,19 @@ describe('RecoverStartupUseCase', () => {
   });
 
   it('cleans orphaned dump files only for projects with orphaned runs', async () => {
-    const orphan = createOrphanedResult('run-orphan-1', 'locaboo');
+    const orphan = createOrphanedResult('run-orphan-1', 'vinsware');
     mockAuditLog.findOrphaned.mockResolvedValue([orphan]);
-    const projects = [createProjectConfig('locaboo')];
+    const projects = [createProjectConfig('vinsware')];
     mockConfigLoader.loadAll.mockReturnValue(projects);
     mockFilesystem.exists.mockReturnValue(true);
-    mockFilesystem.listDirectory.mockReturnValue(['locaboo.sql.gz', 'locaboo.sql.gz.gpg', '.lock', 'notes.txt']);
+    mockFilesystem.listDirectory.mockReturnValue(['vinsware.sql.gz', 'vinsware.sql.gz.gpg', '.lock', 'notes.txt']);
 
     await service.onModuleInit();
 
-    expect(mockFilesystem.removeFile).toHaveBeenCalledWith('/data/backups/locaboo/locaboo.sql.gz');
-    expect(mockFilesystem.removeFile).toHaveBeenCalledWith('/data/backups/locaboo/locaboo.sql.gz.gpg');
-    expect(mockFilesystem.removeFile).not.toHaveBeenCalledWith('/data/backups/locaboo/.lock');
-    expect(mockFilesystem.removeFile).not.toHaveBeenCalledWith('/data/backups/locaboo/notes.txt');
+    expect(mockFilesystem.removeFile).toHaveBeenCalledWith('/data/backups/vinsware/vinsware.sql.gz');
+    expect(mockFilesystem.removeFile).toHaveBeenCalledWith('/data/backups/vinsware/vinsware.sql.gz.gpg');
+    expect(mockFilesystem.removeFile).not.toHaveBeenCalledWith('/data/backups/vinsware/.lock');
+    expect(mockFilesystem.removeFile).not.toHaveBeenCalledWith('/data/backups/vinsware/notes.txt');
   });
 
   it('skips dump cleanup when project has no orphaned runs', async () => {
@@ -197,24 +198,24 @@ describe('RecoverStartupUseCase', () => {
   });
 
   it('releases stale locks only for projects with orphaned runs', async () => {
-    const orphan1 = createOrphanedResult('run-1', 'locaboo');
+    const orphan1 = createOrphanedResult('run-1', 'vinsware');
     const orphan2 = createOrphanedResult('run-2', 'webapp');
     mockAuditLog.findOrphaned.mockResolvedValue([orphan1, orphan2]);
-    const projects = [createProjectConfig('locaboo'), createProjectConfig('webapp'), createProjectConfig('untouched')];
+    const projects = [createProjectConfig('vinsware'), createProjectConfig('webapp'), createProjectConfig('untouched')];
     mockConfigLoader.loadAll.mockReturnValue(projects);
     mockBackupLock.isLocked.mockReturnValue(true);
     mockBackupLock.release.mockResolvedValue(undefined);
 
     await service.onModuleInit();
 
-    expect(mockBackupLock.release).toHaveBeenCalledWith('locaboo');
+    expect(mockBackupLock.release).toHaveBeenCalledWith('vinsware');
     expect(mockBackupLock.release).toHaveBeenCalledWith('webapp');
     expect(mockBackupLock.release).not.toHaveBeenCalledWith('untouched');
   });
 
   it('unlocks restic repos for enabled projects (non-fatal on error)', async () => {
     const projects = [
-      createProjectConfig('locaboo', true),
+      createProjectConfig('vinsware', true),
       createProjectConfig('webapp', true),
       createProjectConfig('disabled-project', false),
     ];
@@ -235,7 +236,7 @@ describe('RecoverStartupUseCase', () => {
       type: 'audit',
       payload: new BackupResult({
         runId: 'run-fb-1',
-        projectName: 'locaboo',
+        projectName: 'vinsware',
         status: BackupStatus.Success,
         currentStage: BackupStage.NotifyResult,
         startedAt: new Date('2026-03-18T02:00:00Z'),
@@ -259,7 +260,7 @@ describe('RecoverStartupUseCase', () => {
     const notificationEntry: FallbackEntry = {
       id: 'fb-2',
       type: 'notification',
-      payload: { project: 'locaboo', message: 'Backup succeeded' },
+      payload: { project: 'vinsware', message: 'Backup succeeded' },
       timestamp: '2026-03-18T02:05:01Z',
     };
 
@@ -294,9 +295,9 @@ describe('RecoverStartupUseCase', () => {
   });
 
   it('handles dump cleanup failure for individual files gracefully', async () => {
-    const orphan = createOrphanedResult('run-1', 'locaboo');
+    const orphan = createOrphanedResult('run-1', 'vinsware');
     mockAuditLog.findOrphaned.mockResolvedValue([orphan]);
-    const projects = [createProjectConfig('locaboo')];
+    const projects = [createProjectConfig('vinsware')];
     mockConfigLoader.loadAll.mockReturnValue(projects);
     mockFilesystem.exists.mockReturnValue(true);
     mockFilesystem.listDirectory.mockReturnValue(['dump.sql.gz']);

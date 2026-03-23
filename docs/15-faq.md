@@ -984,7 +984,7 @@ Set `enabled: false` in `config/projects.yml`:
 
 ```yaml
 projects:
-  - name: locaboo
+  - name: vinsware
     enabled: false    # Pauses scheduled and --all backups
     cron: "0 0 * * *"
     # ... rest of config
@@ -1005,9 +1005,9 @@ backupctl config reload
 
 **What still works:**
 
-- `backupctl run locaboo` — manual single-project runs still work, so you can do ad-hoc backups while paused
-- `backupctl snapshots locaboo` — you can still browse existing snapshots
-- `backupctl restore locaboo ...` — restores from existing snapshots still work
+- `backupctl run vinsware` — manual single-project runs still work, so you can do ad-hoc backups while paused
+- `backupctl snapshots vinsware` — you can still browse existing snapshots
+- `backupctl restore vinsware ...` — restores from existing snapshots still work
 
 To re-enable, set `enabled: true` and reload config again.
 

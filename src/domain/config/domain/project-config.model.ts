@@ -26,6 +26,7 @@ export interface ProjectConfigParams {
   readonly hooks: { readonly preBackup: string | null; readonly postBackup: string | null } | null;
   readonly verification: { readonly enabled: boolean };
   readonly notification: { readonly type: string; readonly config: Record<string, unknown> } | null;
+  readonly monitor: { readonly type: string; readonly config: Record<string, unknown> } | null;
 }
 
 export class ProjectConfig {
@@ -58,6 +59,7 @@ export class ProjectConfig {
   readonly hooks: { readonly preBackup: string | null; readonly postBackup: string | null } | null;
   readonly verification: { readonly enabled: boolean };
   readonly notification: { readonly type: string; readonly config: Record<string, unknown> } | null;
+  readonly monitor: { readonly type: string; readonly config: Record<string, unknown> } | null;
 
   constructor(params: ProjectConfigParams) {
     this.name = params.name;
@@ -74,6 +76,7 @@ export class ProjectConfig {
     this.hooks = params.hooks;
     this.verification = params.verification;
     this.notification = params.notification;
+    this.monitor = params.monitor ?? null;
   }
 
   hasDatabase(): boolean {
@@ -98,5 +101,9 @@ export class ProjectConfig {
 
   hasTimeout(): boolean {
     return this.timeoutMinutes != null && this.timeoutMinutes > 0;
+  }
+
+  hasMonitor(): boolean {
+    return this.monitor != null;
   }
 }

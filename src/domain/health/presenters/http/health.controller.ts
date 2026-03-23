@@ -9,6 +9,7 @@ interface HealthResponse {
     diskSpace: { available: boolean; freeGb: number };
     ssh: { connected: boolean; authenticated: boolean };
     resticRepos: boolean;
+    uptimeKuma?: { configured: boolean; connected: boolean };
   };
   uptime: number;
 }
@@ -34,6 +35,12 @@ export class HealthController {
           authenticated: result.sshAuthenticated,
         },
         resticRepos: result.resticReposHealthy,
+        ...(result.uptimeKumaConfigured && {
+          uptimeKuma: {
+            configured: result.uptimeKumaConfigured,
+            connected: result.uptimeKumaConnected,
+          },
+        }),
       },
       uptime: result.uptime,
     };

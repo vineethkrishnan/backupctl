@@ -1,6 +1,6 @@
 # Backup Flow
 
-This document is a deep dive into the 11-step backup orchestration pipeline. It covers every stage, the retry policy, concurrency model, snapshot tagging, failure recovery, and notification formats.
+This document is a deep dive into the 13-step backup orchestration pipeline. It covers every stage, the retry policy, concurrency model, snapshot tagging, failure recovery, and notification formats.
 
 The orchestration is implemented in `RunBackupUseCase` (application layer), which coordinates domain ports without containing business logic itself. Each step calls a port interface — the infrastructure layer provides the concrete adapters.
 
@@ -25,11 +25,12 @@ Every backup run follows this exact sequence. `AuditLogPort.trackProgress(runId,
 | 9 | PostHook | `HookExecutorPort.execute(postBackup)` | No | Runs only if `hooks.post_backup` is configured |
 | 10 | Audit | `AuditLogPort.finishRun(runId, result)` | — | Falls back to JSONL if audit DB is down |
 | 11 | Notify | `NotifierPort.notifySuccess()` or `notifyFailure()` | — | Falls back to JSONL if notification fails |
-| 12 | Unlock | `BackupLockPort.release()` | — | Always executed, even on failure |
+| 12 | Heartbeat | `HeartbeatMonitorPort.sendHeartbeat()` | — | Sends `up` or `down` to Uptime Kuma (if configured) |
+| 13 | Unlock | `BackupLockPort.release()` | — | Always executed, even on failure |
 
-Steps 2, 4, and 5 are conditional — they are skipped entirely if their respective config flags are not set. The orchestrator logs a `[SKIP]` message when skipping a conditional step.
+Steps 2, 4, 5, and 12 are conditional — they are skipped entirely if their respective config flags are not set. The orchestrator logs a `[SKIP]` message when skipping a conditional step.
 
-Step 12 (Unlock) runs in a `finally` block, guaranteeing lock release regardless of outcome.
+Step 13 (Unlock) runs in a `finally` block, guaranteeing lock release regardless of outcome.
 
 ---
 
@@ -101,7 +102,7 @@ The orchestrator calls `retryPolicy.evaluateRetry(error, attemptCount)` to decid
 Each project gets its own lock file at `{BACKUP_BASE_DIR}/{project}/.lock`. The lock file contains the PID and start timestamp of the process holding the lock.
 
 ```
-# Example: /data/backups/locaboo/.lock
+# Example: /data/backups/vinsware/.lock
 pid=1234
 started=2026-03-18T00:00:05.000Z
 ```
@@ -144,10 +145,10 @@ A single restic snapshot contains both the database dump and all asset directori
 backupctl:combined, project:{name}
 ```
 
-Example for `locaboo`:
+Example for `vinsware`:
 
 ```
-backupctl:combined, project:locaboo
+backupctl:combined, project:vinsware
 ```
 
 ### Separate Mode
@@ -197,7 +198,7 @@ The timeout check runs between each step. If the elapsed time exceeds `timeout_m
 
 If a configured asset path does not exist on disk when the backup runs, the orchestrator:
 
-1. Logs a warning: `Asset path not found: /data/locaboo/missing-dir`
+1. Logs a warning: `Asset path not found: /data/vinsware/missing-dir`
 2. Fires `NotifierPort.notifyWarning(projectName, message)` with details
 3. Continues the backup with the remaining asset paths
 
@@ -238,7 +239,8 @@ The orchestrator distinguishes between backup-critical and non-critical failures
 | Steps 0-9 failure | Backup marked as `failed` | Retry (if retryable) or abort |
 | Step 10 (Audit) failure | Backup still `success` | JSONL fallback, replay on startup |
 | Step 11 (Notify) failure | Backup still `success` | JSONL fallback, replay on startup |
-| Step 12 (Unlock) failure | Lock may be stale | Cleaned on startup recovery |
+| Step 12 (Heartbeat) failure | Backup still `success` | Logged only — missed heartbeat is the signal |
+| Step 13 (Unlock) failure | Lock may be stale | Cleaned on startup recovery |
 
 ---
 
@@ -300,7 +302,7 @@ Sent at the beginning of each backup run (step 1).
 **Slack/Email text:**
 
 ```
-🔄 Backup started for locaboo
+🔄 Backup started for vinsware
 Run ID: a1b2c3d4
 Time: 2026-03-18 00:00:05 (Europe/Berlin)
 ```
@@ -312,7 +314,7 @@ Sent when a backup completes successfully (step 11).
 **Slack/Email text:**
 
 ```
-✅ Backup completed for locaboo
+✅ Backup completed for vinsware
 Run ID: a1b2c3d4
 Duration: 1m 19s
 Dump size: 145.2 MB
@@ -327,7 +329,7 @@ Sent when a backup fails at any stage (step 11).
 **Slack/Email text:**
 
 ```
-❌ Backup failed for locaboo
+❌ Backup failed for vinsware
 Run ID: a1b2c3d4
 Failed at stage: Sync (attempt 3/3)
 Duration: 2m 10s
@@ -341,7 +343,7 @@ Sent when a backup exceeds `timeout_minutes` (mid-run, between steps).
 **Slack/Email text:**
 
 ```
-⚠️ Backup timeout warning for locaboo
+⚠️ Backup timeout warning for vinsware
 Run ID: a1b2c3d4
 Elapsed: 32m (timeout: 30m)
 Current stage: Sync (6/11)
@@ -357,7 +359,7 @@ Sent on the schedule defined by `DAILY_SUMMARY_CRON` (default: `0 8 * * *`).
 ```
 📊 Daily Backup Summary — 2026-03-18
 
-  ✅ locaboo     — success (1m 19s)
+  ✅ vinsware     — success (1m 19s)
   ✅ project-x   — success (1m 25s)
   ❌ project-y   — failed (Dump: connection refused)
 
@@ -371,11 +373,11 @@ All notification types sent via the webhook adapter use this JSON structure:
 ```json
 {
   "event": "backup_success",
-  "project": "locaboo",
-  "text": "✅ Backup completed for locaboo\nRun ID: a1b2c3d4\nDuration: 1m 19s\nDump size: 145.2 MB\nSnapshot: abc12345\nRepository size: 1.8 GB",
+  "project": "vinsware",
+  "text": "✅ Backup completed for vinsware\nRun ID: a1b2c3d4\nDuration: 1m 19s\nDump size: 145.2 MB\nSnapshot: abc12345\nRepository size: 1.8 GB",
   "data": {
     "runId": "a1b2c3d4",
-    "project": "locaboo",
+    "project": "vinsware",
     "status": "success",
     "duration": 79,
     "dumpSize": 152253030,

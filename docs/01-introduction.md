@@ -32,6 +32,10 @@ Optional per-project GPG encryption of dump files before remote sync. Keys are m
 
 Get notified on backup start, success, failure, and warnings through Slack (webhook), Email (SMTP with explicit TLS control via `smtp_secure`), or Webhook (JSON payload with markdown-formatted text). A daily summary option is also available.
 
+### Heartbeat monitoring
+
+Optional Uptime Kuma integration provides passive failure detection via push monitors. After each backup, a heartbeat ping is sent with `up` or `down` status. If the ping stops (crashed container, stuck cron), Kuma detects the missing heartbeat and fires its own alerts — complementing the active notification system.
+
 ### Pre/post backup hooks
 
 Run arbitrary shell commands before and after each backup. Useful for application-level maintenance mode, cache clearing, or custom validation scripts.

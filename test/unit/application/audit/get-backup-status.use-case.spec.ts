@@ -50,6 +50,7 @@ describe('GetBackupStatusUseCase', () => {
       hooks: null,
       verification: { enabled: false },
       notification: null,
+      monitor: null,
     });
 
   beforeEach(() => {
@@ -74,20 +75,20 @@ describe('GetBackupStatusUseCase', () => {
   });
 
   it('delegates to findByProject when projectName is given', async () => {
-    const results = [createResult('locaboo', 'run-1')];
+    const results = [createResult('vinsware', 'run-1')];
     mockAuditLog.findByProject.mockResolvedValue(results);
 
-    const status = await useCase.execute(new GetBackupStatusQuery({ projectName: 'locaboo', limit: 5 }));
+    const status = await useCase.execute(new GetBackupStatusQuery({ projectName: 'vinsware', limit: 5 }));
 
-    expect(mockAuditLog.findByProject).toHaveBeenCalledWith('locaboo', 5);
+    expect(mockAuditLog.findByProject).toHaveBeenCalledWith('vinsware', 5);
     expect(status).toEqual(results);
   });
 
   it('aggregates results from all projects when no projectName', async () => {
-    const projects = [createProjectConfig('locaboo'), createProjectConfig('webapp')];
+    const projects = [createProjectConfig('vinsware'), createProjectConfig('webapp')];
     mockConfigLoader.loadAll.mockReturnValue(projects);
     mockAuditLog.findByProject
-      .mockResolvedValueOnce([createResult('locaboo', 'run-1')])
+      .mockResolvedValueOnce([createResult('vinsware', 'run-1')])
       .mockResolvedValueOnce([createResult('webapp', 'run-2')]);
 
     const status = await useCase.execute(new GetBackupStatusQuery({ limit: 10 }));
@@ -95,7 +96,7 @@ describe('GetBackupStatusUseCase', () => {
     expect(mockConfigLoader.loadAll).toHaveBeenCalled();
     expect(mockAuditLog.findByProject).toHaveBeenCalledTimes(2);
     expect(status).toHaveLength(2);
-    expect(status[0].projectName).toBe('locaboo');
+    expect(status[0].projectName).toBe('vinsware');
     expect(status[1].projectName).toBe('webapp');
   });
 });

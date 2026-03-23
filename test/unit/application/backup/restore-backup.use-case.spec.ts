@@ -79,6 +79,7 @@ function buildProjectConfig(
     hooks: null,
     verification: { enabled: false },
     notification: { type: 'slack', config: {} },
+    monitor: null,
     ...overrides,
   });
 }

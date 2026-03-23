@@ -9,6 +9,7 @@ import { GpgKeyManagerPort } from '@domain/backup/application/ports/gpg-key-mana
 import { HookExecutorPort } from '@domain/backup/application/ports/hook-executor.port';
 import { LocalCleanupPort } from '@domain/backup/application/ports/local-cleanup.port';
 import { RemoteStorageFactoryPort } from '@domain/backup/application/ports/remote-storage-factory.port';
+import { HeartbeatMonitorPort } from '@domain/backup/application/ports/heartbeat-monitor.port';
 import { AuditLogPort } from '@domain/audit/application/ports/audit-log.port';
 import { FallbackWriterPort } from '@domain/audit/application/ports/fallback-writer.port';
 import { NotifierPort } from '@domain/notification/application/ports/notifier.port';
@@ -27,6 +28,7 @@ import { SyncResult } from '@domain/backup/domain/value-objects/sync-result.mode
 import { evaluateRetry } from '@domain/backup/domain/policies/retry.policy';
 import { DumperRegistry } from '@domain/backup/application/registries/dumper.registry';
 import { NotifierRegistry } from '@domain/notification/application/registries/notifier.registry';
+import { formatDuration } from '@common/helpers/format.util';
 
 import {
   CONFIG_LOADER_PORT,
@@ -42,6 +44,7 @@ import {
   HOOK_EXECUTOR_PORT,
   LOCAL_CLEANUP_PORT,
   REMOTE_STORAGE_FACTORY,
+  HEARTBEAT_MONITOR_PORT,
 } from '@common/di/injection-tokens';
 
 import { RunBackupCommand } from './run-backup.command';
@@ -79,6 +82,7 @@ export class RunBackupUseCase {
     @Inject(REMOTE_STORAGE_FACTORY) private readonly storageFactory: RemoteStorageFactoryPort,
     @Inject(FILESYSTEM_PORT) private readonly filesystem: FileSystemPort,
     @Inject(GPG_KEY_MANAGER_PORT) private readonly gpgKeyManager: GpgKeyManagerPort,
+    @Inject(HEARTBEAT_MONITOR_PORT) private readonly heartbeatMonitor: HeartbeatMonitorPort,
     configService: ConfigService,
   ) {
     this.maxRetries = configService.get<number>('BACKUP_RETRY_COUNT', 3);
@@ -440,6 +444,11 @@ export class RunBackupUseCase {
       await this.finalizeNotification(notifier, config.name, result);
     }
 
+    // Send heartbeat to push monitor (if configured)
+    if (config.hasMonitor()) {
+      await this.finalizeHeartbeat(config, result);
+    }
+
     return result;
   }
 
@@ -539,6 +548,28 @@ export class RunBackupUseCase {
       } catch (fallbackError) {
         this.logger.error(`Notification fallback also failed for ${projectName}: ${String(fallbackError)}`);
       }
+    }
+  }
+
+  private async finalizeHeartbeat(
+    config: ProjectConfig,
+    result: BackupResult,
+  ): Promise<void> {
+    try {
+      const monitor = config.monitor;
+      if (!monitor) return;
+
+      const pushToken = monitor.config.push_token as string;
+      if (!pushToken) return;
+
+      const status = result.status === BackupStatus.Success ? 'up' : 'down';
+      const message = result.status === BackupStatus.Success
+        ? `OK - ${formatDuration(result.durationMs)}`
+        : `FAIL - ${result.errorStage ?? 'unknown'}: ${result.errorMessage ?? 'unknown error'}`;
+
+      await this.heartbeatMonitor.sendHeartbeat(pushToken, status, message, result.durationMs);
+    } catch (error) {
+      this.logger.error(`Heartbeat failed for ${config.name}, continuing: ${String(error)}`);
     }
   }
 

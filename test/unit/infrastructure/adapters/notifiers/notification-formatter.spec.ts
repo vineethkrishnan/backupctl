@@ -96,7 +96,7 @@ describe('notification-formatter', () => {
     it('should build success entries', () => {
       const dump = new DumpResult('/data/db.sql.gz', 512, 1000);
       const sync = new SyncResult('snap-1', 1, 0, 512, 500);
-      const result = createResult({ projectName: 'locaboo', dumpResult: dump, syncResult: sync });
+      const result = createResult({ projectName: 'vinsware', dumpResult: dump, syncResult: sync });
       const entries = buildDailySummaryEntries([result]);
 
       expect(entries).toHaveLength(1);
@@ -129,9 +129,9 @@ describe('notification-formatter', () => {
   describe('formatFailureText', () => {
     it('should format failure text with stage and retryable info', () => {
       const error = new BackupStageError(BackupStage.Dump, new Error('connection refused'), true);
-      const text = formatFailureText('locaboo', error);
+      const text = formatFailureText('vinsware', error);
 
-      expect(text).toContain('❌ Backup failed — locaboo');
+      expect(text).toContain('❌ Backup failed — vinsware');
       expect(text).toContain('Stage: dump');
       expect(text).toContain('Retryable: Yes');
       expect(text).toContain('Error: connection refused');
@@ -147,12 +147,12 @@ describe('notification-formatter', () => {
 
   describe('formatSuccessText', () => {
     it('should produce plaintext success with all sections', () => {
-      const dump = new DumpResult('/data/backups/locaboo.sql.gz', 1024 * 1024, 5000);
+      const dump = new DumpResult('/data/backups/vinsware.sql.gz', 1024 * 1024, 5000);
       const sync = new SyncResult('snap-abc', 10, 3, 2048, 2000);
       const prune = new PruneResult(2, '50 MB');
       const cleanup = new CleanupResult(5, 10000);
       const result = createResult({
-        projectName: 'locaboo',
+        projectName: 'vinsware',
         dumpResult: dump,
         syncResult: sync,
         pruneResult: prune,
@@ -162,8 +162,8 @@ describe('notification-formatter', () => {
       });
       const text = formatSuccessText(result);
 
-      expect(text).toContain('✅ Backup completed — locaboo');
-      expect(text).toContain('DB: locaboo');
+      expect(text).toContain('✅ Backup completed — vinsware');
+      expect(text).toContain('DB: vinsware');
       expect(text).toContain('Encrypted: Yes');
       expect(text).toContain('Snapshot: snap-abc');
       expect(text).toContain('Pruned: 2 snapshots');
@@ -182,7 +182,7 @@ describe('notification-formatter', () => {
 
   describe('formatDailySummaryText', () => {
     it('should produce daily summary with mixed results', () => {
-      const success = createResult({ projectName: 'locaboo', durationMs: 5000 });
+      const success = createResult({ projectName: 'vinsware', durationMs: 5000 });
       const failure = createResult({
         projectName: 'shopify',
         status: BackupStatus.Failed,
@@ -191,7 +191,7 @@ describe('notification-formatter', () => {
       const text = formatDailySummaryText([success, failure], '2026-03-19');
 
       expect(text).toContain('📊 Daily Backup Summary — 2026-03-19');
-      expect(text).toContain('✅ locaboo');
+      expect(text).toContain('✅ vinsware');
       expect(text).toContain('❌ shopify — FAILED — connection timeout');
       expect(text).toContain('Total: 1/2 successful');
     });

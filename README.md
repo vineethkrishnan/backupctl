@@ -27,6 +27,7 @@ backupctl is a standalone Docker service that orchestrates scheduled backups for
 - **Restic + Hetzner Storage Box** — encrypted, deduplicated backups over SFTP
 - **GPG encryption** — optional per-project dump encryption before upload
 - **Notifications** — Slack, Email (SMTP/TLS), Webhook (JSON + markdown)
+- **Uptime Kuma monitoring** — optional heartbeat push monitors for passive failure detection
 - **Pre/post hooks** — run arbitrary shell commands around each backup
 - **Retry with backoff** — configurable exponential retry for transient failures
 - **Audit trail** — every run tracked in PostgreSQL with real-time stage progress
@@ -125,7 +126,8 @@ Also available in [`docs/`](docs/README.md):
 | 9   | [Restore Guide](docs/09-restore-guide.md)     | Per-DB restore, decrypt, decompress, `--guide`             |
 | 10  | [Cheatsheet](docs/10-cheatsheet.md)           | Daily ops quick reference, one-liners                      |
 | 11  | [Adding Adapters](docs/11-adding-adapters.md) | Extending with new DB engines, notifiers, storage backends |
-| 12  | [Troubleshooting](docs/12-troubleshooting.md) | Common issues, debug commands, log locations.               |
+| 12  | [Troubleshooting](docs/12-troubleshooting.md) | Common issues, debug commands, log locations               |
+| 16  | [Monitoring](docs/16-monitoring.md)           | Uptime Kuma push monitors, setup, heartbeat details        |
 
 ## Tech Stack
 
