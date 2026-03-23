@@ -26,7 +26,7 @@ backupctl status
 backupctl status myproject
 backupctl status myproject --last 5
 
-# Health check (audit DB, restic repos, disk space, SSH)
+# Health check (audit DB, restic repos, disk space, SSH, Uptime Kuma)
 backupctl health
 
 # View logs

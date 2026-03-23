@@ -1,22 +1,22 @@
 projects:
-  - name: locaboo
+  - name: vinsware
     enabled: true
     cron: '0 0 * * *'
     timeout_minutes: 30
     database:
       type: postgres
-      host: postgres-locaboo
+      host: postgres-vinsware
       port: 5432
-      name: locaboo_db
+      name: vinsware_db
       user: backup_user
-      password: ${LOCABOO_DB_PASSWORD}
+      password: ${VINSWARE_DB_PASSWORD}
     assets:
       paths:
-        - /data/locaboo/uploads
-        - /data/locaboo/assets
+        - /data/vinsware/uploads
+        - /data/vinsware/assets
     restic:
-      repository_path: /backups/locaboo
-      password: ${LOCABOO_RESTIC_PASSWORD}
+      repository_path: /backups/vinsware
+      password: ${VINSWARE_RESTIC_PASSWORD}
       snapshot_mode: combined
     retention:
       local_days: 7
@@ -26,16 +26,20 @@ projects:
     encryption:
       enabled: true
       type: gpg
-      recipient: vineeth.nk@ayunis.com
+      recipient: vineeth.nk@vinsware.com
     hooks:
-      pre_backup: 'curl -s http://locaboo-app:3000/maintenance/on'
-      post_backup: 'curl -s http://locaboo-app:3000/maintenance/off'
+      pre_backup: 'curl -s http://vinsware-app:3000/maintenance/on'
+      post_backup: 'curl -s http://vinsware-app:3000/maintenance/off'
     verification:
       enabled: true
     notification:
       type: slack
       config:
-        webhook_url: https://hooks.slack.com/services/LOCABOO/SPECIFIC/HOOK
+        webhook_url: https://hooks.slack.com/services/VINSWARE/SPECIFIC/HOOK
+    monitor:
+      type: uptime-kuma
+      config:
+        push_token: YOUR_VINSWARE_PUSH_TOKEN
 
   - name: project-x
     enabled: true
@@ -66,6 +70,10 @@ projects:
         to: devops@company.com
         from: backup@company.com
         password: ${EMAIL_PASSWORD}
+    monitor:
+      type: uptime-kuma
+      config:
+        push_token: YOUR_PROJECTX_PUSH_TOKEN
 
   - name: project-y
     enabled: true

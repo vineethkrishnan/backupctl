@@ -47,6 +47,7 @@ describe('ListSnapshotsUseCase', () => {
       hooks: null,
       verification: { enabled: false },
       notification: null,
+      monitor: null,
     });
 
     mockConfigLoader = {

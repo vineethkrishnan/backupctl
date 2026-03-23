@@ -29,12 +29,12 @@ describe('SlackNotifierAdapter', () => {
   function createSuccessResult(overrides?: Partial<ConstructorParameters<typeof BackupResult>[0]>): BackupResult {
     return new BackupResult({
       runId: 'run-123',
-      projectName: 'locaboo',
+      projectName: 'vinsware',
       status: BackupStatus.Success,
       currentStage: BackupStage.NotifyResult,
       startedAt: new Date('2026-03-18T00:00:00Z'),
       completedAt: new Date('2026-03-18T00:03:12Z'),
-      dumpResult: new DumpResult('/data/backups/locaboo/backup.sql.gz', 257949696, 45000),
+      dumpResult: new DumpResult('/data/backups/vinsware/backup.sql.gz', 257949696, 45000),
       syncResult: new SyncResult('a1b2c3d4', 12, 3, 54525952, 120000),
       pruneResult: new PruneResult(2, '150 MB'),
       cleanupResult: new CleanupResult(1, 1048576),
@@ -70,7 +70,7 @@ describe('SlackNotifierAdapter', () => {
 
   describe('notifyStarted', () => {
     it('should post Block Kit message with blue sidebar', async () => {
-      await adapter.notifyStarted('locaboo');
+      await adapter.notifyStarted('vinsware');
 
       expect(mockedAxios.post).toHaveBeenCalledTimes(1);
 
@@ -81,11 +81,11 @@ describe('SlackNotifierAdapter', () => {
 
       const text = allBlockText();
       expect(text).toContain('Backup started');
-      expect(text).toContain('locaboo');
+      expect(text).toContain('vinsware');
     });
 
     it('should include timestamp in context block', async () => {
-      await adapter.notifyStarted('locaboo');
+      await adapter.notifyStarted('vinsware');
 
       const text = allBlockText();
       expect(text).toContain('🕐');
@@ -105,7 +105,7 @@ describe('SlackNotifierAdapter', () => {
 
       const text = allBlockText();
       expect(text).toContain('Backup completed');
-      expect(text).toContain('locaboo');
+      expect(text).toContain('vinsware');
       expect(text).toContain('246.00 MB');
       expect(text).toContain('🔒 Yes');
       expect(text).toContain('☑️ Yes');
@@ -172,21 +172,21 @@ describe('SlackNotifierAdapter', () => {
         true,
       );
 
-      await adapter.notifyFailure('locaboo', error);
+      await adapter.notifyFailure('vinsware', error);
 
       expect(mockedAxios.post).toHaveBeenCalledTimes(1);
       expect(getAttachment().color).toBe('#e74c3c');
 
       const text = allBlockText();
       expect(text).toContain('Backup failed');
-      expect(text).toContain('locaboo');
+      expect(text).toContain('vinsware');
       expect(text).toContain('sync');
       expect(text).toContain('connection timeout to storage box');
     });
 
     it('should use minimal text to avoid duplicate with Block Kit', async () => {
       const error = new BackupStageError(BackupStage.Sync, new Error('timeout'), true);
-      await adapter.notifyFailure('locaboo', error);
+      await adapter.notifyFailure('vinsware', error);
 
       const { text } = getPayload() as { text: string };
       expect(text).toBe(' ');
@@ -194,7 +194,7 @@ describe('SlackNotifierAdapter', () => {
 
     it('should show retryable status in fields', async () => {
       const error = new BackupStageError(BackupStage.Sync, new Error('timeout'), true);
-      await adapter.notifyFailure('locaboo', error);
+      await adapter.notifyFailure('vinsware', error);
 
       const text = allBlockText();
       expect(text).toContain('Retryable');
@@ -208,7 +208,7 @@ describe('SlackNotifierAdapter', () => {
         false,
       );
 
-      await adapter.notifyFailure('locaboo', error);
+      await adapter.notifyFailure('vinsware', error);
 
       const text = allBlockText();
       expect(text).toContain('Retryable');
@@ -225,19 +225,19 @@ describe('SlackNotifierAdapter', () => {
 
   describe('notifyWarning', () => {
     it('should post Block Kit message with orange sidebar', async () => {
-      await adapter.notifyWarning('locaboo', 'Backup timeout exceeded');
+      await adapter.notifyWarning('vinsware', 'Backup timeout exceeded');
 
       expect(mockedAxios.post).toHaveBeenCalledTimes(1);
       expect(getAttachment().color).toBe('#f39c12');
 
       const text = allBlockText();
       expect(text).toContain('Warning');
-      expect(text).toContain('locaboo');
+      expect(text).toContain('vinsware');
       expect(text).toContain('Backup timeout exceeded');
     });
 
     it('should use minimal text to avoid duplicate with Block Kit', async () => {
-      await adapter.notifyWarning('locaboo', 'Backup timeout exceeded');
+      await adapter.notifyWarning('vinsware', 'Backup timeout exceeded');
 
       const { text } = getPayload() as { text: string };
       expect(text).toBe(' ');
@@ -273,7 +273,7 @@ describe('SlackNotifierAdapter', () => {
 
       const text = allBlockText();
       expect(text).toContain('Daily Backup Summary');
-      expect(text).toContain('locaboo');
+      expect(text).toContain('vinsware');
       expect(text).toContain('project-x');
       expect(text).toContain('project-y');
       expect(text).toContain('restic sync timeout');

@@ -100,15 +100,15 @@ Checking prerequisites...
 
   Add a project? [Y/n]: Y
 
-  Project name: locaboo
+  Project name: vinsware
   Database type (postgres/mysql/mongo): postgres
-  Database host: postgres-locaboo
+  Database host: postgres-vinsware
   Database port [5432]: 5432
-  Database name: locaboo_db
+  Database name: vinsware_db
   Database user: backup_user
   Database password: ********
   Cron schedule [0 0 * * *]: 0 0 * * *
-  Restic repository path [/backups/locaboo]: /backups/locaboo
+  Restic repository path [/backups/vinsware]: /backups/vinsware
 
   Add another project? [y/N]: N
 
@@ -162,9 +162,9 @@ After installation:
 
 ```bash
 backupctl health                       # production
-backupctl run locaboo --dry-run
+backupctl run vinsware --dry-run
 backupctl-dev health                   # development
-backupctl-dev config show locaboo
+backupctl-dev config show vinsware
 ```
 
 The wrapper scripts check if the target container is running and give a helpful error with start instructions if not.
@@ -316,7 +316,7 @@ Tailing backupctl logs (Ctrl-C to stop)...
 
 backupctl  | [2026-03-18 00:00:00] [info] Application started on port 3100
 backupctl  | [2026-03-18 00:00:01] [info] Startup recovery completed
-backupctl  | [2026-03-18 00:00:01] [info] Registered cron: locaboo (0 0 * * *)
+backupctl  | [2026-03-18 00:00:01] [info] Registered cron: vinsware (0 0 * * *)
 backupctl  | [2026-03-18 00:00:01] [info] Registered cron: project-x (30 1 * * *)
 backupctl  | [2026-03-18 00:00:01] [info] Registered cron: project-y (0 2 * * *)
 ^C
@@ -337,8 +337,8 @@ Opening shell in backupctl container...
   ✅ Disk space — 42.0 GB free
   ...
 
-/app # ls /data/backups/locaboo/
-locaboo_db_20260318_000032.sql.gz.gpg
+/app # ls /data/backups/vinsware/
+vinsware_db_20260318_000032.sql.gz.gpg
 uploads/
 assets/
 
@@ -354,7 +354,7 @@ $ ./scripts/backupctl-manage.sh backup-dir
 
 === Backup Directory Sizes ===
 
-/data/backups/locaboo        1.2 GB
+/data/backups/vinsware        1.2 GB
 /data/backups/project-x      845 MB
 /data/backups/project-y      320 MB
 /data/backups/.logs          12 MB
@@ -377,12 +377,12 @@ Audit DB:  connected (142 records)
 Projects:  3 configured, 3 enabled
 
 Last backups:
-  locaboo     ✅ 2026-03-18 00:01:24 (1m 19s)
+  vinsware     ✅ 2026-03-18 00:01:24 (1m 19s)
   project-x   ✅ 2026-03-18 01:32:25 (1m 25s)
   project-y   ❌ 2026-03-18 02:00:12 (failed: Dump)
 
 Next scheduled:
-  locaboo     2026-03-19 00:00:00 (in 23h 58m)
+  vinsware     2026-03-19 00:00:00 (in 23h 58m)
   project-x   2026-03-19 01:30:00 (in 25h 28m)
   project-y   2026-03-19 02:00:00 (in 25h 58m)
 ```

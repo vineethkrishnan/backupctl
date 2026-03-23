@@ -78,6 +78,12 @@ These are used when a project has no `encryption` block in YAML.
 | `GPG_RECIPIENT` | — | GPG key recipient identifier (email or key ID) |
 | `GPG_KEYS_DIR` | `/app/gpg-keys` | Directory for GPG public key files (auto-imported on startup) |
 
+### Heartbeat Monitoring
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `UPTIME_KUMA_BASE_URL` | — | Base URL of your Uptime Kuma instance (e.g., `https://kuma.example.com`). Required if any project has `monitor.type: uptime-kuma` |
+
 ### Health
 
 | Variable | Default | Description |
@@ -95,13 +101,13 @@ These are used when a project has no `encryption` block in YAML.
 Project-specific secrets follow the naming pattern `{PROJECT}_DB_PASSWORD` and `{PROJECT}_RESTIC_PASSWORD` (uppercase project name with hyphens replaced by underscores):
 
 ```env
-LOCABOO_DB_PASSWORD=secret
-LOCABOO_RESTIC_PASSWORD=restic-secret
+VINSWARE_DB_PASSWORD=secret
+VINSWARE_RESTIC_PASSWORD=restic-secret
 PROJECTX_DB_PASSWORD=secret
 PROJECTY_DB_PASSWORD=secret
 ```
 
-These are referenced in `projects.yml` via `${LOCABOO_DB_PASSWORD}`.
+These are referenced in `projects.yml` via `${VINSWARE_DB_PASSWORD}`.
 
 ## Project Configuration (projects.yml)
 
@@ -196,6 +202,24 @@ Hooks run via `child_process.execFile` — no shell injection. Configured timeou
 | `notification.config` | object | no | Values from `.env` | Channel-specific configuration (see examples below) |
 
 If the entire `notification` block is absent, the global notification channel from `.env` is used.
+
+### Monitor
+
+Optional. Configures a heartbeat monitor for passive failure detection. Independent of the `notification` block — you can have both, either, or neither.
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `monitor.type` | string | yes | Monitor type. Currently only `uptime-kuma` is supported |
+| `monitor.config.push_token` | string | yes | Push token from the Uptime Kuma push monitor page |
+
+```yaml
+monitor:
+  type: uptime-kuma
+  config:
+    push_token: YOUR_PUSH_TOKEN
+```
+
+When the `monitor` block is absent, the heartbeat step is skipped entirely. See [Monitoring with Uptime Kuma](16-monitoring.md) for full setup instructions.
 
 ## Config Resolution Rules
 
@@ -298,7 +322,7 @@ The webhook notifier POSTs `application/json` with an `event` field, a `text` fi
 encryption:
   enabled: true
   type: gpg
-  recipient: locaboo-backup@company.com
+  recipient: vinsware-backup@company.com
 ```
 
 ### Global (via .env)
@@ -320,28 +344,28 @@ A full `config/projects.yml` with three projects using different databases and s
 ```yaml
 projects:
   # PostgreSQL with full configuration
-  - name: locaboo
+  - name: vinsware
     enabled: true
     cron: "0 0 * * *"
     timeout_minutes: 30
-    docker_network: locaboo_locaboo-network
+    docker_network: vinsware_vinsware-network
 
     database:
       type: postgres
-      host: postgres-locaboo
+      host: postgres-vinsware
       port: 5432
-      name: locaboo_db
+      name: vinsware_db
       user: backup_user
-      password: ${LOCABOO_DB_PASSWORD}
+      password: ${VINSWARE_DB_PASSWORD}
 
     assets:
       paths:
-        - /data/locaboo/uploads
-        - /data/locaboo/assets
+        - /data/vinsware/uploads
+        - /data/vinsware/assets
 
     restic:
-      repository_path: backups/locaboo
-      password: ${LOCABOO_RESTIC_PASSWORD}
+      repository_path: backups/vinsware
+      password: ${VINSWARE_RESTIC_PASSWORD}
       snapshot_mode: combined
 
     retention:
@@ -353,11 +377,11 @@ projects:
     encryption:
       enabled: true
       type: gpg
-      recipient: locaboo-backup@company.com
+      recipient: vinsware-backup@company.com
 
     hooks:
-      pre_backup: "curl -s http://locaboo-app:3000/maintenance/on"
-      post_backup: "curl -s http://locaboo-app:3000/maintenance/off"
+      pre_backup: "curl -s http://vinsware-app:3000/maintenance/on"
+      post_backup: "curl -s http://vinsware-app:3000/maintenance/off"
 
     verification:
       enabled: true
@@ -365,7 +389,12 @@ projects:
     notification:
       type: slack
       config:
-        webhook_url: https://hooks.slack.com/services/LOCABOO/SPECIFIC/HOOK
+        webhook_url: https://hooks.slack.com/services/VINSWARE/SPECIFIC/HOOK
+
+    monitor:
+      type: uptime-kuma
+      config:
+        push_token: YOUR_VINSWARE_PUSH_TOKEN
 
   # MySQL with email notifications and separate snapshots
   - name: project-x
@@ -457,10 +486,10 @@ backupctl organizes all data under `BACKUP_BASE_DIR` (default `/data/backups`):
 
 ```
 ${BACKUP_BASE_DIR}/
-├── locaboo/
-│   ├── locaboo_backup_20260318_000000_a1b2.sql.gz       # compressed dump
-│   ├── locaboo_backup_20260318_000000_a1b2.sql.gz.gpg   # encrypted dump (if enabled)
-│   ├── locaboo_backup_20260317_000000_c3d4.sql.gz
+├── vinsware/
+│   ├── vinsware_backup_20260318_000000_a1b2.sql.gz       # compressed dump
+│   ├── vinsware_backup_20260318_000000_a1b2.sql.gz.gpg   # encrypted dump (if enabled)
+│   ├── vinsware_backup_20260317_000000_c3d4.sql.gz
 │   └── .lock                                             # present while backup is running
 ├── project-x/
 │   ├── project-x_backup_20260318_013000_e5f6.sql.gz
@@ -485,7 +514,7 @@ Use the CLI to validate configuration at any time:
 backupctl config validate
 
 # Show resolved config for a specific project (secrets masked)
-backupctl config show locaboo
+backupctl config show vinsware
 ```
 
 `config validate` checks:
@@ -495,6 +524,8 @@ backupctl config show locaboo
 - `${VAR_NAME}` references resolve to non-empty values in `.env`
 - Database type is one of `postgres`, `mysql`, `mongodb`
 - Notification type is one of `slack`, `email`, `webhook`
+- Monitor type is `uptime-kuma` (if present) and `push_token` is set
+- `UPTIME_KUMA_BASE_URL` is set in `.env` when any project uses `monitor.type: uptime-kuma`
 - Cron expressions are valid
 - Retention values are non-negative
 - GPG recipient is set when encryption is enabled

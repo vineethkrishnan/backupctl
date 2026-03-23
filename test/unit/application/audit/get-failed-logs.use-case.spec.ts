@@ -46,12 +46,12 @@ describe('GetFailedLogsUseCase', () => {
   });
 
   it('delegates to findFailed', async () => {
-    const failedResults = [createResult('locaboo', 'run-fail')];
+    const failedResults = [createResult('vinsware', 'run-fail')];
     mockAuditLog.findFailed.mockResolvedValue(failedResults);
 
-    const result = await useCase.execute(new GetFailedLogsQuery({ projectName: 'locaboo', limit: 3 }));
+    const result = await useCase.execute(new GetFailedLogsQuery({ projectName: 'vinsware', limit: 3 }));
 
-    expect(mockAuditLog.findFailed).toHaveBeenCalledWith('locaboo', 3);
+    expect(mockAuditLog.findFailed).toHaveBeenCalledWith('vinsware', 3);
     expect(result).toEqual(failedResults);
   });
 });

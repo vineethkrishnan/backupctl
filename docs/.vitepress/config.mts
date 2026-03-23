@@ -64,6 +64,7 @@ export default defineConfig({
           { text: 'Development', link: '/13-development' },
           { text: 'Migrations', link: '/14-migrations' },
           { text: 'FAQ', link: '/15-faq' },
+          { text: 'Monitoring', link: '/16-monitoring' },
         ],
       },
       {

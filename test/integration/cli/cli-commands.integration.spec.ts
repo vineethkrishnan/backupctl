@@ -31,7 +31,7 @@ jest.setTimeout(30000);
 function buildResult(overrides: Partial<BackupResult> = {}): BackupResult {
   return new BackupResult({
     runId: 'run-1',
-    projectName: 'locaboo',
+    projectName: 'vinsware',
     status: BackupStatus.Success,
     currentStage: BackupStage.NotifyResult,
     startedAt: new Date('2026-03-18T02:00:00Z'),
@@ -54,7 +54,7 @@ function buildResult(overrides: Partial<BackupResult> = {}): BackupResult {
 
 function buildTestConfig(): ProjectConfig {
   return new ProjectConfig({
-    name: 'locaboo',
+    name: 'vinsware',
     enabled: true,
     cron: '0 2 * * *',
     timeoutMinutes: null,
@@ -62,14 +62,14 @@ function buildTestConfig(): ProjectConfig {
       type: 'postgres',
       host: 'localhost',
       port: 5432,
-      name: 'locaboo_prod',
+      name: 'vinsware_prod',
       user: 'user',
       password: 'pass',
     },
     compression: { enabled: true },
     assets: { paths: [] },
     restic: {
-      repositoryPath: '/backups/locaboo',
+      repositoryPath: '/backups/vinsware',
       password: 'rpass',
       snapshotMode: 'combined',
     },
@@ -78,6 +78,7 @@ function buildTestConfig(): ProjectConfig {
     hooks: null,
     verification: { enabled: false },
     notification: null,
+    monitor: null,
   });
 }
 
@@ -151,10 +152,10 @@ describe('CLI commands (integration)', () => {
     it('should trigger backup for a named project', async () => {
       mockOrchestrator.execute.mockResolvedValue([buildResult()]);
 
-      await CommandTestFactory.run(commandModule, ['run', 'locaboo']);
+      await CommandTestFactory.run(commandModule, ['run', 'vinsware']);
 
       expect(mockOrchestrator.execute).toHaveBeenCalledWith(
-        expect.objectContaining({ projectName: 'locaboo', isAll: false }),
+        expect.objectContaining({ projectName: 'vinsware', isAll: false }),
       );
     });
 
@@ -170,14 +171,14 @@ describe('CLI commands (integration)', () => {
 
     it('should call getDryRunReport for --dry-run flag', async () => {
       mockOrchestrator.getDryRunReport.mockResolvedValue({
-        projectName: 'locaboo',
+        projectName: 'vinsware',
         checks: [{ name: 'Config loaded', passed: true, message: 'OK' }],
         allPassed: true,
       });
 
-      await CommandTestFactory.run(commandModule, ['run', 'locaboo', '--dry-run']);
+      await CommandTestFactory.run(commandModule, ['run', 'vinsware', '--dry-run']);
 
-      expect(mockOrchestrator.getDryRunReport).toHaveBeenCalledWith('locaboo');
+      expect(mockOrchestrator.getDryRunReport).toHaveBeenCalledWith('vinsware');
       expect(mockOrchestrator.execute).not.toHaveBeenCalled();
     });
   });
@@ -216,7 +217,7 @@ describe('CLI commands (integration)', () => {
     it('should report configuration errors', async () => {
       mockConfigLoader.validate.mockReturnValue({
         isValid: false,
-        errors: ['Project "locaboo": missing required field: cron'],
+        errors: ['Project "vinsware": missing required field: cron'],
       });
 
       await CommandTestFactory.run(commandModule, ['config', 'validate']);
@@ -231,26 +232,26 @@ describe('CLI commands (integration)', () => {
         new SnapshotInfo(
           'abc123def456',
           '2026-03-18T02:05:00Z',
-          ['/data/backups/locaboo'],
+          ['/data/backups/vinsware'],
           'backupctl',
-          ['project:locaboo', 'db:postgres'],
+          ['project:vinsware', 'db:postgres'],
           '512MB',
         ),
       ]);
 
-      await CommandTestFactory.run(commandModule, ['snapshots', 'locaboo']);
+      await CommandTestFactory.run(commandModule, ['snapshots', 'vinsware']);
 
       expect(mockSnapshotManagement.execute).toHaveBeenCalledWith(
-        expect.objectContaining({ projectName: 'locaboo' }),
+        expect.objectContaining({ projectName: 'vinsware' }),
       );
     });
 
     it('should display message when no snapshots found', async () => {
       mockSnapshotManagement.execute.mockResolvedValue([]);
 
-      await CommandTestFactory.run(commandModule, ['snapshots', 'locaboo']);
+      await CommandTestFactory.run(commandModule, ['snapshots', 'vinsware']);
 
-      expect(console.log).toHaveBeenCalledWith('No snapshots found for locaboo.');
+      expect(console.log).toHaveBeenCalledWith('No snapshots found for vinsware.');
     });
   });
 });

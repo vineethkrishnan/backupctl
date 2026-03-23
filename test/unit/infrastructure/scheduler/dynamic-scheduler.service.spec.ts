@@ -40,6 +40,7 @@ function createProjectConfig(overrides: Partial<{ name: string; cron: string; en
     hooks: null,
     verification: { enabled: false },
     notification: null,
+    monitor: null,
   });
 }
 
@@ -144,14 +145,14 @@ describe('DynamicSchedulerService', () => {
 
   describe('onModuleInit', () => {
     it('should register cron jobs for each enabled project', async () => {
-      const locaboo = createProjectConfig({ name: 'locaboo', cron: '0 2 * * *' });
+      const vinsware = createProjectConfig({ name: 'vinsware', cron: '0 2 * * *' });
       const shopify = createProjectConfig({ name: 'shopify', cron: '0 3 * * *' });
-      configLoader.loadAll.mockReturnValue([locaboo, shopify]);
+      configLoader.loadAll.mockReturnValue([vinsware, shopify]);
 
       await service.onModuleInit();
 
       expect(schedulerRegistry.addCronJob).toHaveBeenCalledWith(
-        'backup-locaboo',
+        'backup-vinsware',
         expect.objectContaining({ cronTime: expect.anything() }),
       );
       expect(schedulerRegistry.addCronJob).toHaveBeenCalledWith(
@@ -186,25 +187,25 @@ describe('DynamicSchedulerService', () => {
 
   describe('executeScheduledBackup', () => {
     it('should acquire lock, run backup with lockHeldExternally, then release', async () => {
-      await service.executeScheduledBackup('locaboo');
+      await service.executeScheduledBackup('vinsware');
 
-      expect(backupLock.acquireOrQueue).toHaveBeenCalledWith('locaboo');
+      expect(backupLock.acquireOrQueue).toHaveBeenCalledWith('vinsware');
       expect(runBackup.execute).toHaveBeenCalledWith(
         expect.objectContaining({
-          projectName: 'locaboo',
+          projectName: 'vinsware',
           lockHeldExternally: true,
         }),
       );
-      expect(backupLock.release).toHaveBeenCalledWith('locaboo');
+      expect(backupLock.release).toHaveBeenCalledWith('vinsware');
     });
 
     it('should release lock even when backup throws', async () => {
       runBackup.execute.mockRejectedValueOnce(new Error('dump failed'));
 
-      await expect(service.executeScheduledBackup('locaboo')).rejects.toThrow('dump failed');
+      await expect(service.executeScheduledBackup('vinsware')).rejects.toThrow('dump failed');
 
-      expect(backupLock.acquireOrQueue).toHaveBeenCalledWith('locaboo');
-      expect(backupLock.release).toHaveBeenCalledWith('locaboo');
+      expect(backupLock.acquireOrQueue).toHaveBeenCalledWith('vinsware');
+      expect(backupLock.release).toHaveBeenCalledWith('vinsware');
     });
 
     it('should pass correct RunBackupCommand', async () => {
@@ -229,7 +230,7 @@ describe('DynamicSchedulerService', () => {
 
     it('should send daily summary to all registered notifiers', async () => {
       const recentResult = createBackupResult({
-        projectName: 'locaboo',
+        projectName: 'vinsware',
         startedAt: new Date(),
       });
       getBackupStatus.execute.mockResolvedValue([recentResult]);
@@ -270,14 +271,14 @@ describe('DynamicSchedulerService', () => {
 
   describe('backup cron callback', () => {
     it('registers backup job with correct name for each project', async () => {
-      const locaboo = createProjectConfig({ name: 'locaboo' });
+      const vinsware = createProjectConfig({ name: 'vinsware' });
       const shopify = createProjectConfig({ name: 'shopify' });
-      configLoader.loadAll.mockReturnValue([locaboo, shopify]);
+      configLoader.loadAll.mockReturnValue([vinsware, shopify]);
 
       await service.onModuleInit();
 
       const jobNames = schedulerRegistry.addCronJob.mock.calls.map((call) => call[0] as string);
-      expect(jobNames).toContain('backup-locaboo');
+      expect(jobNames).toContain('backup-vinsware');
       expect(jobNames).toContain('backup-shopify');
       expect(jobNames).toContain('daily-summary');
     });

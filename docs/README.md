@@ -13,7 +13,7 @@
 | 5  | [Configuration](05-configuration.md) | Project YAML format, `.env` globals, config resolution, examples |
 | 6  | [CLI Reference](06-cli-reference.md) | All 14 commands with flags, arguments, exit codes, and examples |
 | 7  | [Bash Scripts](07-bash-scripts.md) | Host-side scripts: `install.sh`, `dev.sh`, `backupctl-manage.sh` |
-| 8  | [Backup Flow](08-backup-flow.md) | The 11-step orchestration pipeline in detail |
+| 8  | [Backup Flow](08-backup-flow.md) | The 13-step orchestration pipeline in detail |
 | 9  | [Restore Guide](09-restore-guide.md) | Snapshot browsing, file restore, database import, `--guide` mode |
 | 10 | [Cheatsheet](10-cheatsheet.md) | Quick-reference commands for daily operations |
 | 11 | [Adding Adapters](11-adding-adapters.md) | How to add new database dumpers, notifiers, or storage backends |
@@ -21,6 +21,7 @@
 | 13 | [Development](13-development.md) | Docker dev environment, networking, socat relay, testing, static analysis |
 | 14 | [Migrations](14-migrations.md) | TypeORM migration commands, patterns, and troubleshooting |
 | 15 | [FAQ](15-faq.md) | Setup issues, Docker networking, ISP port blocking, SSH/GPG/restic fixes |
+| 16 | [Monitoring](16-monitoring.md) | Uptime Kuma push monitors for passive failure detection |
 
 ## Quick Links
 

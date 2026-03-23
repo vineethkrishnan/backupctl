@@ -100,4 +100,46 @@ describe('HealthController', () => {
       uptime: 120,
     });
   });
+
+  it('should include uptimeKuma in response when configured', async () => {
+    const result = new HealthCheckResult(
+      true,
+      true,
+      50,
+      true,
+      true,
+      true,
+      3600,
+      true,
+      true,
+      true,
+    );
+    checkHealth.execute.mockResolvedValue(result);
+
+    const body = await controller.check();
+
+    expect(body.checks.uptimeKuma).toEqual({ configured: true, connected: true });
+    expect(body.status).toBe('healthy');
+  });
+
+  it('should include uptimeKuma when configured but disconnected without affecting healthy status', async () => {
+    const result = new HealthCheckResult(
+      true,
+      true,
+      50,
+      true,
+      true,
+      true,
+      3600,
+      true,
+      false,
+      true,
+    );
+    checkHealth.execute.mockResolvedValue(result);
+
+    const body = await controller.check();
+
+    expect(body.checks.uptimeKuma).toEqual({ configured: true, connected: false });
+    expect(body.status).toBe('healthy');
+  });
 });

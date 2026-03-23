@@ -27,6 +27,7 @@ function buildParams(overrides: Partial<ProjectConfigParams> = {}): ProjectConfi
     hooks: null,
     verification: { enabled: false },
     notification: null,
+    monitor: null,
     ...overrides,
   };
 }
@@ -141,6 +142,22 @@ describe('ProjectConfig', () => {
       const config = new ProjectConfig(buildParams({ timeoutMinutes: 0 }));
 
       expect(config.hasTimeout()).toBe(false);
+    });
+  });
+
+  describe('hasMonitor', () => {
+    it('should return true when monitor is configured', () => {
+      const config = new ProjectConfig(buildParams({
+        monitor: { type: 'uptime-kuma', config: { push_token: 'abc123' } },
+      }));
+
+      expect(config.hasMonitor()).toBe(true);
+    });
+
+    it('should return false when monitor is null', () => {
+      const config = new ProjectConfig(buildParams({ monitor: null }));
+
+      expect(config.hasMonitor()).toBe(false);
     });
   });
 });

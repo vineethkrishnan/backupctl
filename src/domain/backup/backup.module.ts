@@ -16,6 +16,7 @@ import { FileCleanupAdapter } from './infrastructure/adapters/cleanup/file-clean
 import { ShellHookExecutorAdapter } from './infrastructure/adapters/hooks/shell-hook-executor.adapter';
 import { GpgEncryptorAdapter } from './infrastructure/adapters/encryptors/gpg-encryptor.adapter';
 import { DumperBootstrapService } from './infrastructure/adapters/dumpers/dumper-bootstrap.service';
+import { UptimeKumaHeartbeatAdapter } from './infrastructure/adapters/monitors/uptime-kuma-heartbeat.adapter';
 import { DynamicSchedulerService } from './infrastructure/scheduler/dynamic-scheduler.service';
 
 import { RunCommand } from './presenters/cli/run.command';
@@ -31,6 +32,7 @@ import {
   DUMP_ENCRYPTOR_PORT,
   LOCAL_CLEANUP_PORT,
   HOOK_EXECUTOR_PORT,
+  HEARTBEAT_MONITOR_PORT,
 } from '@common/di/injection-tokens';
 
 @Module({
@@ -52,6 +54,7 @@ import {
     { provide: DUMP_ENCRYPTOR_PORT, useClass: GpgEncryptorAdapter },
     { provide: LOCAL_CLEANUP_PORT, useClass: FileCleanupAdapter },
     { provide: HOOK_EXECUTOR_PORT, useClass: ShellHookExecutorAdapter },
+    { provide: HEARTBEAT_MONITOR_PORT, useClass: UptimeKumaHeartbeatAdapter },
 
     // Infrastructure
     DumperBootstrapService,
@@ -72,6 +75,7 @@ import {
     GetCacheInfoUseCase,
     ClearCacheUseCase,
     DUMPER_REGISTRY,
+    HEARTBEAT_MONITOR_PORT,
   ],
 })
 export class BackupModule {}

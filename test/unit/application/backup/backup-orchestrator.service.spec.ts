@@ -17,6 +17,7 @@ import { RemoteStoragePort } from '@domain/backup/application/ports/remote-stora
 import { AuditLogPort } from '@domain/audit/application/ports/audit-log.port';
 import { FallbackWriterPort } from '@domain/audit/application/ports/fallback-writer.port';
 import { NotifierPort } from '@domain/notification/application/ports/notifier.port';
+import { HeartbeatMonitorPort } from '@domain/backup/application/ports/heartbeat-monitor.port';
 import { ConfigLoaderPort } from '@domain/config/application/ports/config-loader.port';
 import { ClockPort } from '@common/clock/clock.port';
 import { FileSystemPort } from '@common/filesystem/filesystem.port';
@@ -43,6 +44,7 @@ import {
   HOOK_EXECUTOR_PORT,
   LOCAL_CLEANUP_PORT,
   REMOTE_STORAGE_FACTORY,
+  HEARTBEAT_MONITOR_PORT,
 } from '@common/di/injection-tokens';
 
 // ── Test helpers ───────────────────────────────────────────────────────
@@ -152,6 +154,13 @@ function createMockFilesystem(): jest.Mocked<FileSystemPort> {
   };
 }
 
+function createMockHeartbeatMonitor(): jest.Mocked<HeartbeatMonitorPort> {
+  return {
+    sendHeartbeat: jest.fn().mockResolvedValue(undefined),
+    checkConnectivity: jest.fn().mockResolvedValue(true),
+  };
+}
+
 function createMockGpgKeyManager(): jest.Mocked<GpgKeyManagerPort> {
   return {
     importKey: jest.fn().mockResolvedValue(undefined),
@@ -187,6 +196,7 @@ function buildProjectConfig(overrides: Partial<ConstructorParameters<typeof Proj
     hooks: null,
     verification: { enabled: false },
     notification: { type: 'slack', config: {} },
+    monitor: null,
     ...overrides,
   });
 }
@@ -210,6 +220,7 @@ describe('RunBackupUseCase', () => {
   let mockStorageFactory: jest.Mocked<RemoteStorageFactoryPort>;
   let mockFilesystem: jest.Mocked<FileSystemPort>;
   let mockGpgKeyManager: jest.Mocked<GpgKeyManagerPort>;
+  let mockHeartbeatMonitor: jest.Mocked<HeartbeatMonitorPort>;
   let mockDumperRegistry: DumperRegistry;
   let mockNotifierRegistry: NotifierRegistry;
 
@@ -237,6 +248,7 @@ describe('RunBackupUseCase', () => {
 
     mockFilesystem = createMockFilesystem();
     mockGpgKeyManager = createMockGpgKeyManager();
+    mockHeartbeatMonitor = createMockHeartbeatMonitor();
 
     // Set up default resolved values
     mockBackupLock.acquire.mockResolvedValue(true);
@@ -274,6 +286,7 @@ describe('RunBackupUseCase', () => {
         { provide: REMOTE_STORAGE_FACTORY, useValue: mockStorageFactory },
         { provide: FILESYSTEM_PORT, useValue: mockFilesystem },
         { provide: GPG_KEY_MANAGER_PORT, useValue: mockGpgKeyManager },
+        { provide: HEARTBEAT_MONITOR_PORT, useValue: mockHeartbeatMonitor },
         {
           provide: ConfigService,
           useValue: {
@@ -873,6 +886,90 @@ describe('RunBackupUseCase', () => {
 
       expect(results[0].status).toBe(BackupStatus.Success);
       expect(mockAuditLog.trackProgress).toHaveBeenCalled();
+    });
+  });
+
+  // ── heartbeat monitor ────────────────────────────────────────────────
+
+  describe('heartbeat monitor', () => {
+    it('sends heartbeat with status=up after successful backup', async () => {
+      const config = buildProjectConfig({
+        monitor: { type: 'uptime-kuma', config: { push_token: 'tok-123' } },
+      });
+      mockConfigLoader.getProject.mockReturnValue(config);
+
+      const results = await service.execute(
+        new RunBackupCommand({ projectName: 'test-project' }),
+      );
+
+      expect(results[0].status).toBe(BackupStatus.Success);
+      expect(mockHeartbeatMonitor.sendHeartbeat).toHaveBeenCalledTimes(1);
+      expect(mockHeartbeatMonitor.sendHeartbeat).toHaveBeenCalledWith(
+        'tok-123',
+        'up',
+        expect.stringContaining('OK'),
+        expect.any(Number),
+      );
+    });
+
+    it('sends heartbeat with status=down after failed backup', async () => {
+      const config = buildProjectConfig({
+        monitor: { type: 'uptime-kuma', config: { push_token: 'tok-123' } },
+      });
+      mockConfigLoader.getProject.mockReturnValue(config);
+      mockDumper.dump.mockRejectedValue(new Error('disk full'));
+
+      const results = await service.execute(
+        new RunBackupCommand({ projectName: 'test-project' }),
+      );
+
+      expect(results[0].status).toBe(BackupStatus.Failed);
+      expect(mockHeartbeatMonitor.sendHeartbeat).toHaveBeenCalledWith(
+        'tok-123',
+        'down',
+        expect.stringContaining('FAIL'),
+        expect.any(Number),
+      );
+    });
+
+    it('skips heartbeat when project has no monitor config', async () => {
+      const config = buildProjectConfig({ monitor: null });
+      mockConfigLoader.getProject.mockReturnValue(config);
+
+      await service.execute(
+        new RunBackupCommand({ projectName: 'test-project' }),
+      );
+
+      expect(mockHeartbeatMonitor.sendHeartbeat).not.toHaveBeenCalled();
+    });
+
+    it('does not affect backup result when heartbeat fails', async () => {
+      const config = buildProjectConfig({
+        monitor: { type: 'uptime-kuma', config: { push_token: 'tok-123' } },
+      });
+      mockConfigLoader.getProject.mockReturnValue(config);
+      mockHeartbeatMonitor.sendHeartbeat.mockRejectedValue(new Error('Kuma down'));
+
+      const results = await service.execute(
+        new RunBackupCommand({ projectName: 'test-project' }),
+      );
+
+      expect(results[0].status).toBe(BackupStatus.Success);
+      expect(mockHeartbeatMonitor.sendHeartbeat).toHaveBeenCalled();
+    });
+
+    it('skips heartbeat during dry run', async () => {
+      const config = buildProjectConfig({
+        monitor: { type: 'uptime-kuma', config: { push_token: 'tok-123' } },
+      });
+      mockConfigLoader.getProject.mockReturnValue(config);
+      mockStorage.listSnapshots.mockResolvedValue([]);
+
+      await service.execute(
+        new RunBackupCommand({ projectName: 'test-project', isDryRun: true }),
+      );
+
+      expect(mockHeartbeatMonitor.sendHeartbeat).not.toHaveBeenCalled();
     });
   });
 });

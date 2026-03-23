@@ -1,15 +1,17 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { AuditLogPort } from '@domain/audit/application/ports/audit-log.port';
+import { HeartbeatMonitorPort } from '@domain/backup/application/ports/heartbeat-monitor.port';
 import { SystemHealthPort, SshCheckConfig } from '@domain/health/application/ports/system-health.port';
 import { HealthCheckResult } from '@domain/audit/domain/health-check-result.model';
-import { AUDIT_LOG_PORT, SYSTEM_HEALTH_PORT } from '@common/di/injection-tokens';
+import { AUDIT_LOG_PORT, SYSTEM_HEALTH_PORT, HEARTBEAT_MONITOR_PORT } from '@common/di/injection-tokens';
 
 @Injectable()
 export class CheckHealthUseCase {
   constructor(
     @Inject(AUDIT_LOG_PORT) private readonly auditLog: AuditLogPort,
     @Inject(SYSTEM_HEALTH_PORT) private readonly systemHealth: SystemHealthPort,
+    @Inject(HEARTBEAT_MONITOR_PORT) private readonly heartbeatMonitor: HeartbeatMonitorPort,
     private readonly configService: ConfigService,
   ) {}
 
@@ -17,13 +19,15 @@ export class CheckHealthUseCase {
     const uptime = process.uptime();
     const minFreeGb = this.configService.get<number>('HEALTH_DISK_MIN_FREE_GB', 5);
     const sshConfig = this.buildSshConfig();
+    const isKumaConfigured = !!this.configService.get<string>('UPTIME_KUMA_BASE_URL');
 
-    const [auditDbConnected, diskResult, sshConnected, sshAuthenticated] =
+    const [auditDbConnected, diskResult, sshConnected, sshAuthenticated, kumaConnected] =
       await Promise.all([
         this.checkAuditDb(),
         this.systemHealth.checkDiskSpace('/', minFreeGb),
         sshConfig ? this.systemHealth.checkSshConnectivity(sshConfig) : Promise.resolve(false),
         sshConfig?.keyPath ? this.systemHealth.checkSshAuthentication(sshConfig.keyPath) : Promise.resolve(false),
+        isKumaConfigured ? this.heartbeatMonitor.checkConnectivity() : Promise.resolve(false),
       ]);
 
     const isSshConfigured = sshConfig !== null;
@@ -37,6 +41,8 @@ export class CheckHealthUseCase {
       sshConnected && sshAuthenticated,
       uptime,
       isSshConfigured,
+      kumaConnected,
+      isKumaConfigured,
     );
   }
 

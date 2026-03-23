@@ -36,6 +36,7 @@ function buildProjectConfig(): ProjectConfig {
     hooks: null,
     verification: { enabled: true },
     notification: { type: 'slack', config: {} },
+    monitor: null,
   });
 }
 
@@ -129,6 +130,7 @@ describe('ConfigShowSubCommand', () => {
       hooks: null,
       verification: { enabled: false },
       notification: null,
+      monitor: null,
     });
     configLoader.getProject.mockReturnValue(filesOnlyConfig);
 

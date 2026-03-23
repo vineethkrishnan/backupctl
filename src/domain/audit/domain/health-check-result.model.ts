@@ -7,6 +7,8 @@ export class HealthCheckResult {
   readonly resticReposHealthy: boolean;
   readonly uptime: number;
   readonly sshConfigured: boolean;
+  readonly uptimeKumaConnected: boolean;
+  readonly uptimeKumaConfigured: boolean;
 
   constructor(
     auditDbConnected: boolean,
@@ -17,6 +19,8 @@ export class HealthCheckResult {
     resticReposHealthy: boolean,
     uptime: number,
     sshConfigured = true,
+    uptimeKumaConnected = false,
+    uptimeKumaConfigured = false,
   ) {
     this.auditDbConnected = auditDbConnected;
     this.diskSpaceAvailable = diskSpaceAvailable;
@@ -26,6 +30,8 @@ export class HealthCheckResult {
     this.resticReposHealthy = resticReposHealthy;
     this.uptime = uptime;
     this.sshConfigured = sshConfigured;
+    this.uptimeKumaConnected = uptimeKumaConnected;
+    this.uptimeKumaConfigured = uptimeKumaConfigured;
   }
 
   isHealthy(): boolean {
