@@ -10,7 +10,7 @@ mkdir -p "$BACKUP_BASE_DIR/.fallback-audit" 2>/dev/null || true
 # Run pending database migrations
 if [ -f dist/db/datasource.js ]; then
   echo "Running database migrations..."
-  npx typeorm migration:run -d dist/db/datasource.js 2>&1 || {
+  node ./node_modules/.bin/typeorm migration:run -d dist/db/datasource.js 2>&1 || {
     echo "Warning: migrations failed — audit DB may be unavailable"
   }
 fi
