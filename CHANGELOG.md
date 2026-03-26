@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.18](https://github.com/vineethkrishnan/backupctl/compare/v0.1.17...v0.1.18) (2026-03-26)
+
+
+### Documentation
+
+* **ci:** update documentation for network module and BACKUP_HOST_DIR ([#46](https://github.com/vineethkrishnan/backupctl/issues/46)) ([f212d09](https://github.com/vineethkrishnan/backupctl/commit/f212d09f91c56c12cd399cd0b8bcd4ea73eb52a3))
+
 ## [0.1.17](https://github.com/vineethkrishnan/backupctl/compare/v0.1.16...v0.1.17) (2026-03-26)
 
 
