@@ -11,6 +11,7 @@ import { AuditModule } from '@domain/audit/audit.module';
 import { ConfigAppModule } from '@domain/config/config.module';
 import { NotificationModule } from '@domain/notification/notification.module';
 import { HealthModule } from '@domain/health/health.module';
+import { NetworkModule } from '@domain/network/network.module';
 import { SharedInfraModule } from './shared-infra.module';
 import { typeormConfig } from '../config/typeorm.config';
 
@@ -72,6 +73,7 @@ import { typeormConfig } from '../config/typeorm.config';
     BackupModule,
     NotificationModule,
     HealthModule,
+    NetworkModule,
   ],
 })
 export class AppModule {}
