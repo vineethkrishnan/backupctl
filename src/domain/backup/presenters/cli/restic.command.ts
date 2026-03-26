@@ -11,7 +11,7 @@ export class ResticCommand extends CommandRunner {
     @Inject(REMOTE_STORAGE_FACTORY) private readonly storageFactory: RemoteStorageFactoryPort,
   ) { super(); }
 
-  private static readonly DESTRUCTIVE_COMMANDS = ['forget', 'key', 'prune', 'migrate', 'init'];
+  private static readonly DESTRUCTIVE_COMMANDS = ['forget', 'key', 'prune', 'migrate'];
 
   async run(params: string[]): Promise<void> {
     const [projectName, ...resticArgs] = params;
