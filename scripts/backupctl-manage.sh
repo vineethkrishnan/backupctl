@@ -287,6 +287,22 @@ cmd_deploy() {
 
   echo "=== backupctl deploy ==="
 
+  # Ensure backup base directory exists with correct ownership (node user = UID 1000)
+  local backup_dir
+  backup_dir=$(grep -E '^BACKUP_BASE_DIR=' .env 2>/dev/null | cut -d= -f2 || echo "/data/backups")
+  backup_dir="${backup_dir:-/data/backups}"
+  if [ ! -d "$backup_dir" ]; then
+    echo "Creating backup directory: $backup_dir"
+    sudo mkdir -p "$backup_dir" && sudo chown 1000:1000 "$backup_dir"
+  else
+    local dir_owner
+    dir_owner=$(stat -c '%u' "$backup_dir" 2>/dev/null || stat -f '%u' "$backup_dir" 2>/dev/null)
+    if [ "$dir_owner" != "1000" ]; then
+      echo "Fixing ownership of $backup_dir for container's node user (UID 1000)..."
+      sudo chown -R 1000:1000 "$backup_dir"
+    fi
+  fi
+
   echo "[1/5] Building and starting containers..."
   if [ -n "$REBUILD" ]; then
     docker compose -f "$COMPOSE_FILE" up -d $REBUILD

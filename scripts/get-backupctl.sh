@@ -194,7 +194,7 @@ ok "docker-compose.yml created"
 
 info "Downloading management scripts..."
 
-for file in install.sh backupctl-manage.sh; do
+for file in install.sh install-cli.sh backupctl-manage.sh; do
   if curl -fsSL "${BASE_URL}/scripts/${file}" -o "$INSTALL_DIR/scripts/${file}" 2>/dev/null; then
     chmod +x "$INSTALL_DIR/scripts/${file}"
     ok "scripts/${file}"

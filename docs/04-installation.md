@@ -84,7 +84,7 @@ Verifies that Docker, Docker Compose, git, openssl, and ssh-keygen are installed
 ```
 === backupctl Installation Wizard ===
 
-[1/10] Checking prerequisites...
+[1/14] Checking prerequisites...
   ✓ Docker 27.3.1
   ✓ Docker Compose v2.30.3
   ✓ git 2.43.0
@@ -98,7 +98,7 @@ All prerequisites met.
 Prompts for core service configuration with sensible defaults.
 
 ```
-[2/10] Application settings
+[2/14] Application settings
   APP_PORT [3100]:
   TIMEZONE [Europe/Berlin]:
   BACKUP_BASE_DIR [/data/backups]:
@@ -111,7 +111,7 @@ Prompts for core service configuration with sensible defaults.
 Configures the PostgreSQL audit database. The password is auto-generated if left blank.
 
 ```
-[3/10] Audit database
+[3/14] Audit database
   AUDIT_DB_HOST [backupctl-audit-db]:
   AUDIT_DB_PORT [5432]:
   AUDIT_DB_NAME [backup_audit]:
@@ -125,7 +125,7 @@ Configures the PostgreSQL audit database. The password is auto-generated if left
 Configures SSH access, generates a key pair if needed, copies the public key, scans `known_hosts`, and verifies the connection.
 
 ```
-[4/10] Hetzner Storage Box
+[4/14] Hetzner Storage Box
   HETZNER_SSH_HOST: u123456.your-storagebox.de
   HETZNER_SSH_USER: u123456
 
@@ -144,7 +144,7 @@ Configures SSH access, generates a key pair if needed, copies the public key, sc
 Sets a global restic repository password and retry configuration.
 
 ```
-[5/10] Restic configuration
+[5/14] Restic configuration
   RESTIC_PASSWORD: ********
   BACKUP_RETRY_COUNT [3]:
   BACKUP_RETRY_DELAY_MS [5000]:
@@ -155,7 +155,7 @@ Sets a global restic repository password and retry configuration.
 Choose a global notification channel and enter channel-specific settings.
 
 ```
-[6/10] Notification defaults
+[6/14] Notification defaults
   NOTIFICATION_TYPE (slack|email|webhook|none) [slack]: slack
   SLACK_WEBHOOK_URL: https://hooks.slack.com/services/T.../B.../xxx
   DAILY_SUMMARY_CRON [0 8 * * *]:
@@ -168,7 +168,7 @@ For email, the wizard prompts for `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP
 Optionally enables GPG encryption globally and imports key files.
 
 ```
-[7/10] Encryption
+[7/14] Encryption
   Enable GPG encryption? [y/N]: y
   GPG_RECIPIENT: backup@company.com
   Import GPG key file? [y/N]: y
@@ -176,12 +176,25 @@ Optionally enables GPG encryption globally and imports key files.
   Copied to ./gpg-keys/backup-key.pub.gpg
 ```
 
-### 8. Project Configuration
+### 8. Monitoring
+
+Optionally configure Uptime Kuma heartbeat monitoring. If enabled, each project can send a heartbeat ping after every backup.
+
+```
+[8/14] Monitoring Defaults
+  Enable Uptime Kuma heartbeat monitoring? [y/N]: y
+  Uptime Kuma base URL: https://status.example.com
+  ✔ Monitoring configured
+```
+
+Per-project push tokens are configured in the project step.
+
+### 9. Project Configuration
 
 An interactive loop that builds `config/projects.yml` one project at a time.
 
 ```
-[8/10] Project configuration
+[9/14] Project configuration
   Add a project? [Y/n]: Y
 
   Project name: vinsware
@@ -208,23 +221,23 @@ An interactive loop that builds `config/projects.yml` one project at a time.
   Add another project? [Y/n]: N
 ```
 
-### 9. File Generation
+### 10. File Generation
 
 Generates `.env` and `config/projects.yml` from all collected values.
 
 ```
-[9/10] Generating configuration files
+[10/14] Generating configuration files
   ✓ .env created
   ✓ config/projects.yml created
   ✓ Directories created: config/, ssh-keys/, gpg-keys/
 ```
 
-### 10. Build and Deploy
+### 11. Build and Deploy
 
 Optionally builds the Docker image, starts containers, runs migrations, initializes restic repos, and runs a health check.
 
 ```
-[11/13] Docker Setup
+[12/14] Docker Setup
   Build and start containers now? [Y/n]: Y
 
   Building Docker image... done.
@@ -239,12 +252,12 @@ Optionally builds the Docker image, starts containers, runs migrations, initiali
     ✓ SSH: connected
 ```
 
-### 11. CLI Shortcuts
+### 12. CLI Shortcuts
 
 Installs `backupctl` and `backupctl-dev` wrapper commands so you can run CLI commands from any directory without the `docker exec` prefix.
 
 ```
-[12/13] CLI Shortcuts
+[13/14] CLI Shortcuts
   Install CLI shortcuts? [Y/n]: Y
 
   Install location:
@@ -422,6 +435,9 @@ Generate an SSH key pair, copy the public key to the Hetzner Storage Box, scan t
 ```bash
 # Generate key (skip if you already have one)
 ssh-keygen -t ed25519 -f ./ssh-keys/id_ed25519 -N ""
+
+# Ensure correct permissions (SSH requires 600)
+chmod 600 ./ssh-keys/id_ed25519
 
 # Copy public key to storage box (requires the storage box password once)
 cat ./ssh-keys/id_ed25519.pub | ssh -p 23 u123456@u123456.your-storagebox.de install-ssh-key
@@ -638,6 +654,8 @@ cd .. && rm -rf backupctl
 Remote restic snapshots on the Hetzner Storage Box are not affected by uninstalling the local service. To remove remote data, connect to the storage box directly and delete the repository directories.
 
 ## Getting Help
+
+If you see **permission denied** errors when the container writes under `BACKUP_BASE_DIR` (for example when creating log directories), the installation wizard and Docker entrypoint now attempt to fix common host volume ownership and permissions automatically. If problems remain, see [Permission Denied on Backup Directory](12-troubleshooting.md#permission-denied-on-backup-directory) in the troubleshooting guide.
 
 If you run into issues during installation:
 
