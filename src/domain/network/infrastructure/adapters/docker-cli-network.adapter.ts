@@ -14,7 +14,7 @@ export class DockerCliNetworkAdapter implements DockerNetworkPort {
       ['inspect', '--format', '{{json .NetworkSettings.Networks}}', containerName],
       { timeout: 15000 },
     );
-    const networks: Record<string, unknown> = JSON.parse(stdout.trim());
+    const networks = JSON.parse(stdout.trim()) as Record<string, unknown>;
     return networkName in networks;
   }
 
