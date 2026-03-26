@@ -1,6 +1,6 @@
 # CLI Reference
 
-backupctl provides 15 commands for managing backups, restores, health checks, configuration, upgrades, and direct restic access. Every command returns structured exit codes suitable for scripting and CI/CD pipelines.
+backupctl provides 16 commands for managing backups, restores, health checks, configuration, networking, upgrades, and direct restic access. Every command returns structured exit codes suitable for scripting and CI/CD pipelines.
 
 ## Entry Points
 
@@ -47,6 +47,7 @@ Without verbose, the CLI only shows warnings and errors during bootstrap. With v
 - [config](#config) — validate, show, reload, import GPG keys
 - [cache](#cache) — restic cache management
 - [restic](#restic) — restic passthrough
+- [network](#network) — Docker network management
 - [Global Behaviors](#global-behaviors) — exit codes, concurrency, logging
 
 ---
@@ -750,6 +751,81 @@ repository abc12345 opened (version 2, compression auto)
 Now serving the repository at /mnt/restic
 Use another terminal or file manager to browse the snapshots.
 When finished, press Ctrl-C or send SIGINT to quit.
+```
+
+---
+
+## network
+
+Manage Docker network connectivity for the backupctl container. Connects the container to project-specific Docker networks so it can reach database containers by hostname.
+
+### Syntax
+
+```
+backupctl network connect [project]
+```
+
+### Subcommands
+
+| Subcommand | Description |
+|------------|-------------|
+| `connect` | Connect the backupctl container to project Docker networks |
+| `connect <project>` | Connect to a specific project's Docker network |
+
+When no project name is given, `connect` iterates all projects and connects to each one that has a `docker_network` defined. Projects without `docker_network` are skipped.
+
+### Prerequisites
+
+The Docker socket must be mounted into the backupctl container:
+
+```yaml
+volumes:
+  - /var/run/docker.sock:/var/run/docker.sock:ro
+```
+
+### Exit Codes
+
+| Code | Meaning |
+|------|---------|
+| `0` | All connections successful (or already connected) |
+| `1` | All connections failed |
+| `5` | Partial success (some connected, some failed) |
+
+### Examples
+
+**Connect to all project networks:**
+
+```
+$ backupctl network connect
+Connecting backupctl to project Docker networks...
+
+  ✓ vinsware — connected to vinsware_vinsware-network
+  - project-x — already connected to projectx_network
+  - static-assets — no docker_network configured
+
+Summary: 1 connected, 1 already connected, 1 skipped
+```
+
+**Connect to a specific project:**
+
+```
+$ backupctl network connect vinsware
+Connecting backupctl to project Docker networks...
+
+  ✓ vinsware — connected to vinsware_vinsware-network
+
+Summary: 1 connected
+```
+
+**Network does not exist:**
+
+```
+$ backupctl network connect broken-project
+Connecting backupctl to project Docker networks...
+
+  ✗ broken-project — network 'nonexistent_network' does not exist
+
+Summary: 1 failed
 ```
 
 ---

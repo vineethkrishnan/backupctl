@@ -157,6 +157,16 @@ backupctl run myproject
 backupctl snapshots myproject --last 1
 ```
 
+## Docker Network
+
+```bash
+# Connect to all project Docker networks
+backupctl network connect
+
+# Connect to a specific project's network
+backupctl network connect myproject
+```
+
 ## Docker Commands
 
 ```bash
