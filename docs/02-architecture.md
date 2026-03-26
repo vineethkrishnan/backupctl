@@ -150,17 +150,35 @@ src/
 │   │   │   └── notifier-bootstrap.service.ts
 │   │   └── notification.module.ts
 │   │
-│   └── health/                                # Health check module
+│   ├── health/                                # Health check module
+│   │   ├── application/
+│   │   │   └── use-cases/
+│   │   │       └── check-health/
+│   │   │           └── check-health.use-case.ts
+│   │   ├── presenters/
+│   │   │   ├── cli/
+│   │   │   │   └── health.command.ts
+│   │   │   └── http/
+│   │   │       └── health.controller.ts
+│   │   └── health.module.ts
+│   │
+│   └── network/                               # Docker network module
+│       ├── domain/
+│       │   └── network-connect-result.model.ts
 │       ├── application/
+│       │   ├── ports/
+│       │   │   └── docker-network.port.ts
 │       │   └── use-cases/
-│       │       └── check-health/
-│       │           └── check-health.use-case.ts
+│       │       └── connect-network/
+│       │           ├── connect-network.command.ts
+│       │           └── connect-network.use-case.ts
+│       ├── infrastructure/
+│       │   └── adapters/
+│       │       └── docker-cli-network.adapter.ts
 │       ├── presenters/
-│       │   ├── cli/
-│       │   │   └── health.command.ts
-│       │   └── http/
-│       │       └── health.controller.ts
-│       └── health.module.ts
+│       │   └── cli/
+│       │       └── network.command.ts
+│       └── network.module.ts
 │
 ├── common/                                    # Cross-cutting (imported by any layer)
 │   ├── di/
@@ -290,7 +308,10 @@ AppModule (root)
 ├── NotificationModule
 │   └── NotifierBootstrapService (registers adapters at startup)
 │
-└── HealthModule       [imports AuditModule]
+├── HealthModule       [imports AuditModule]
+│
+└── NetworkModule
+    └── DOCKER_NETWORK_PORT → DockerCliNetworkAdapter
 ```
 
 All DI tokens are **Symbol-based**, defined in `common/di/injection-tokens.ts`.
@@ -406,6 +427,16 @@ Tracks every backup run with real-time stage progress.
 ### health/ — Health Check Module
 
 **Use Case:** `CheckHealthUseCase` — checks audit DB, disk space, SSH, restic repos, Uptime Kuma connectivity
+
+### network/ — Docker Network Module
+
+Connects the backupctl container to project-specific Docker networks so it can resolve database hostnames.
+
+**Port:** `DockerNetworkPort` — `connectContainer()`, `isContainerConnected()`, `networkExists()`
+
+**Use Case:** `ConnectNetworkUseCase` — iterates projects, checks network existence, connects container (idempotent)
+
+**Adapter:** `DockerCliNetworkAdapter` — uses `docker network connect/inspect` via `safeExecFile`
 
 ---
 

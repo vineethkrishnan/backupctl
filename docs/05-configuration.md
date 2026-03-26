@@ -13,6 +13,7 @@ Most configuration changes in `projects.yml` take effect automatically on the ne
 | `APP_PORT` | `3100` | HTTP port for health and status endpoints |
 | `TIMEZONE` | `Europe/Berlin` | Timezone for file names, audit timestamps, notifications, and logs |
 | `BACKUP_BASE_DIR` | `/data/backups` | Base directory for all backup data, lock files, fallback audit, and logs |
+| `BACKUP_HOST_DIR` | `${BACKUP_BASE_DIR}` | Host-side path for the Docker volume mount. Use when the host backup directory differs from the container path (e.g., `/home/user/backups`). Eliminates the need for `docker-compose.override.yml` |
 | `LOG_LEVEL` | `info` | Logging level: `debug`, `info`, `warn`, `error` |
 | `LOG_DIR` | `/data/backups/.logs` | Directory for log files (Winston daily rotate) |
 | `LOG_MAX_SIZE` | `10m` | Maximum size per log file before rotation |
@@ -538,6 +539,6 @@ backupctl config show vinsware
 
 ## What's Next
 
-- **Run commands** — [CLI Reference](06-cli-reference.md) covers all 14 commands with flags and examples.
+- **Run commands** — [CLI Reference](06-cli-reference.md) covers all 16 commands with flags and examples.
 - **Understand the flow** — [Backup Flow](08-backup-flow.md) explains the 11-step orchestration pipeline.
 - **Quick reference** — [Cheatsheet](10-cheatsheet.md) for daily operations.

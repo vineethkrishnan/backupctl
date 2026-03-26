@@ -827,18 +827,22 @@ no matching manifest for linux/arm64/v8
 
 **Fix:**
 
-Starting from v0.1.3, backupctl publishes multi-architecture images (AMD64 + ARM64). Pull the latest:
+Starting from v0.1.3, backupctl publishes multi-architecture images (`linux/amd64` + `linux/arm64`). Docker automatically pulls the correct architecture. Pull the latest:
 
 ```bash
 docker compose pull
 docker compose up -d
 ```
 
-If you're running from source, Docker Buildx handles multi-arch automatically:
+If you're running from source, Docker builds natively for your host architecture:
 
 ```bash
 docker compose up -d --build
 ```
+
+The CI/CD pipeline builds both architectures using Docker Buildx with QEMU emulation. The Dockerfile uses multi-arch base images (`node:20-alpine`, `golang:*-alpine`) and compiles restic with `CGO_ENABLED=0` for static binaries on both platforms.
+
+See [Network — Docker Image Architecture Support](17-network.md#docker-image-architecture-support) for details on cross-architecture builds.
 
 ---
 

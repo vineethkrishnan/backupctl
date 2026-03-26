@@ -1,6 +1,6 @@
 # CLI Reference
 
-backupctl provides 15 commands for managing backups, restores, health checks, configuration, upgrades, and direct restic access. Every command returns structured exit codes suitable for scripting and CI/CD pipelines.
+backupctl provides 16 commands for managing backups, restores, health checks, configuration, networking, upgrades, and direct restic access. Every command returns structured exit codes suitable for scripting and CI/CD pipelines.
 
 ## Entry Points
 
@@ -47,6 +47,7 @@ Without verbose, the CLI only shows warnings and errors during bootstrap. With v
 - [config](#config) — validate, show, reload, import GPG keys
 - [cache](#cache) — restic cache management
 - [restic](#restic) — restic passthrough
+- [network](#network) — Docker network management
 - [Global Behaviors](#global-behaviors) — exit codes, concurrency, logging
 
 ---
@@ -751,6 +752,62 @@ Now serving the repository at /mnt/restic
 Use another terminal or file manager to browse the snapshots.
 When finished, press Ctrl-C or send SIGINT to quit.
 ```
+
+---
+
+## network
+
+Manage Docker network connectivity for the backupctl container. Connects the container to project-specific Docker networks so it can reach database containers by hostname.
+
+### Syntax
+
+```
+backupctl network connect [project]
+```
+
+### Subcommands
+
+| Subcommand | Description |
+|------------|-------------|
+| `connect` | Connect the backupctl container to project Docker networks |
+| `connect <project>` | Connect to a specific project's Docker network |
+
+When no project name is given, `connect` iterates all projects and connects to each one that has a `docker_network` defined. Projects without `docker_network` are skipped.
+
+### Prerequisites
+
+The Docker socket must be mounted and the container must have permission to access it. Add both to `docker-compose.yml`:
+
+```yaml
+volumes:
+  - /var/run/docker.sock:/var/run/docker.sock:ro
+group_add:
+  - '${DOCKER_GID:-999}'
+```
+
+If the default GID `999` doesn't match your host, check with `stat -c '%g' /var/run/docker.sock` and set `DOCKER_GID` in `.env`. See [Network](17-network.md) for full setup details.
+
+### Exit Codes
+
+| Code | Meaning |
+|------|---------|
+| `0` | All connections successful (or already connected) |
+| `1` | All connections failed |
+| `5` | Partial success (some connected, some failed) |
+
+### Examples
+
+**Connect to all project networks:**
+
+![backupctl network connect](/images/17-network-connect.png)
+
+**Connect to a specific project:**
+
+![backupctl network connect single](/images/18-network-connect-single.png)
+
+**Network does not exist:**
+
+![backupctl network connect failed](/images/19-network-connect-failed.png)
 
 ---
 
