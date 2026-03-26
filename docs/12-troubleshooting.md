@@ -84,14 +84,23 @@ docker exec backupctl ls -la /home/node/.ssh/
 docker exec backupctl ssh-keyscan -H storage-box.example.com >> /home/node/.ssh/known_hosts
 ```
 
-3. **Permission denied** — verify your SSH key is correctly mounted and has the right permissions:
+3. **Permission denied (bad permissions)** — SSH keys must have `0600` permissions. If the key file on the host has open permissions (e.g., `0644`), SSH will refuse to use it:
 
 ```bash
-# Keys must be readable only by owner
-docker exec backupctl chmod 600 /home/node/.ssh/id_*
+# Fix on the host (permissions carry through the volume mount)
+chmod 600 ssh-keys/id_ed25519
+docker restart backupctl
 ```
 
-4. **Key not mounted** — check that `ssh-keys/` is correctly mounted in `docker-compose.yml` and contains the private key.
+The installation wizard now enforces `chmod 600` on all private keys during file generation. If you placed keys manually after setup, fix the permissions on the host.
+
+4. **Permission denied (key not authorized)** — the public key is not installed on the storage box. Install it:
+
+```bash
+ssh-copy-id -p 23 -i ssh-keys/id_ed25519.pub u123456@u123456.your-storagebox.de
+```
+
+5. **Key not mounted** — check that `ssh-keys/` is correctly mounted in `docker-compose.yml` and contains the private key.
 
 ## Audit Database Unreachable
 
@@ -358,7 +367,19 @@ Fix: create the `.env` file. Use the setup wizard for a guided experience:
 
 Fix: validate the YAML syntax and fix any errors. Check for tabs (YAML requires spaces) and proper indentation.
 
-5. **Missing mounted volumes** — required directories (`config/`, `ssh-keys/`) don't exist on the host:
+5. **Backup directory not writable** — the container runs as `node` (UID 1000) but `/data/backups` is owned by root:
+
+```
+Error: EACCES: permission denied, mkdir '/data/backups/.logs'
+```
+
+Fix: set ownership on the host:
+
+```bash
+sudo chown -R 1000:1000 /data/backups
+```
+
+6. **Missing mounted volumes** — required directories (`config/`, `ssh-keys/`) don't exist on the host:
 
 Fix: create the directories:
 
@@ -432,24 +453,16 @@ EACCES: permission denied, mkdir '/data/backups/.logs'
 
 **Fix:**
 
-Ensure the host directory exists and is writable:
+The container runs as the `node` user (UID 1000). The host directory must be owned by this UID:
 
 ```bash
-# Create backup directories on the host
-mkdir -p ~/backupctl/data/backups
-
-# Map the host path in docker-compose.yml
-volumes:
-  - /home/youruser/backupctl/data/backups:/data/backups
-```
-
-Or set ownership on the host:
-
-```bash
+sudo mkdir -p /data/backups
 sudo chown -R 1000:1000 /data/backups
 ```
 
-The container entrypoint automatically creates `.logs` and `.fallback-audit` subdirectories on startup.
+The installation wizard (`scripts/install.sh`) and `backupctl-manage.sh deploy` handle this automatically. The container entrypoint creates `.logs` and `.fallback-audit` subdirectories on startup, and exits with a clear error message if the directory is not writable.
+
+> **Note:** Creating the directory under your home directory (e.g., `~/backupctl/data/backups`) won't work unless you also update `BACKUP_BASE_DIR` in `.env` and the volume mount in `docker-compose.yml` to match.
 
 ---
 

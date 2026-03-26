@@ -28,13 +28,16 @@ Interactive installation wizard that configures backupctl from scratch with zero
 2. **Collect global settings** — timezone, backup base directory, log level, app port
 3. **Configure audit database** — PostgreSQL host, port, credentials (generates secure defaults)
 4. **Configure Hetzner Storage Box** — SSH host, user, key path; optionally generates an SSH key pair
-5. **Set encryption defaults** — global GPG toggle, recipient email
+5. **Configure restic** — global repository password, retry count, retry delay
 6. **Set notification defaults** — global notification type and channel config (Slack webhook URL, SMTP settings, or webhook endpoint)
-7. **Configure retry policy** — retry count and delay
-8. **Add projects** — interactive loop to add one or more projects with database, schedule, retention, and notification settings
-9. **Generate files** — writes `.env`, `config/projects.yml`, and creates required directories
-10. **Initialize restic repos** — optionally initializes restic repositories for each project
-11. **Run first health check** — starts containers and verifies everything works
+7. **Set encryption defaults** — global GPG toggle, recipient email
+8. **Configure monitoring** — optional Uptime Kuma base URL for heartbeat monitoring
+9. **Add projects** — interactive loop to add one or more projects with database, schedule, retention, monitoring, and notification settings
+10. **Review configuration** — summary of all settings with option to re-run any step
+11. **Generate files** — writes `.env`, `config/projects.yml`, enforces SSH key permissions, and creates required directories
+12. **Docker setup** — creates backup directory with correct ownership (UID 1000), builds and starts containers, connects project Docker networks, initializes restic repos
+13. **CLI shortcuts** — installs `backupctl` and `backupctl-dev` wrapper commands
+14. **Completion** — shows next steps and useful commands
 
 ### Prerequisites
 
@@ -132,9 +135,9 @@ Setup complete! Run "backupctl health" to verify.
 
 | File | Contents |
 |------|----------|
-| `.env` | All secrets and global settings |
-| `config/projects.yml` | Project definitions with `${}` variable references |
-| `ssh-keys/id_ed25519` | SSH key pair (if generated) |
+| `.env` | All secrets and global settings (including `UPTIME_KUMA_BASE_URL` if monitoring is enabled) |
+| `config/projects.yml` | Project definitions with `${}` variable references (includes `monitor` blocks if configured) |
+| `ssh-keys/id_ed25519` | SSH key pair (if generated); permissions enforced to `0600` |
 
 ---
 
