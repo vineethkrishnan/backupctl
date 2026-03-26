@@ -28,7 +28,7 @@ WARNING="${YELLOW}⚠${RESET}"
 
 # ── State ────────────────────────────────────────────────────
 
-TOTAL_STEPS=13
+TOTAL_STEPS=14
 ENV_VARS=""
 PROJECTS=()
 PROJECT_COUNT=0
@@ -696,11 +696,37 @@ step_encryption() {
 }
 
 # ════════════════════════════════════════════════════════════
-# Step 8: Project Configuration
+# Step 8: Monitoring Defaults
+# ════════════════════════════════════════════════════════════
+
+step_monitoring() {
+  print_step 8 "Monitoring Defaults"
+
+  print_dim "Optionally send heartbeat pings to Uptime Kuma after each backup."
+  print_dim "Each project can have its own push token. The base URL is shared."
+  echo ""
+
+  UPTIME_KUMA_BASE_URL=""
+
+  if ask_yn "Enable Uptime Kuma heartbeat monitoring?" "n"; then
+    while true; do
+      UPTIME_KUMA_BASE_URL=$(ask "Uptime Kuma base URL (e.g., https://status.example.com)" "")
+      if validate_not_empty "$UPTIME_KUMA_BASE_URL" "Uptime Kuma base URL"; then break; fi
+    done
+
+    echo ""
+    print_success "Monitoring configured (Uptime Kuma → ${UPTIME_KUMA_BASE_URL})"
+  else
+    print_success "Monitoring skipped (can be added per-project later)"
+  fi
+}
+
+# ════════════════════════════════════════════════════════════
+# Step 9: Project Configuration
 # ════════════════════════════════════════════════════════════
 
 step_projects() {
-  print_step 8 "Project Configuration"
+  print_step 9 "Project Configuration"
 
   print_dim "Define backup projects. Each project has its own database, schedule,"
   print_dim "retention policy, and optional overrides for notifications/encryption."
@@ -1027,6 +1053,20 @@ add_project() {
     fi
   fi
 
+  # Monitoring (Uptime Kuma heartbeat)
+  local proj_monitor_token=""
+  if [ -n "$UPTIME_KUMA_BASE_URL" ]; then
+    echo ""
+    echo -e "  ${BOLD}Monitoring:${RESET} ${DIM}(Uptime Kuma → ${UPTIME_KUMA_BASE_URL})${RESET}"
+    if ask_yn "Enable heartbeat monitoring for this project?" "y"; then
+      while true; do
+        proj_monitor_token=$(ask "Uptime Kuma push token (the hash from the push URL)" "")
+        if validate_not_empty "$proj_monitor_token" "Push token"; then break; fi
+      done
+      print_success "Heartbeat: ${UPTIME_KUMA_BASE_URL}/api/push/${proj_monitor_token}"
+    fi
+  fi
+
   # Store the env vars for this project
   if [ "$proj_has_db" = "true" ]; then
     env_set "${proj_env_key}_DB_PASSWORD" "$proj_db_password"
@@ -1114,6 +1154,15 @@ add_project() {
     yaml+="      enabled: ${proj_verification}"$'\n'
   fi
 
+  # Monitor block (Uptime Kuma)
+  if [ -n "$proj_monitor_token" ]; then
+    yaml+=""$'\n'
+    yaml+="    monitor:"$'\n'
+    yaml+="      type: uptime-kuma"$'\n'
+    yaml+="      config:"$'\n'
+    yaml+="        push_token: ${proj_monitor_token}"$'\n'
+  fi
+
   # Notification block
   if [ "$proj_notif_type" != "none" ] && [ "$proj_notif_type" != "$NOTIFICATION_TYPE" -o -n "$proj_notif_config" ]; then
     yaml+=""$'\n'
@@ -1151,12 +1200,12 @@ add_project() {
 }
 
 # ════════════════════════════════════════════════════════════
-# Step 9: Review Configuration
+# Step 10: Review Configuration
 # ════════════════════════════════════════════════════════════
 
 step_review() {
   while true; do
-    print_step 9 "Review Configuration"
+    print_step 10 "Review Configuration"
 
     echo -e "  ${BOLD}Application${RESET}"
     echo -e "    Port: ${CYAN}${APP_PORT}${RESET}  |  Timezone: ${CYAN}${TIMEZONE}${RESET}  |  Backup dir: ${CYAN}${BACKUP_BASE_DIR}${RESET}"
@@ -1184,6 +1233,14 @@ step_review() {
       echo -e "    Enabled: ${CYAN}yes${RESET}  |  Type: ${CYAN}${ENCRYPTION_TYPE}${RESET}  |  Recipient: ${CYAN}${GPG_RECIPIENT}${RESET}"
     else
       echo -e "    Enabled: ${CYAN}no${RESET}"
+    fi
+    echo ""
+
+    echo -e "  ${BOLD}Monitoring${RESET}"
+    if [ -n "$UPTIME_KUMA_BASE_URL" ]; then
+      echo -e "    Uptime Kuma: ${CYAN}${UPTIME_KUMA_BASE_URL}${RESET}"
+    else
+      echo -e "    ${DIM}(none configured)${RESET}"
     fi
     echo ""
 
@@ -1222,7 +1279,7 @@ step_review() {
     echo -e "  ${BOLD}━━━ Re-run a step? ━━━${RESET}"
     echo -e "    ${DIM}2)${RESET} Application    ${DIM}3)${RESET} Audit DB      ${DIM}4)${RESET} Hetzner"
     echo -e "    ${DIM}5)${RESET} Restic         ${DIM}6)${RESET} Notifications ${DIM}7)${RESET} Encryption"
-    echo -e "    ${DIM}8)${RESET} Projects       ${DIM}c)${RESET} Continue to generate files"
+    echo -e "    ${DIM}8)${RESET} Monitoring     ${DIM}9)${RESET} Projects      ${DIM}c)${RESET} Continue"
     echo ""
 
     local choice
@@ -1235,9 +1292,10 @@ step_review() {
       5) step_restic ;;
       6) step_notifications ;;
       7) step_encryption ;;
-      8) step_projects ;;
+      8) step_monitoring ;;
+      9) step_projects ;;
       c|C) break ;;
-      *) print_error "Invalid choice. Enter a step number (2-8) or 'c' to continue." ;;
+      *) print_error "Invalid choice. Enter a step number (2-9) or 'c' to continue." ;;
     esac
   done
 
@@ -1245,11 +1303,11 @@ step_review() {
 }
 
 # ════════════════════════════════════════════════════════════
-# Step 10: Generate Configuration Files
+# Step 11: Generate Configuration Files
 # ════════════════════════════════════════════════════════════
 
 step_generate() {
-  print_step 10 "Generate Configuration Files"
+  print_step 11 "Generate Configuration Files"
 
   # Create directories (gpg-keys/ always needed — Docker compose mounts it)
   mkdir -p config ssh-keys gpg-keys
@@ -1333,6 +1391,15 @@ GPG_RECIPIENT=${GPG_RECIPIENT}
 ENVEOF
   fi
 
+  # Monitoring
+  if [ -n "$UPTIME_KUMA_BASE_URL" ]; then
+    cat >> .env <<ENVEOF
+
+# ── Monitoring ───────────────────────────────────────────
+UPTIME_KUMA_BASE_URL=${UPTIME_KUMA_BASE_URL}
+ENVEOF
+  fi
+
   # Append project-specific secrets
   if [ -n "$ENV_VARS" ]; then
     cat >> .env <<ENVEOF
@@ -1344,6 +1411,16 @@ ENVEOF
 
   chmod 600 .env
   print_success ".env generated (permissions: 600)"
+
+  # Ensure SSH private keys have strict permissions (required by SSH)
+  for keyfile in ssh-keys/id_*; do
+    [ -f "$keyfile" ] || continue
+    case "$keyfile" in *.pub) continue ;; esac
+    chmod 600 "$keyfile"
+  done
+  if [ -f ssh-keys/config ]; then
+    chmod 600 ssh-keys/config
+  fi
 
   # ── Generate config/projects.yml ──
   cat > config/projects.yml <<YMLEOF
@@ -1375,15 +1452,40 @@ YMLEOF
 }
 
 # ════════════════════════════════════════════════════════════
-# Step 11: Docker Setup
+# Step 12: Docker Setup
 # ════════════════════════════════════════════════════════════
 
 step_docker() {
-  print_step 11 "Docker Setup"
+  print_step 12 "Docker Setup"
 
   if ! ask_yn "Build and start Docker containers now?" "y"; then
     print_info "Skipping Docker setup. Run later with: docker compose up -d --build"
     return
+  fi
+
+  # Ensure backup base directory exists and is owned by UID 1000 (node user inside container)
+  echo ""
+  print_info "Preparing backup directory: ${BACKUP_BASE_DIR}"
+  if [ ! -d "$BACKUP_BASE_DIR" ]; then
+    if sudo mkdir -p "$BACKUP_BASE_DIR" && sudo chown 1000:1000 "$BACKUP_BASE_DIR"; then
+      print_success "Created ${BACKUP_BASE_DIR} with correct ownership (UID 1000)"
+    else
+      print_warning "Could not create ${BACKUP_BASE_DIR}"
+      print_info "Run manually: sudo mkdir -p ${BACKUP_BASE_DIR} && sudo chown 1000:1000 ${BACKUP_BASE_DIR}"
+    fi
+  else
+    local dir_owner
+    dir_owner=$(stat -c '%u' "$BACKUP_BASE_DIR" 2>/dev/null || stat -f '%u' "$BACKUP_BASE_DIR" 2>/dev/null)
+    if [ "$dir_owner" != "1000" ]; then
+      print_info "Fixing ownership (currently UID ${dir_owner}, need 1000)..."
+      if sudo chown -R 1000:1000 "$BACKUP_BASE_DIR"; then
+        print_success "Ownership set to UID 1000 (node)"
+      else
+        print_warning "Could not fix ownership. Run: sudo chown -R 1000:1000 ${BACKUP_BASE_DIR}"
+      fi
+    else
+      print_success "Directory exists with correct ownership"
+    fi
   fi
 
   # Build and start
@@ -1395,17 +1497,23 @@ step_docker() {
   if docker compose up -d --build >"$build_log" 2>&1; then
     print_success "Containers started"
 
-    # Auto-connect project Docker networks
+    # Auto-connect project Docker networks (container must be running first)
+    sleep 2
     for proj_yaml in "${PROJECTS[@]}"; do
       local pnet
       pnet=$(echo "$proj_yaml" | grep 'docker_network:' | head -1 | sed 's/.*docker_network: //')
       if [ -n "$pnet" ]; then
         if docker network ls --format '{{.Name}}' | grep -q "^${pnet}$"; then
-          docker network connect "$pnet" backupctl 2>/dev/null \
-            && print_success "Connected to network: ${pnet}" \
-            || print_warning "Failed to connect to network: ${pnet}"
+          if docker inspect backupctl --format '{{json .NetworkSettings.Networks}}' 2>/dev/null | grep -q "\"${pnet}\""; then
+            print_success "Already connected to network: ${pnet}"
+          else
+            docker network connect "$pnet" backupctl 2>/dev/null \
+              && print_success "Connected to network: ${pnet}" \
+              || print_warning "Failed to connect to network: ${pnet}"
+          fi
         else
-          print_warning "Docker network '${pnet}' not found — connect manually after it's created"
+          print_warning "Docker network '${pnet}' not found — connect manually:"
+          print_dim "docker network connect <network-name> backupctl"
         fi
       fi
     done
@@ -1508,11 +1616,11 @@ step_docker() {
 }
 
 # ════════════════════════════════════════════════════════════
-# Step 12: CLI Shortcuts
+# Step 13: CLI Shortcuts
 # ════════════════════════════════════════════════════════════
 
 step_cli_shortcuts() {
-  print_step 12 "CLI Shortcuts"
+  print_step 13 "CLI Shortcuts"
 
   print_dim "Install 'backupctl' and 'backupctl-dev' commands so you can run"
   print_dim "CLI commands from any directory without the Docker exec prefix."
@@ -1520,6 +1628,18 @@ step_cli_shortcuts() {
   echo -e "  ${DIM}Instead of:  docker exec backupctl node dist/cli.js health${RESET}"
   echo -e "  ${DIM}Just type:   backupctl health${RESET}"
   echo ""
+
+  local cli_script="${SCRIPT_DIR}/install-cli.sh"
+
+  if [ ! -f "$cli_script" ]; then
+    print_warning "CLI installer script not found at ${cli_script}"
+    print_info "Skipping CLI shortcuts. Install manually after setup."
+    return
+  fi
+
+  if [ ! -x "$cli_script" ]; then
+    chmod +x "$cli_script"
+  fi
 
   if ! ask_yn "Install CLI shortcuts?" "y"; then
     print_info "Skipped. Install later with: ./scripts/install-cli.sh"
@@ -1540,20 +1660,20 @@ step_cli_shortcuts() {
 
   case "$choice" in
     2)
-      "${SCRIPT_DIR}/install-cli.sh" --system
+      "$cli_script" --system
       ;;
     *)
-      "${SCRIPT_DIR}/install-cli.sh" --user
+      "$cli_script" --user
       ;;
   esac
 }
 
 # ════════════════════════════════════════════════════════════
-# Step 13: Completion
+# Step 14: Completion
 # ════════════════════════════════════════════════════════════
 
 step_completion() {
-  print_step 13 "Installation Complete"
+  print_step 14 "Installation Complete"
 
   echo -e "${BOLD}${GREEN}"
   echo "  ╔═══════════════════════════════════════════════════════════╗"
@@ -1666,6 +1786,7 @@ main() {
   step_restic
   step_notifications
   step_encryption
+  step_monitoring
   step_projects
   step_review
   step_generate
