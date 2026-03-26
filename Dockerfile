@@ -9,13 +9,13 @@ COPY src/ ./src/
 RUN npm run build
 
 # ── Build stage: restic with patched dependencies ─────────
-FROM golang:1.26-alpine AS restic-builder
+FROM golang:1.26.1-alpine AS restic-builder
 
 RUN apk add --no-cache git
 WORKDIR /build
 RUN git clone --branch v0.18.1 --depth 1 https://github.com/restic/restic.git .
-RUN go get golang.org/x/crypto@latest \
-    && go get golang.org/x/net@latest \
+RUN go get golang.org/x/crypto@v0.45.0 \
+    && go get golang.org/x/net@v0.45.0 \
     && go get google.golang.org/grpc@latest \
     && go get google.golang.org/protobuf@latest \
     && go get go.opentelemetry.io/otel/sdk@latest \
@@ -50,6 +50,11 @@ RUN apk upgrade --no-cache \
     && rm -rf /root/.npm
 
 COPY --from=restic-builder /restic /usr/local/bin/restic
+
+# Pre-create backup base dir so the node user can write to it even if
+# the host volume mount creates it as root on first run.
+RUN mkdir -p /data/backups/.logs /data/backups/.fallback-audit \
+    && chown -R node:node /data/backups
 
 # Run as non-root — SSH keys mounted to /home/node/.ssh
 RUN mkdir -p /home/node/.ssh /home/node/.gnupg \
