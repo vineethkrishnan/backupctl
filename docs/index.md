@@ -33,8 +33,8 @@ features:
     title: Crash Recovery
     details: Automatic startup recovery — orphan cleanup, stale lock removal, restic unlock, fallback replay, GPG key import.
   - icon: "⚡"
-    title: 14 CLI Commands
-    details: "run, status, health, restore, snapshots, prune, logs, config, cache, restic — all with structured exit codes."
+    title: 16 CLI Commands
+    details: "run, status, health, restore, snapshots, prune, logs, config, cache, restic, network, upgrade — all with structured exit codes."
   - icon: "🏗️"
     title: Hexagonal Architecture
     details: Pure domain layer with zero framework dependencies. Ports and adapters for clean, testable, extensible design.

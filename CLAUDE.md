@@ -187,17 +187,35 @@ src/
 │   │   │   └── webhook-notifier.adapter.ts
 │   │   └── notification.module.ts
 │   │
-│   └── health/                                # Health module
+│   ├── health/                                # Health module
+│   │   ├── application/
+│   │   │   └── use-cases/
+│   │   │       └── check-health/
+│   │   │           └── check-health.use-case.ts
+│   │   ├── presenters/
+│   │   │   ├── cli/
+│   │   │   │   └── health.command.ts
+│   │   │   └── http/
+│   │   │       └── health.controller.ts
+│   │   └── health.module.ts
+│   │
+│   └── network/                               # Docker network module
+│       ├── domain/
+│       │   └── network-connect-result.model.ts
 │       ├── application/
+│       │   ├── ports/
+│       │   │   └── docker-network.port.ts
 │       │   └── use-cases/
-│       │       └── check-health/
-│       │           └── check-health.use-case.ts
+│       │       └── connect-network/
+│       │           ├── connect-network.command.ts
+│       │           └── connect-network.use-case.ts
+│       ├── infrastructure/
+│       │   └── adapters/
+│       │       └── docker-cli-network.adapter.ts
 │       ├── presenters/
-│       │   ├── cli/
-│       │   │   └── health.command.ts
-│       │   └── http/
-│       │       └── health.controller.ts
-│       └── health.module.ts
+│       │   └── cli/
+│       │       └── network.command.ts
+│       └── network.module.ts
 │
 ├── common/                                    # Cross-cutting (imported by any layer)
 │   ├── di/
@@ -261,7 +279,7 @@ Modules may only import another module's **`application/ports/`** or **`domain/`
 
 | Decision | Rationale |
 |----------|-----------|
-| Vertical-slice modules (`backup/`, `audit/`, `config/`, `notification/`, `health/`) | Each module self-contained with own domain/application/infrastructure/presenters |
+| Vertical-slice modules (`backup/`, `audit/`, `config/`, `notification/`, `health/`, `network/`) | Each module self-contained with own domain/application/infrastructure/presenters |
 | Use cases in `application/use-cases/{action}/` | One directory per use case with Command/Query + UseCase. Single `execute()` method per use case |
 | Command/Query pattern | Commands for writes, Queries for reads. Plain data carriers with constructor params. Presenters map args → Command/Query → UseCase.execute() |
 | Ports in `application/ports/` (not `domain/`) | Ports define outbound contracts; application layer owns the orchestration interface |
@@ -279,6 +297,7 @@ Modules may only import another module's **`application/ports/`** or **`domain/`
 | Winston with log rotation | JSON for prod, pretty for dev. `winston-daily-rotate-file` |
 | CLI exit codes 0-5 | 0=success, 1=failure, 2=locked, 3=config error, 4=connectivity, 5=partial |
 | `BACKUP_BASE_DIR` env var | Configurable base dir, default `/data/backups` |
+| `BACKUP_HOST_DIR` env var | Host-side volume mount path, falls back to `BACKUP_BASE_DIR`. Decouples host path from container path, eliminating need for `docker-compose.override.yml` |
 | `TIMEZONE` env var | Default `Europe/Berlin`. Used in file names, audit, notifications, logs |
 | Webhook JSON + markdown | `{ event, project, text (markdown), data (structured) }` |
 | `smtp_secure` field | Explicit TLS control for email notifier |
@@ -376,9 +395,10 @@ test/
 │   │   ├── backup/registries/          # DumperRegistry, NotifierRegistry
 │   │   ├── audit/                      # QueryAuditLogsUseCase, RecoverStartupUseCase
 │   │   ├── health/                     # CheckHealthUseCase
+│   │   ├── network/                    # ConnectNetworkUseCase
 │   │   └── snapshot/                   # ListSnapshotsUseCase
 │   └── infrastructure/
-│       ├── adapters/                   # dumpers, storage, notifiers, encryptors, cleanup, hooks, clock, config
+│       ├── adapters/                   # dumpers, storage, notifiers, encryptors, cleanup, hooks, clock, config, docker
 │       ├── persistence/                # TypeORM audit repo, JSONL fallback, file lock
 │       ├── cli/commands/               # Command parsing, exit codes, flags
 │       ├── http/                       # Controller responses
@@ -545,7 +565,7 @@ Explain **why**, not obvious **what**. No comments on self-evident code.
 
 ## CLI Commands
 
-15 commands via `backupctl <command>`:
+16 commands via `backupctl <command>`:
 
 | Command | Description |
 |---------|-------------|
@@ -560,6 +580,7 @@ Explain **why**, not obvious **what**. No comments on self-evident code.
 | `cache <project> [--clear] / --clear-all` | Restic cache management |
 | `restic <project> <cmd> [args...]` | Restic passthrough |
 | `upgrade` | Check for updates and show upgrade instructions |
+| `network connect [project]` | Connect container to project Docker networks |
 
 ### Exit Codes
 
