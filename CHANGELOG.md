@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.16](https://github.com/vineethkrishnan/backupctl/compare/v0.1.15...v0.1.16) (2026-03-26)
+
+
+### Features
+
+* **security:** add Uptime Kuma heartbeat integration and harden deployment ([#42](https://github.com/vineethkrishnan/backupctl/issues/42)) ([7d0c62f](https://github.com/vineethkrishnan/backupctl/commit/7d0c62ffc1e47923b177860acd3253fd354dbc2c))
+
 ## [0.1.15](https://github.com/vineethkrishnan/backupctl/compare/v0.1.14...v0.1.15) (2026-03-23)
 
 
