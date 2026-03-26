@@ -776,12 +776,16 @@ When no project name is given, `connect` iterates all projects and connects to e
 
 ### Prerequisites
 
-The Docker socket must be mounted into the backupctl container:
+The Docker socket must be mounted and the container must have permission to access it. Add both to `docker-compose.yml`:
 
 ```yaml
 volumes:
   - /var/run/docker.sock:/var/run/docker.sock:ro
+group_add:
+  - '${DOCKER_GID:-999}'
 ```
+
+If the default GID `999` doesn't match your host, check with `stat -c '%g' /var/run/docker.sock` and set `DOCKER_GID` in `.env`. See [Network](17-network.md) for full setup details.
 
 ### Exit Codes
 
@@ -795,38 +799,15 @@ volumes:
 
 **Connect to all project networks:**
 
-```
-$ backupctl network connect
-Connecting backupctl to project Docker networks...
-
-  ✓ vinsware — connected to vinsware_vinsware-network
-  - project-x — already connected to projectx_network
-  - static-assets — no docker_network configured
-
-Summary: 1 connected, 1 already connected, 1 skipped
-```
+![backupctl network connect](/images/17-network-connect.png)
 
 **Connect to a specific project:**
 
-```
-$ backupctl network connect vinsware
-Connecting backupctl to project Docker networks...
-
-  ✓ vinsware — connected to vinsware_vinsware-network
-
-Summary: 1 connected
-```
+![backupctl network connect single](/images/18-network-connect-single.png)
 
 **Network does not exist:**
 
-```
-$ backupctl network connect broken-project
-Connecting backupctl to project Docker networks...
-
-  ✗ broken-project — network 'nonexistent_network' does not exist
-
-Summary: 1 failed
-```
+![backupctl network connect failed](/images/19-network-connect-failed.png)
 
 ---
 

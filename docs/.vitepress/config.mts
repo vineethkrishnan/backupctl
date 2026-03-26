@@ -65,6 +65,7 @@ export default defineConfig({
           { text: 'Migrations', link: '/14-migrations' },
           { text: 'FAQ', link: '/15-faq' },
           { text: 'Monitoring', link: '/16-monitoring' },
+          { text: 'Network', link: '/17-network' },
         ],
       },
       {

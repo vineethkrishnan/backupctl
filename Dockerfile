@@ -14,8 +14,8 @@ FROM golang:1.26.1-alpine AS restic-builder
 RUN apk add --no-cache git
 WORKDIR /build
 RUN git clone --branch v0.18.1 --depth 1 https://github.com/restic/restic.git .
-RUN go get golang.org/x/crypto@v0.45.0 \
-    && go get golang.org/x/net@v0.45.0 \
+RUN go get golang.org/x/crypto@v0.49.0 \
+    && go get golang.org/x/net@v0.52.0 \
     && go get google.golang.org/grpc@latest \
     && go get google.golang.org/protobuf@latest \
     && go get go.opentelemetry.io/otel/sdk@latest \
@@ -35,6 +35,7 @@ RUN npm ci --omit=dev --ignore-scripts && npm cache clean --force
 FROM node:20-alpine3.22
 
 RUN apk upgrade --no-cache \
+    && apk add --no-cache --repository=https://dl-cdn.alpinelinux.org/alpine/edge/main busybox \
     && apk add --no-cache \
     --repository=https://dl-cdn.alpinelinux.org/alpine/edge/main \
     --repository=https://dl-cdn.alpinelinux.org/alpine/v3.22/community \
@@ -44,6 +45,7 @@ RUN apk upgrade --no-cache \
     openssh-client \
     gnupg \
     fuse3 \
+    docker-cli \
     curl \
     tini \
     && rm -rf /usr/local/lib/node_modules/npm /usr/local/bin/npm /usr/local/bin/npx \

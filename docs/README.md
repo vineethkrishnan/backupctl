@@ -22,11 +22,13 @@
 | 14 | [Migrations](14-migrations.md) | TypeORM migration commands, patterns, and troubleshooting |
 | 15 | [FAQ](15-faq.md) | Setup issues, Docker networking, ISP port blocking, SSH/GPG/restic fixes |
 | 16 | [Monitoring](16-monitoring.md) | Uptime Kuma push monitors for passive failure detection |
+| 17 | [Network](17-network.md) | Docker network management, Docker socket setup, multi-arch image support |
 
 ## Quick Links
 
 - **First-time production setup** — [Installation](04-installation.md) + [FAQ](15-faq.md)
 - **Development setup** — [Development Guide](13-development.md) (Docker, networking, socat relay, testing)
+- **Docker networking** — [Network](17-network.md) (Docker socket, multi-arch images, connect command)
 - **Configure a project** — [Configuration](05-configuration.md) (YAML format, docker_network, all fields)
 - **Run a backup** — [CLI Reference → `run`](06-cli-reference.md)
 - **Restore from snapshot** — [Restore Guide](09-restore-guide.md)
