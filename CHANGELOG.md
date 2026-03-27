@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.19](https://github.com/vineethkrishnan/backupctl/compare/v0.1.18...v0.1.19) (2026-03-27)
+
+
+### Bug Fixes
+
+* **config:** align DAILY_SUMMARY_CRON default to 0 7 across env, docs, and scripts (BCTL-0) ([#48](https://github.com/vineethkrishnan/backupctl/issues/48)) ([3a2b982](https://github.com/vineethkrishnan/backupctl/commit/3a2b98280a58d9cf0f11a4933dd7bf4dbb6dad77))
+
 ## [0.1.18](https://github.com/vineethkrishnan/backupctl/compare/v0.1.17...v0.1.18) (2026-03-26)
 
 
