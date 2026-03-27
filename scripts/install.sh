@@ -636,7 +636,7 @@ step_notifications() {
   esac
 
   echo ""
-  DAILY_SUMMARY_CRON=$(ask "Daily summary cron schedule" "0 8 * * *")
+  DAILY_SUMMARY_CRON=$(ask "Daily summary cron schedule" "0 7 * * *")
 
   echo ""
   print_success "Notifications configured (${NOTIFICATION_TYPE})"

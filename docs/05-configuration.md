@@ -95,7 +95,7 @@ These are used when a project has no `encryption` block in YAML.
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `DAILY_SUMMARY_CRON` | `0 8 * * *` | Cron expression for the daily backup summary notification |
+| `DAILY_SUMMARY_CRON` | `0 7 * * *` | Cron expression for the daily backup summary notification |
 
 ### Project Secrets
 
