@@ -352,7 +352,7 @@ The backup is still running and has not been killed.
 
 ### Daily Summary
 
-Sent on the schedule defined by `DAILY_SUMMARY_CRON` (default: `0 8 * * *`).
+Sent on the schedule defined by `DAILY_SUMMARY_CRON` (default: `0 7 * * *`).
 
 **Slack/Email text:**
 

@@ -87,7 +87,7 @@ LOG_MAX_FILES=5
 HEALTH_DISK_MIN_FREE_GB=5
 
 # Daily summary cron
-DAILY_SUMMARY_CRON=0 8 * * *
+DAILY_SUMMARY_CRON=0 7 * * *
 ENVEOF
     echo "  Created .env with defaults — edit passwords before deploying!"
   else

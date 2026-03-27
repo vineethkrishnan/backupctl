@@ -158,7 +158,7 @@ Choose a global notification channel and enter channel-specific settings.
 [6/14] Notification defaults
   NOTIFICATION_TYPE (slack|email|webhook|none) [slack]: slack
   SLACK_WEBHOOK_URL: https://hooks.slack.com/services/T.../B.../xxx
-  DAILY_SUMMARY_CRON [0 8 * * *]:
+  DAILY_SUMMARY_CRON [0 7 * * *]:
 ```
 
 For email, the wizard prompts for `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_TO`, `SMTP_FROM`, and `SMTP_PASSWORD`. For webhook, it prompts for `WEBHOOK_URL`.
