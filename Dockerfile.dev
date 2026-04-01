@@ -15,7 +15,7 @@ RUN CGO_ENABLED=0 go build -tags disable_grpc_modules -ldflags "-s -w" -o /resti
 
 # ── Development image ─────────────────────────────────────
 # Full toolchain + hot reload via NestJS watch mode
-FROM node:20-alpine3.22
+FROM node:25-alpine3.22
 
 RUN apk upgrade --no-cache \
     && apk add --no-cache \

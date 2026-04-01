@@ -1,5 +1,5 @@
 # ── Build stage: NestJS ────────────────────────────────────
-FROM node:20-alpine3.22 AS builder
+FROM node:25-alpine3.22 AS builder
 
 WORKDIR /app
 COPY package*.json ./
@@ -24,7 +24,7 @@ RUN go get golang.org/x/crypto@v0.49.0 \
 RUN CGO_ENABLED=0 go build -tags disable_grpc_modules -ldflags "-s -w" -o /restic ./cmd/restic
 
 # ── Production dependencies (clean layer, no npm cache) ───
-FROM node:20-alpine3.22 AS deps
+FROM node:25-alpine3.22 AS deps
 
 RUN npm install -g npm@latest
 WORKDIR /app
@@ -32,7 +32,7 @@ COPY package*.json ./
 RUN npm ci --omit=dev --ignore-scripts && npm cache clean --force
 
 # ── Production stage ──────────────────────────────────────
-FROM node:20-alpine3.22
+FROM node:25-alpine3.22
 
 RUN apk upgrade --no-cache \
     && apk add --no-cache --repository=https://dl-cdn.alpinelinux.org/alpine/edge/main busybox \
