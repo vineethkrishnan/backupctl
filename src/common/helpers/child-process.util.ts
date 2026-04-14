@@ -16,7 +16,7 @@ export async function safeExecFile(
   args: string[],
   options: ExecOptions = {},
 ): Promise<ExecResult> {
-  const { timeout = 300000, env, cwd } = options;
+  const { timeout = 1800000, env, cwd } = options;
 
   return new Promise((resolve, reject) => {
     execFile(

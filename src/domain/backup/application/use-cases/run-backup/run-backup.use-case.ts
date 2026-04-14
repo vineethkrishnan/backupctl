@@ -341,7 +341,9 @@ export class RunBackupUseCase {
         dumpResult = await this.executeRetryableStage<DumpResult>(
           BackupStage.Dump,
           runId,
-          () => dumper.dump(outputDir, config.name, timestamp),
+          () => dumper.dump(outputDir, config.name, timestamp, {
+            timeoutMs: config.timeoutMinutes != null ? config.timeoutMinutes * 60 * 1000 : undefined,
+          }),
           (retries) => { totalRetries += retries; },
         );
 

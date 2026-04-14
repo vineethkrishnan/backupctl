@@ -1,7 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 
-import { DatabaseDumperPort } from '@domain/backup/application/ports/database-dumper.port';
+import { DatabaseDumperPort, DumpOptions } from '@domain/backup/application/ports/database-dumper.port';
 import { DumpResult } from '@domain/backup/domain/value-objects/dump-result.model';
 import { safeExecFile } from '@common/helpers/child-process.util';
 
@@ -16,7 +16,7 @@ export interface MongoConfig {
 export class MongoDumpAdapter implements DatabaseDumperPort {
   constructor(private readonly config: MongoConfig) {}
 
-  async dump(outputDir: string, projectName: string, timestamp: string): Promise<DumpResult> {
+  async dump(outputDir: string, projectName: string, timestamp: string, options?: DumpOptions): Promise<DumpResult> {
     const fileName = `${projectName}_backup_${timestamp}.archive.gz`;
     const filePath = path.join(outputDir, fileName);
     const startTime = Date.now();
@@ -42,7 +42,7 @@ export class MongoDumpAdapter implements DatabaseDumperPort {
         '--gzip',
       ];
 
-      await safeExecFile('mongodump', args);
+      await safeExecFile('mongodump', args, { timeout: options?.timeoutMs });
     } finally {
       try { fs.unlinkSync(configPath); } catch { /* cleanup best-effort */ }
     }
