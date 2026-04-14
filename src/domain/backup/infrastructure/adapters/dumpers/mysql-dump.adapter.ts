@@ -1,7 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 
-import { DatabaseDumperPort } from '@domain/backup/application/ports/database-dumper.port';
+import { DatabaseDumperPort, DumpOptions } from '@domain/backup/application/ports/database-dumper.port';
 import { DumpResult } from '@domain/backup/domain/value-objects/dump-result.model';
 import { safeExecFile } from '@common/helpers/child-process.util';
 
@@ -16,7 +16,7 @@ export interface MysqlConfig {
 export class MysqlDumpAdapter implements DatabaseDumperPort {
   constructor(private readonly config: MysqlConfig) {}
 
-  async dump(outputDir: string, projectName: string, timestamp: string): Promise<DumpResult> {
+  async dump(outputDir: string, projectName: string, timestamp: string, options?: DumpOptions): Promise<DumpResult> {
     const baseName = `${projectName}_backup_${timestamp}.sql`;
     const sqlFilePath = path.join(outputDir, baseName);
     const gzFilePath = `${sqlFilePath}.gz`;
@@ -37,6 +37,7 @@ export class MysqlDumpAdapter implements DatabaseDumperPort {
 
     await safeExecFile('mysqldump', args, {
       env: { MYSQL_PWD: this.config.password },
+      timeout: options?.timeoutMs,
     });
     await safeExecFile('gzip', [sqlFilePath]);
 

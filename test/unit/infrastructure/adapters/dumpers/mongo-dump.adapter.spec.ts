@@ -46,6 +46,7 @@ describe('MongoDumpAdapter', () => {
           '--archive=/backups/myproject_backup_20260318_120000.archive.gz',
           '--gzip',
         ]),
+        expect.objectContaining({}),
       );
     });
 
