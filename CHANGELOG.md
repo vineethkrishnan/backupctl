@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.20](https://github.com/vineethkrishnan/backupctl/compare/v0.1.19...v0.1.20) (2026-04-14)
+
+
+### Bug Fixes
+
+* **backup:** add database connectivity check to dry-run and include stderr in exec errors (BCTL-0) ([#59](https://github.com/vineethkrishnan/backupctl/issues/59)) ([919b303](https://github.com/vineethkrishnan/backupctl/commit/919b303c477a7af8f1a7320cbfd6b0708d0bb705))
+
 ## [0.1.19](https://github.com/vineethkrishnan/backupctl/compare/v0.1.18...v0.1.19) (2026-03-27)
 
 
