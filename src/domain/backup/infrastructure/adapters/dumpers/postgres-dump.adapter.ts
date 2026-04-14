@@ -1,7 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 
-import { DatabaseDumperPort } from '@domain/backup/application/ports/database-dumper.port';
+import { DatabaseDumperPort, DumpOptions } from '@domain/backup/application/ports/database-dumper.port';
 import { DumpResult } from '@domain/backup/domain/value-objects/dump-result.model';
 import { safeExecFile } from '@common/helpers/child-process.util';
 
@@ -16,7 +16,7 @@ export interface PostgresConfig {
 export class PostgresDumpAdapter implements DatabaseDumperPort {
   constructor(private readonly config: PostgresConfig) {}
 
-  async dump(outputDir: string, projectName: string, timestamp: string): Promise<DumpResult> {
+  async dump(outputDir: string, projectName: string, timestamp: string, options?: DumpOptions): Promise<DumpResult> {
     const fileName = `${projectName}_backup_${timestamp}.dump`;
     const filePath = path.join(outputDir, fileName);
     const startTime = Date.now();
@@ -34,6 +34,7 @@ export class PostgresDumpAdapter implements DatabaseDumperPort {
 
     await safeExecFile('pg_dump', args, {
       env: { PGPASSWORD: this.config.password },
+      timeout: options?.timeoutMs,
     });
 
     const stats = fs.statSync(filePath);
