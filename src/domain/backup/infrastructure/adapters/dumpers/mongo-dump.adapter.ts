@@ -65,4 +65,18 @@ export class MongoDumpAdapter implements DatabaseDumperPort {
       return false;
     }
   }
+
+  async testConnection(): Promise<void> {
+    await safeExecFile('mongosh', [
+      '--host', this.config.host,
+      '--port', String(this.config.port),
+      '--username', this.config.user,
+      '--password', this.config.password,
+      '--authenticationDatabase', 'admin',
+      this.config.name,
+      '--eval', 'db.runCommand({ ping: 1 })',
+    ], {
+      timeout: 10000,
+    });
+  }
 }

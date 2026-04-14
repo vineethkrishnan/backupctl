@@ -237,6 +237,7 @@ describe('RunBackupUseCase (integration flow)', () => {
     mockDumper = {
       dump: jest.fn().mockResolvedValue(new DumpResult('/data/backups/vinsware/dump.sql.gz', 1024000, 5000)),
       verify: jest.fn().mockResolvedValue(true),
+      testConnection: jest.fn().mockResolvedValue(undefined),
     };
 
     mockStorage = {

@@ -23,7 +23,7 @@ function buildConfig(): ProjectConfig {
 }
 
 function createMockDumper(): DatabaseDumperPort {
-  return { dump: jest.fn(), verify: jest.fn() };
+  return { dump: jest.fn(), verify: jest.fn(), testConnection: jest.fn() };
 }
 
 describe('DumperRegistry', () => {

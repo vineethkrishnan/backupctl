@@ -62,6 +62,7 @@ function createMockDumper(): jest.Mocked<DatabaseDumperPort> {
   return {
     dump: jest.fn(),
     verify: jest.fn(),
+    testConnection: jest.fn(),
   };
 }
 
@@ -256,6 +257,7 @@ describe('RunBackupUseCase', () => {
     mockAuditLog.startRun.mockResolvedValue('run-001');
     mockDumper.dump.mockResolvedValue(defaultDumpResult);
     mockDumper.verify.mockResolvedValue(true);
+    mockDumper.testConnection.mockResolvedValue(undefined);
     mockStorage.sync.mockResolvedValue(defaultSyncResult);
     mockStorage.prune.mockResolvedValue(defaultPruneResult);
     mockStorage.restore.mockResolvedValue(undefined);
@@ -398,7 +400,7 @@ describe('RunBackupUseCase', () => {
       expect(report.projectName).toBe('test-project');
       const configCheck = report.checks.find((c) => c.name === 'Config loaded');
       expect(configCheck?.passed).toBe(true);
-      const dumperCheck = report.checks.find((c) => c.name === 'Database dumper');
+      const dumperCheck = report.checks.find((c) => c.name === 'Database connection');
       expect(dumperCheck?.passed).toBe(true);
       const notifierCheck = report.checks.find((c) => c.name === 'Notifier');
       expect(notifierCheck?.passed).toBe(true);
@@ -791,7 +793,7 @@ describe('RunBackupUseCase', () => {
 
       const report = await service.getDryRunReport('test-project');
 
-      const dumperCheck = report.checks.find((c) => c.name === 'Database dumper');
+      const dumperCheck = report.checks.find((c) => c.name === 'Database connection');
       expect(dumperCheck).toBeUndefined();
       expect(report.allPassed).toBe(true);
     });
