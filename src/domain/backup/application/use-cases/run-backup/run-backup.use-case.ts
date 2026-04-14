@@ -342,7 +342,7 @@ export class RunBackupUseCase {
           BackupStage.Dump,
           runId,
           () => dumper.dump(outputDir, config.name, timestamp, {
-            timeoutMs: config.hasTimeout() ? config.timeoutMinutes! * 60 * 1000 : undefined,
+            timeoutMs: config.timeoutMinutes != null ? config.timeoutMinutes * 60 * 1000 : undefined,
           }),
           (retries) => { totalRetries += retries; },
         );
