@@ -197,10 +197,16 @@ export class RunBackupUseCase {
 
     if (config.hasDatabase() && config.database) {
       const dbType = config.database.type;
-      if (this.dumperRegistry.has(dbType)) {
-        checks.push({ name: 'Database dumper', passed: true, message: `Adapter found for database type: ${dbType}` });
-      } else {
+      if (!this.dumperRegistry.has(dbType)) {
         checks.push({ name: 'Database dumper', passed: false, message: `No database dumper registered for type: ${dbType}` });
+      } else {
+        try {
+          const dumper = this.dumperRegistry.create(dbType, config);
+          await dumper.testConnection();
+          checks.push({ name: 'Database connection', passed: true, message: `Connected to ${dbType} database "${config.database.name}" on ${config.database.host}:${config.database.port}` });
+        } catch (error) {
+          checks.push({ name: 'Database connection', passed: false, message: `Failed to connect to ${dbType} database: ${(error as Error).message}` });
+        }
       }
     }
 

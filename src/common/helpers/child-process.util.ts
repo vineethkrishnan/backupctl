@@ -30,8 +30,8 @@ export async function safeExecFile(
       },
       (error, stdout, stderr) => {
         if (error) {
-          const message = error.message;
-          reject(new Error(`Command "${command}" failed: ${message}`));
+          const detail = stderr?.trim() || error.message;
+          reject(new Error(`Command "${command}" failed: ${detail}`));
           return;
         }
         resolve({ stdout: stdout ?? '', stderr: stderr ?? '' });

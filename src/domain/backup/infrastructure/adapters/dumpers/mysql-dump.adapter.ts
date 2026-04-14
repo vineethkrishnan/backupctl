@@ -54,4 +54,16 @@ export class MysqlDumpAdapter implements DatabaseDumperPort {
       return false;
     }
   }
+
+  async testConnection(): Promise<void> {
+    await safeExecFile('mysqladmin', [
+      '--host', this.config.host,
+      '--port', String(this.config.port),
+      '--user', this.config.user,
+      'ping',
+    ], {
+      env: { MYSQL_PWD: this.config.password },
+      timeout: 10000,
+    });
+  }
 }
