@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.21](https://github.com/vineethkrishnan/backupctl/compare/v0.1.20...v0.1.21) (2026-04-14)
+
+
+### Bug Fixes
+
+* **backup:** increase default exec timeout and thread config timeout to dump commands ([#61](https://github.com/vineethkrishnan/backupctl/issues/61)) ([e867959](https://github.com/vineethkrishnan/backupctl/commit/e867959b3e2d933a3d83b8c19142ac3efb0cfc73))
+* **ci:** enable signed commits for release-please (BCTL-0) ([#63](https://github.com/vineethkrishnan/backupctl/issues/63)) ([a636e74](https://github.com/vineethkrishnan/backupctl/commit/a636e74bd157793920d63b2f6a6b5f2a4e3bc223))
+
+
+### CI/CD
+
+* **deps:** bump the actions group with 11 updates ([#54](https://github.com/vineethkrishnan/backupctl/issues/54)) ([f0e33e3](https://github.com/vineethkrishnan/backupctl/commit/f0e33e387aea4c64d618c3a7ac2bd298eb9cf40c))
+
 ## [0.1.20](https://github.com/vineethkrishnan/backupctl/compare/v0.1.19...v0.1.20) (2026-04-14)
 
 
