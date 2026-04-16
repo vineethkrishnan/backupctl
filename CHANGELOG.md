@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.22](https://github.com/vineethkrishnan/backupctl/compare/v0.1.21...v0.1.22) (2026-04-16)
+
+
+### Features
+
+* **backup:** add --verify-dump flag and per-project dump_timeout_minutes ([#64](https://github.com/vineethkrishnan/backupctl/issues/64)) ([25c7a7e](https://github.com/vineethkrishnan/backupctl/commit/25c7a7e2c3d9d001c5c48505ed8c809e5d976de4))
+
 ## [0.1.21](https://github.com/vineethkrishnan/backupctl/compare/v0.1.20...v0.1.21) (2026-04-14)
 
 
