@@ -67,6 +67,7 @@ function buildTestConfig(overrides: Partial<ProjectConfig> = {}): ProjectConfig 
       name: 'vinsware_prod',
       user: 'vinsware_user',
       password: 'test-pass',
+      dumpTimeoutMinutes: null,
     },
     compression: { enabled: true },
     assets: { paths: [] },

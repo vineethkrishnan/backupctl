@@ -10,7 +10,7 @@ function buildConfig(overrides: Partial<ProjectConfigParams> = {}): ProjectConfi
     enabled: true,
     cron: '0 2 * * *',
     timeoutMinutes: null,
-    database: { type: 'postgres', host: 'db.example.com', port: 5432, name: 'mydb', user: 'admin', password: 'secret' },
+    database: { type: 'postgres', host: 'db.example.com', port: 5432, name: 'mydb', user: 'admin', password: 'secret', dumpTimeoutMinutes: null },
     compression: { enabled: true },
     assets: { paths: [] },
     restic: { repositoryPath: '/repo', password: 'pass', snapshotMode: 'combined' },
@@ -160,7 +160,7 @@ describe('GetRestoreGuideUseCase', () => {
     it('uses .sql.gz extension in decrypt step for mysql (encryption wraps compressed file)', () => {
       configLoader.getProject.mockReturnValue(buildConfig({
         ...encryptedConfig,
-        database: { type: 'mysql', host: 'db', port: 3306, name: 'app', user: 'root', password: 'secret' },
+        database: { type: 'mysql', host: 'db', port: 3306, name: 'app', user: 'root', password: 'secret', dumpTimeoutMinutes: null },
       }));
 
       const guide = useCase.execute(new GetRestoreGuideQuery({ projectName: 'test-project' }));
@@ -171,7 +171,7 @@ describe('GetRestoreGuideUseCase', () => {
     it('uses .archive.gz extension in decrypt step for mongodb', () => {
       configLoader.getProject.mockReturnValue(buildConfig({
         ...encryptedConfig,
-        database: { type: 'mongodb', host: 'db', port: 27017, name: 'app', user: 'root', password: 'secret' },
+        database: { type: 'mongodb', host: 'db', port: 27017, name: 'app', user: 'root', password: 'secret', dumpTimeoutMinutes: null },
       }));
 
       const guide = useCase.execute(new GetRestoreGuideQuery({ projectName: 'test-project' }));
@@ -181,7 +181,7 @@ describe('GetRestoreGuideUseCase', () => {
   });
 
   describe('mysql guide', () => {
-    const mysqlConfig = { database: { type: 'mysql', host: 'db', port: 3306, name: 'app', user: 'root', password: 'secret' } };
+    const mysqlConfig = { database: { type: 'mysql', host: 'db', port: 3306, name: 'app', user: 'root', password: 'secret', dumpTimeoutMinutes: null } };
 
     it('returns mysql restore command with .sql extension', () => {
       configLoader.getProject.mockReturnValue(buildConfig(mysqlConfig));
@@ -228,7 +228,7 @@ describe('GetRestoreGuideUseCase', () => {
 
   describe('mongodb guide', () => {
     it('returns mongorestore command with --gzip --archive flag', () => {
-      configLoader.getProject.mockReturnValue(buildConfig({ database: { type: 'mongodb', host: 'db', port: 27017, name: 'app', user: 'root', password: 'secret' } }));
+      configLoader.getProject.mockReturnValue(buildConfig({ database: { type: 'mongodb', host: 'db', port: 27017, name: 'app', user: 'root', password: 'secret', dumpTimeoutMinutes: null } }));
 
       const guide = useCase.execute(new GetRestoreGuideQuery({ projectName: 'test-project' }));
 
@@ -239,7 +239,7 @@ describe('GetRestoreGuideUseCase', () => {
 
   describe('edge cases', () => {
     it('returns fallback message for unsupported database type', () => {
-      configLoader.getProject.mockReturnValue(buildConfig({ database: { type: 'redis', host: 'db', port: 6379, name: 'cache', user: 'u', password: 'p' } }));
+      configLoader.getProject.mockReturnValue(buildConfig({ database: { type: 'redis', host: 'db', port: 6379, name: 'cache', user: 'u', password: 'p', dumpTimeoutMinutes: null } }));
 
       const guide = useCase.execute(new GetRestoreGuideQuery({ projectName: 'test-project' }));
 
@@ -247,7 +247,7 @@ describe('GetRestoreGuideUseCase', () => {
     });
 
     it('is case-insensitive on database type', () => {
-      configLoader.getProject.mockReturnValue(buildConfig({ database: { type: 'POSTGRES', host: 'db', port: 5432, name: 'mydb', user: 'u', password: 'p' } }));
+      configLoader.getProject.mockReturnValue(buildConfig({ database: { type: 'POSTGRES', host: 'db', port: 5432, name: 'mydb', user: 'u', password: 'p', dumpTimeoutMinutes: null } }));
 
       const guide = useCase.execute(new GetRestoreGuideQuery({ projectName: 'test-project' }));
 

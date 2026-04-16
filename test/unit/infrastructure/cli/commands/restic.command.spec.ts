@@ -18,6 +18,7 @@ function buildProjectConfig(): ProjectConfig {
       name: 'testdb',
       user: 'admin',
       password: 'secret',
+      dumpTimeoutMinutes: null,
     },
     compression: { enabled: true },
     assets: { paths: [] },

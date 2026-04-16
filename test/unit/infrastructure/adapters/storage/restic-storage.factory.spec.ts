@@ -33,7 +33,7 @@ describe('ResticStorageFactory', () => {
       enabled: true,
       cron: '0 2 * * *',
       timeoutMinutes: null,
-      database: { type: 'postgres', host: 'db', port: 5432, name: 'testdb', user: 'u', password: 'p' },
+      database: { type: 'postgres', host: 'db', port: 5432, name: 'testdb', user: 'u', password: 'p', dumpTimeoutMinutes: null },
       compression: { enabled: true },
       assets: { paths: [] },
       restic: {

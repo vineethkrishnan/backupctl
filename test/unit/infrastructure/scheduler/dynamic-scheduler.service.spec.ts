@@ -27,6 +27,7 @@ function createProjectConfig(overrides: Partial<{ name: string; cron: string; en
       name: 'testdb',
       user: 'testuser',
       password: 'testpass',
+      dumpTimeoutMinutes: null,
     },
     compression: { enabled: true },
     assets: { paths: [] },

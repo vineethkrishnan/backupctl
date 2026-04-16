@@ -20,6 +20,7 @@ interface RawProjectEntry {
     name: string;
     user: string;
     password: string;
+    dump_timeout_minutes?: number;
   };
   compression?: { enabled?: boolean };
   assets?: { paths?: string[] };
@@ -296,6 +297,7 @@ export class YamlConfigLoaderAdapter implements ConfigLoaderPort {
             name: resolved.database.name,
             user: resolved.database.user,
             password: resolved.database.password,
+            dumpTimeoutMinutes: resolved.database.dump_timeout_minutes ?? null,
           }
         : null,
       compression: { enabled: resolved.compression?.enabled ?? true },

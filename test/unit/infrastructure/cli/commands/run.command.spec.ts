@@ -118,7 +118,7 @@ describe('RunCommand', () => {
 
     await command.run(['test'], { dryRun: true });
 
-    expect(runBackup.getDryRunReport).toHaveBeenCalledWith('test');
+    expect(runBackup.getDryRunReport).toHaveBeenCalledWith('test', { verifyDump: undefined });
     expect(runBackup.execute).not.toHaveBeenCalled();
   });
 

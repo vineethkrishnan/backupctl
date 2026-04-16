@@ -18,7 +18,7 @@ describe('DumperBootstrapService', () => {
       enabled: true,
       cron: '0 2 * * *',
       timeoutMinutes: null,
-      database: { type: dbType, host: 'db', port: 5432, name: 'testdb', user: 'admin', password: 'secret' },
+      database: { type: dbType, host: 'db', port: 5432, name: 'testdb', user: 'admin', password: 'secret', dumpTimeoutMinutes: null },
       compression: { enabled: true },
       assets: { paths: [] },
       restic: { repositoryPath: '/repo', password: 'pass', snapshotMode: 'combined' },

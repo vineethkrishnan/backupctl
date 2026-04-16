@@ -36,7 +36,7 @@ describe('RecoverStartupUseCase', () => {
       enabled,
       cron: '0 2 * * *',
       timeoutMinutes: null,
-      database: { type: 'postgres', host: 'localhost', port: 5432, name: 'db', user: 'u', password: 'p' },
+      database: { type: 'postgres', host: 'localhost', port: 5432, name: 'db', user: 'u', password: 'p', dumpTimeoutMinutes: null },
       compression: { enabled: true },
       assets: { paths: [] },
       restic: { repositoryPath: '/repo', password: 'secret', snapshotMode: 'combined' },
