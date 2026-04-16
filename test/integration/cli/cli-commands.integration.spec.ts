@@ -178,7 +178,7 @@ describe('CLI commands (integration)', () => {
 
       await CommandTestFactory.run(commandModule, ['run', 'vinsware', '--dry-run']);
 
-      expect(mockOrchestrator.getDryRunReport).toHaveBeenCalledWith('vinsware');
+      expect(mockOrchestrator.getDryRunReport).toHaveBeenCalledWith('vinsware', { verifyDump: undefined });
       expect(mockOrchestrator.execute).not.toHaveBeenCalled();
     });
   });

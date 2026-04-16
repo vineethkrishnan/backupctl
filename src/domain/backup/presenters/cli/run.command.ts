@@ -8,6 +8,7 @@ import { formatBytes, formatDuration } from '@common/helpers/format.util';
 interface RunOptions {
   all?: boolean;
   dryRun?: boolean;
+  verifyDump?: boolean;
 }
 
 @Command({
@@ -26,6 +27,9 @@ export class RunCommand extends CommandRunner {
   @Option({ flags: '--dry-run', description: 'Simulate backup without executing' })
   parseDryRun(): boolean { return true; }
 
+  @Option({ flags: '--verify-dump', description: 'Test database dump during dry-run (creates and removes a real dump)' })
+  parseVerifyDump(): boolean { return true; }
+
   async run(params: string[], options?: RunOptions): Promise<void> {
     try {
       if (options?.all) { await this.runAll(); return; }
@@ -33,17 +37,23 @@ export class RunCommand extends CommandRunner {
       const projectName = params[0];
       if (!projectName) { console.error('Error: project name is required (or use --all)'); process.exitCode = 1; return; }
 
-      if (options?.dryRun) { await this.runDryRun(projectName); return; }
+      if (options?.verifyDump && !options?.dryRun) {
+        console.error('Error: --verify-dump can only be used with --dry-run');
+        process.exitCode = 1;
+        return;
+      }
+
+      if (options?.dryRun) { await this.runDryRun(projectName, options?.verifyDump); return; }
 
       await this.runSingle(projectName);
     } catch (error) { this.handleError(error); }
   }
 
-  private async runDryRun(projectName: string): Promise<void> {
+  private async runDryRun(projectName: string, verifyDump?: boolean): Promise<void> {
     console.log(`\n=== Dry Run: ${projectName} ===\n`);
     console.log('Validating config and connectivity without executing backup.\n');
 
-    const report = await this.runBackup.getDryRunReport(projectName);
+    const report = await this.runBackup.getDryRunReport(projectName, { verifyDump });
 
     for (const check of report.checks) {
       const icon = check.passed ? '✅' : '❌';

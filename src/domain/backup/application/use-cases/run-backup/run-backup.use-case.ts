@@ -1,5 +1,7 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import * as fs from 'fs';
+import * as os from 'os';
 import * as path from 'path';
 import { randomUUID } from 'crypto';
 
@@ -28,7 +30,7 @@ import { SyncResult } from '@domain/backup/domain/value-objects/sync-result.mode
 import { evaluateRetry } from '@domain/backup/domain/policies/retry.policy';
 import { DumperRegistry } from '@domain/backup/application/registries/dumper.registry';
 import { NotifierRegistry } from '@domain/notification/application/registries/notifier.registry';
-import { formatDuration } from '@common/helpers/format.util';
+import { formatBytes, formatDuration } from '@common/helpers/format.util';
 
 import {
   CONFIG_LOADER_PORT,
@@ -53,6 +55,10 @@ export interface DryRunCheck {
   readonly name: string;
   readonly passed: boolean;
   readonly message: string;
+}
+
+export interface DryRunOptions {
+  readonly verifyDump?: boolean;
 }
 
 export interface DryRunReport {
@@ -152,8 +158,8 @@ export class RunBackupUseCase {
     }
   }
 
-  async getDryRunReport(projectName: string): Promise<DryRunReport> {
-    return this.executeDryRun(projectName);
+  async getDryRunReport(projectName: string, options?: DryRunOptions): Promise<DryRunReport> {
+    return this.executeDryRun(projectName, options);
   }
 
   private async runAllBackups(): Promise<BackupResult[]> {
@@ -183,7 +189,7 @@ export class RunBackupUseCase {
     return results;
   }
 
-  private async executeDryRun(projectName: string): Promise<DryRunReport> {
+  private async executeDryRun(projectName: string, options?: DryRunOptions): Promise<DryRunReport> {
     const checks: DryRunCheck[] = [];
 
     let config: ProjectConfig;
@@ -200,12 +206,44 @@ export class RunBackupUseCase {
       if (!this.dumperRegistry.has(dbType)) {
         checks.push({ name: 'Database dumper', passed: false, message: `No database dumper registered for type: ${dbType}` });
       } else {
+        const dumper = this.dumperRegistry.create(dbType, config);
+
         try {
-          const dumper = this.dumperRegistry.create(dbType, config);
           await dumper.testConnection();
           checks.push({ name: 'Database connection', passed: true, message: `Connected to ${dbType} database "${config.database.name}" on ${config.database.host}:${config.database.port}` });
         } catch (error) {
           checks.push({ name: 'Database connection', passed: false, message: `Failed to connect to ${dbType} database: ${(error as Error).message}` });
+        }
+
+        // Verify dump creates a real dump to a temp directory and cleans up
+        if (options?.verifyDump) {
+          const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'backupctl-verify-'));
+          const timestamp = this.clock.now().toISOString().replace(/[-:T]/g, '').slice(0, 14);
+          try {
+            const dumpResult = await dumper.dump(tmpDir, projectName, timestamp);
+            const verified = await dumper.verify(dumpResult.filePath);
+            if (verified) {
+              checks.push({
+                name: 'Dump verification',
+                passed: true,
+                message: `Dump completed in ${formatDuration(dumpResult.durationMs)}, size: ${formatBytes(dumpResult.sizeBytes)}, integrity verified`,
+              });
+            } else {
+              checks.push({
+                name: 'Dump verification',
+                passed: false,
+                message: `Dump completed (${formatDuration(dumpResult.durationMs)}) but integrity check failed`,
+              });
+            }
+          } catch (error) {
+            checks.push({
+              name: 'Dump verification',
+              passed: false,
+              message: `Dump failed: ${(error as Error).message}`,
+            });
+          } finally {
+            fs.rmSync(tmpDir, { recursive: true, force: true });
+          }
         }
       }
     }
