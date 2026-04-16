@@ -14,6 +14,7 @@ function buildParams(overrides: Partial<ProjectConfigParams> = {}): ProjectConfi
       name: 'testdb',
       user: 'admin',
       password: 'secret',
+      dumpTimeoutMinutes: null,
     },
     compression: { enabled: true },
     assets: { paths: [] },

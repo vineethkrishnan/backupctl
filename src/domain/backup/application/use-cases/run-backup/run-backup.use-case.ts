@@ -376,11 +376,14 @@ export class RunBackupUseCase {
       if (config.hasDatabase() && config.database) {
         const dumper = this.dumperRegistry.create(config.database.type, config);
 
+        // Resolve dump timeout: database-level > project-level > safeExecFile default
+        const dumpTimeoutMinutes = config.database.dumpTimeoutMinutes ?? config.timeoutMinutes;
+
         dumpResult = await this.executeRetryableStage<DumpResult>(
           BackupStage.Dump,
           runId,
           () => dumper.dump(outputDir, config.name, timestamp, {
-            timeoutMs: config.timeoutMinutes != null ? config.timeoutMinutes * 60 * 1000 : undefined,
+            timeoutMs: dumpTimeoutMinutes != null ? dumpTimeoutMinutes * 60 * 1000 : undefined,
           }),
           (retries) => { totalRetries += retries; },
         );

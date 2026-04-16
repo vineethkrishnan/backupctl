@@ -184,6 +184,7 @@ function buildProjectConfig(overrides: Partial<ConstructorParameters<typeof Proj
       name: 'testdb',
       user: 'admin',
       password: 'secret',
+      dumpTimeoutMinutes: null,
     },
     compression: { enabled: true },
     assets: { paths: [] },
@@ -420,7 +421,7 @@ describe('RunBackupUseCase', () => {
 
     it('dry run reports failure for unknown database type', async () => {
       const config = buildProjectConfig({
-        database: { type: 'redis', host: 'localhost', port: 6379, name: 'db', user: 'u', password: 'p' },
+        database: { type: 'redis', host: 'localhost', port: 6379, name: 'db', user: 'u', password: 'p', dumpTimeoutMinutes: null },
       });
       mockConfigLoader.getProject.mockReturnValue(config);
 

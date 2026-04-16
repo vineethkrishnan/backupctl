@@ -13,6 +13,7 @@ export interface ProjectConfigParams {
     readonly name: string;
     readonly user: string;
     readonly password: string;
+    readonly dumpTimeoutMinutes: number | null;
   } | null;
   readonly compression: { readonly enabled: boolean };
   readonly assets: { readonly paths: readonly string[] };
@@ -42,6 +43,7 @@ export class ProjectConfig {
     readonly name: string;
     readonly user: string;
     readonly password: string;
+    readonly dumpTimeoutMinutes: number | null;
   } | null;
   readonly compression: { readonly enabled: boolean };
   readonly assets: { readonly paths: readonly string[] };
