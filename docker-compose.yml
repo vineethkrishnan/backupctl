@@ -30,6 +30,24 @@ services:
           memory: 2G
           cpus: '2'
 
+  migrator:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: migrator
+    image: backupctl-migrator
+    env_file: .env
+    environment:
+      AUDIT_DB_HOST: backupctl-audit-db
+    networks:
+      - backupctl-network
+    depends_on:
+      backupctl-audit-db:
+        condition: service_healthy
+    profiles:
+      - migrate
+    restart: 'no'
+
   backupctl-audit-db:
     container_name: backupctl-audit-db
     image: postgres:16-alpine

@@ -366,12 +366,15 @@ scripts/backupctl-manage.sh check            # validate prerequisites
 docker exec backupctl node dist/cli.js health
 docker exec backupctl node dist/cli.js run vinsware --dry-run
 
-# Migrations
+# Migrations — dev (manual via scripts/dev.sh)
 scripts/dev.sh migrate:run                    # run pending
 scripts/dev.sh migrate:show                   # check status
 scripts/dev.sh migrate:generate <Name>        # from entity diff
 scripts/dev.sh migrate:create <Name>          # empty migration
 scripts/dev.sh migrate:revert                 # undo last
+
+# Migrations — production (run automatically by deploy/upgrade, or manually via:)
+docker compose --profile migrate run --rm --build migrator
 ```
 
 ## Testing

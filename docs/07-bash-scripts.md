@@ -262,7 +262,7 @@ All prerequisites met.
 
 #### deploy
 
-Build and start containers. Equivalent to running `scripts/deploy.sh`.
+Build and start containers, then run any pending database migrations via the dedicated `migrator` service (see [Migration Guide](14-migrations.md#production-migrations)). Equivalent to running `scripts/deploy.sh`.
 
 ```
 $ ./scripts/backupctl-manage.sh deploy
@@ -290,7 +290,7 @@ Deploy complete (rebuilt).
 
 #### upgrade
 
-Pull the latest code, rebuild the image, restart, and clear the upgrade check cache. This is the recommended way to apply updates from the repository.
+Pull the latest code, rebuild the image, run database migrations (via the dedicated `migrator` service — see [Migration Guide](14-migrations.md#production-migrations)), restart, and clear the upgrade check cache. This is the recommended way to apply updates from the repository.
 
 ```
 $ ./scripts/backupctl-manage.sh upgrade

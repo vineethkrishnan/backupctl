@@ -316,8 +316,8 @@ cmd_deploy() {
   echo "[3/5] Waiting for services to start..."
   sleep 5
 
-  echo "[4/5] Running database migrations..."
-  if ! docker exec backupctl npx typeorm migration:run -d dist/db/datasource.js; then
+  echo "[4/5] Running database migrations (migrator service)..."
+  if ! docker compose -f "$COMPOSE_FILE" --profile migrate run --rm --build migrator; then
     echo "ERROR: Database migrations failed. Rolling back..."
     docker compose -f "$COMPOSE_FILE" down
     echo "Fix the migration and re-run: $0 deploy"
@@ -348,8 +348,8 @@ cmd_upgrade() {
   echo "[4/7] Waiting for services to start..."
   sleep 5
 
-  echo "[5/7] Running database migrations..."
-  if ! docker exec backupctl npx typeorm migration:run -d dist/db/datasource.js; then
+  echo "[5/7] Running database migrations (migrator service)..."
+  if ! docker compose -f "$COMPOSE_FILE" --profile migrate run --rm --build migrator; then
     echo "ERROR: Database migrations failed. Check logs with: $0 logs"
     echo "The previous container version may still be running. Fix the migration and re-run: $0 upgrade"
     exit 1

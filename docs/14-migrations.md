@@ -100,6 +100,40 @@ npx ts-node -r tsconfig-paths/register \
 
 ---
 
+## Production Migrations
+
+Production migrations are **not** run manually. They are executed automatically by `scripts/backupctl-manage.sh deploy` and `scripts/backupctl-manage.sh upgrade` via a dedicated **migrator service**.
+
+### Why a Dedicated Migrator Service
+
+The production runtime image (the `backupctl` container) strips `npm` and `npx` to keep it lean. That means `docker exec backupctl npx typeorm ...` cannot work on prod. Instead, the migrator runs in a short-lived, purpose-built container that keeps `npm`/`npx` available.
+
+### How It Works
+
+- `docker-compose.yml` defines a `migrator` service under the `migrate` profile (so `docker compose up` never starts it automatically).
+- The service builds from the `migrator` target in `Dockerfile`, which copies `node_modules/` from the `deps` stage and `dist/` from the `builder` stage, then runs `npx typeorm migration:run -d dist/db/datasource.js`.
+- The deploy and upgrade scripts invoke it with `docker compose --profile migrate run --rm --build migrator`. The container exits after migrations complete.
+
+### Run Migrations Manually on Production
+
+If you ever need to run migrations outside of `deploy` / `upgrade` (for example, after editing a migration file):
+
+```bash
+cd /path/to/backupctl
+docker compose --profile migrate run --rm --build migrator
+```
+
+To inspect status without applying:
+
+```bash
+docker compose --profile migrate run --rm --build --entrypoint sh migrator \
+  -c "npx typeorm migration:show -d dist/db/datasource.js"
+```
+
+> The migrator service depends on `backupctl-audit-db` being healthy. If the audit DB is stopped, start it first with `docker compose up -d backupctl-audit-db`.
+
+---
+
 ## Writing a Migration
 
 ### Naming Convention

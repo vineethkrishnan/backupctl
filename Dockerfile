@@ -31,6 +31,18 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm ci --omit=dev --ignore-scripts && npm cache clean --force
 
+# ── Migrator stage: runs TypeORM migrations against audit DB ──
+# Keeps npm/npx available (unlike the stripped runtime stage below)
+# so the upgrade/deploy scripts can run migrations without exec'ing
+# into the long-running backupctl container.
+FROM node:20-alpine3.22 AS migrator
+
+WORKDIR /app
+ENV NODE_ENV=production
+COPY --from=deps /app/node_modules ./node_modules/
+COPY --from=builder /app/dist ./dist/
+CMD ["npx", "typeorm", "migration:run", "-d", "dist/db/datasource.js"]
+
 # ── Production stage ──────────────────────────────────────
 FROM node:20-alpine3.22
 

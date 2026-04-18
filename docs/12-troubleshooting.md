@@ -129,10 +129,10 @@ docker compose up -d backupctl-audit-db
 
 2. **Connection credentials wrong** — verify `AUDIT_DB_HOST`, `AUDIT_DB_PORT`, `AUDIT_DB_USER`, `AUDIT_DB_PASSWORD`, and `AUDIT_DB_NAME` in `.env` match the audit DB container configuration.
 
-3. **Database not initialized** — run migrations:
+3. **Database not initialized** — run migrations via the migrator service:
 
 ```bash
-docker exec backupctl npx typeorm migration:run -d dist/db/datasource.js
+docker compose --profile migrate run --rm --build migrator
 ```
 
 **Important:** Backups still succeed when the audit database is down. Audit entries are written to the JSONL fallback file at `/data/backups/.fallback-audit/fallback.jsonl` and automatically replayed when the audit database comes back online (on the next container startup).
@@ -478,11 +478,13 @@ QueryFailedError: relation "backup_log" does not exist
 
 **Fix:**
 
-Migrations run automatically on container startup via the entrypoint script. If they didn't run (check container logs for the migration output), run them manually:
+Migrations run automatically during `backupctl-manage.sh deploy` / `upgrade` via a dedicated `migrator` service. If they didn't run, execute them manually:
 
 ```bash
-docker exec backupctl npx typeorm migration:run -d dist/db/datasource.js
+docker compose --profile migrate run --rm --build migrator
 ```
+
+> The `backupctl` runtime image intentionally strips `npm`/`npx`, so `docker exec backupctl npx typeorm ...` will not work on production. Always use the `migrator` service.
 
 You should see:
 

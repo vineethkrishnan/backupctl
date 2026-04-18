@@ -628,7 +628,7 @@ git pull origin main
 npm ci
 npm run build
 docker compose up -d --build
-docker exec backupctl npx typeorm migration:run -d dist/db/datasource.js
+docker compose --profile migrate run --rm --build migrator
 docker exec backupctl node dist/cli.js health
 ```
 
