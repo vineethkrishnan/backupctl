@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.23](https://github.com/vineethkrishnan/backupctl/compare/v0.1.22...v0.1.23) (2026-04-18)
+
+
+### Bug Fixes
+
+* **ci:** run production migrations via dedicated migrator service (BCTL-0) ([#66](https://github.com/vineethkrishnan/backupctl/issues/66)) ([98317fe](https://github.com/vineethkrishnan/backupctl/commit/98317fe3aa82b6e2c184fc7da9a6a985a914c90c))
+* **snapshots:** return newest N for --last instead of oldest (BCTL-0) ([#68](https://github.com/vineethkrishnan/backupctl/issues/68)) ([329044e](https://github.com/vineethkrishnan/backupctl/commit/329044eb27080f35b1a8bf80f869f1419fb3e5df))
+
 ## [0.1.22](https://github.com/vineethkrishnan/backupctl/compare/v0.1.21...v0.1.22) (2026-04-16)
 
 
