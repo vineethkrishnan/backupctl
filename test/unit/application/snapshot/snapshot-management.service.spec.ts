@@ -76,19 +76,20 @@ describe('ListSnapshotsUseCase', () => {
     expect(result).toEqual(snapshots);
   });
 
-  it('applies limit when specified', async () => {
+  it('returns the newest N snapshots when limit is specified', async () => {
+    // Restic lists snapshots oldest → newest
     const snapshots = [
-      createSnapshot('snap-1', '2026-03-18T02:00:00Z'),
-      createSnapshot('snap-2', '2026-03-17T02:00:00Z'),
-      createSnapshot('snap-3', '2026-03-16T02:00:00Z'),
+      createSnapshot('snap-oldest', '2026-03-16T02:00:00Z'),
+      createSnapshot('snap-middle', '2026-03-17T02:00:00Z'),
+      createSnapshot('snap-newest', '2026-03-18T02:00:00Z'),
     ];
     mockStorage.listSnapshots.mockResolvedValue(snapshots);
 
     const result = await service.execute(new ListSnapshotsQuery({ projectName: 'test-project', limit: 2 }));
 
     expect(result).toHaveLength(2);
-    expect(result[0].id).toBe('snap-1');
-    expect(result[1].id).toBe('snap-2');
+    expect(result[0].id).toBe('snap-middle');
+    expect(result[1].id).toBe('snap-newest');
   });
 
   it('returns all snapshots when limit is not specified', async () => {

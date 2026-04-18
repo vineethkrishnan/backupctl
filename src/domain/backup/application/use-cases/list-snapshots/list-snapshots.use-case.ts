@@ -18,7 +18,8 @@ export class ListSnapshotsUseCase {
     const snapshots = await storage.listSnapshots();
 
     if (query.limit !== undefined) {
-      return snapshots.slice(0, query.limit);
+      // Restic returns snapshots oldest → newest; --last N should return the newest N
+      return snapshots.slice(-query.limit);
     }
 
     return snapshots;
