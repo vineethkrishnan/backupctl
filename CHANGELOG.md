@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.24](https://github.com/vineethkrishnan/backupctl/compare/v0.1.23...v0.1.24) (2026-04-19)
+
+
+### Documentation
+
+* add help center with runbooks for recurring production issues (BCTL-0) ([#69](https://github.com/vineethkrishnan/backupctl/issues/69)) ([8216ade](https://github.com/vineethkrishnan/backupctl/commit/8216adecb887ce7d9e5469c7aaf47f78e20be2ee))
+
 ## [0.1.23](https://github.com/vineethkrishnan/backupctl/compare/v0.1.22...v0.1.23) (2026-04-18)
 
 
