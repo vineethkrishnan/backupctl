@@ -20,6 +20,7 @@ export default defineConfig({
       { text: 'Guide', link: '/01-introduction' },
       { text: 'CLI Reference', link: '/06-cli-reference' },
       { text: 'Configuration', link: '/05-configuration' },
+      { text: 'Help Center', link: '/helpcenter/' },
       {
         text: 'Links',
         items: [
@@ -66,6 +67,20 @@ export default defineConfig({
           { text: 'FAQ', link: '/15-faq' },
           { text: 'Monitoring', link: '/16-monitoring' },
           { text: 'Network', link: '/17-network' },
+        ],
+      },
+      {
+        text: 'Help Center',
+        items: [
+          { text: 'Overview', link: '/helpcenter/' },
+          {
+            text: 'pg_dump / mysqldump timeout',
+            link: '/helpcenter/01-dump-command-timeout',
+          },
+          {
+            text: 'Docker network connect fails',
+            link: '/helpcenter/02-docker-network-connect',
+          },
         ],
       },
       {

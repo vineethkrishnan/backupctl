@@ -274,6 +274,12 @@ docker exec backupctl find /data/backups -name "*.dump" -o -name "*.sql.gz" -o -
 
 5. **Adjust retention** — if disk fills up regularly, reduce `keep_daily`, `keep_weekly`, or `keep_monthly` in the project's retention config.
 
+## Dump Command Fails After ~5 Minutes
+
+**Symptom:** Scheduled backups fail daily with `Command "pg_dump" failed` (or `mysqldump`, `mongodump`) roughly 5 minutes after they start. Manual runs from a shell may succeed.
+
+**Cause:** Pre-v0.1.22 builds shipped with a 5-minute default on `safeExecFile`. See the full runbook with diagnosis, sed hotfix, and permanent upgrade path: **[Help Center → pg_dump / mysqldump timeout](helpcenter/01-dump-command-timeout.md)**.
+
 ## Backup Timeout Warning
 
 **Symptom:** A notification warns that a backup exceeded its configured timeout. The backup run shows a warning in the audit log.

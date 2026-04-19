@@ -117,6 +117,10 @@ backupctl network connect ayunis-core-production
 | `1` | All connections failed |
 | `5` | Partial success (some connected, some failed) |
 
+## Troubleshooting
+
+If `backupctl network connect` fails or a project's DB host is unresolvable, see the step-by-step runbook: **[Help Center → Docker network connect fails](helpcenter/02-docker-network-connect.md)**.
+
 ## Finding the Network Name
 
 To find the correct Docker network name for a project:
