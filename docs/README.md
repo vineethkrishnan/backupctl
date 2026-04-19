@@ -23,6 +23,7 @@
 | 15 | [FAQ](15-faq.md) | Setup issues, Docker networking, ISP port blocking, SSH/GPG/restic fixes |
 | 16 | [Monitoring](16-monitoring.md) | Uptime Kuma push monitors for passive failure detection |
 | 17 | [Network](17-network.md) | Docker network management, Docker socket setup, multi-arch image support |
+| —  | [Help Center](helpcenter/index.md) | Step-by-step runbooks for recurring production issues |
 
 ## Quick Links
 
@@ -39,6 +40,8 @@
 ## Getting Help
 
 If something isn't working, start with the [Troubleshooting](12-troubleshooting.md) guide. It covers common errors, diagnostic commands, and recovery procedures for lock files, audit DB connectivity, restic repos, and more.
+
+For recurring production issues with step-by-step runbooks — including diagnosis, short-term workaround, and permanent fix — see the [Help Center](helpcenter/index.md).
 
 If you've checked the troubleshooting guide and FAQ and still need help:
 
