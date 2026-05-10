@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.25](https://github.com/vineethkrishnan/backupctl/compare/v0.1.24...v0.1.25) (2026-05-10)
+
+
+### Documentation
+
+* update domain reference to vinelabs.de ([e4d6f61](https://github.com/vineethkrishnan/backupctl/commit/e4d6f61228d6ec22e8892f8172c90994a482afe6))
+
+
+### CI/CD
+
+* **deps:** bump the actions group with 3 updates ([#76](https://github.com/vineethkrishnan/backupctl/issues/76)) ([75fa9af](https://github.com/vineethkrishnan/backupctl/commit/75fa9af27311a61527baba5970b46f0a57b18ec8))
+
 ## [0.1.24](https://github.com/vineethkrishnan/backupctl/compare/v0.1.23...v0.1.24) (2026-04-19)
 
 
