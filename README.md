@@ -109,7 +109,7 @@ Hexagonal (Ports & Adapters) with strict layer separation.
 
 ## Documentation
 
-**[backupctl.vineethnk.in](https://backupctl.vineethnk.in/)** — full documentation site.
+**[backupctl.vinelabs.de](https://backupctl.vinelabs.de/)** — full documentation site.
 
 Also available in [`docs/`](docs/README.md):
 
