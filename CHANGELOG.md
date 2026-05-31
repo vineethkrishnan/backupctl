@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.26](https://github.com/vineethkrishnan/backupctl/compare/v0.1.25...v0.1.26) (2026-05-31)
+
+
+### Bug Fixes
+
+* **deps:** patch transitive security vulnerabilities via overrides ([#86](https://github.com/vineethkrishnan/backupctl/issues/86)) ([87a2114](https://github.com/vineethkrishnan/backupctl/commit/87a21143c951a4b0a137d1125681b62b77627482))
+
 ## [0.1.25](https://github.com/vineethkrishnan/backupctl/compare/v0.1.24...v0.1.25) (2026-05-10)
 
 
