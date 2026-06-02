@@ -1,5 +1,5 @@
 # ── Build stage: NestJS ────────────────────────────────────
-FROM node:20-alpine3.22 AS builder
+FROM node:26-alpine3.22 AS builder
 
 WORKDIR /app
 COPY package*.json ./
@@ -24,7 +24,7 @@ RUN go get golang.org/x/crypto@v0.49.0 \
 RUN CGO_ENABLED=0 go build -tags disable_grpc_modules -ldflags "-s -w" -o /restic ./cmd/restic
 
 # ── Production dependencies (clean layer, no npm cache) ───
-FROM node:20-alpine3.22 AS deps
+FROM node:26-alpine3.22 AS deps
 
 RUN npm install -g npm@latest
 WORKDIR /app
@@ -35,7 +35,7 @@ RUN npm ci --omit=dev --ignore-scripts && npm cache clean --force
 # Keeps npm/npx available (unlike the stripped runtime stage below)
 # so the upgrade/deploy scripts can run migrations without exec'ing
 # into the long-running backupctl container.
-FROM node:20-alpine3.22 AS migrator
+FROM node:26-alpine3.22 AS migrator
 
 WORKDIR /app
 ENV NODE_ENV=production
@@ -44,7 +44,7 @@ COPY --from=builder /app/dist ./dist/
 CMD ["npx", "typeorm", "migration:run", "-d", "dist/db/datasource.js"]
 
 # ── Production stage ──────────────────────────────────────
-FROM node:20-alpine3.22
+FROM node:26-alpine3.22
 
 RUN apk upgrade --no-cache \
     && apk add --no-cache --repository=https://dl-cdn.alpinelinux.org/alpine/edge/main busybox \
