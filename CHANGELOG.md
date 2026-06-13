@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.27](https://github.com/vineethkrishnan/backupctl/compare/v0.1.26...v0.1.27) (2026-06-13)
+
+
+### CI/CD
+
+* **deps:** bump the actions group with 2 updates ([#89](https://github.com/vineethkrishnan/backupctl/issues/89)) ([36f610d](https://github.com/vineethkrishnan/backupctl/commit/36f610d10ff8030bbf3b91159d3f933ed8e6868a))
+
 ## [0.1.26](https://github.com/vineethkrishnan/backupctl/compare/v0.1.25...v0.1.26) (2026-05-31)
 
 
