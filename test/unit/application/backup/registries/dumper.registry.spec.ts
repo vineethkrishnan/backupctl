@@ -2,24 +2,10 @@ import { DatabaseDumperPort } from '@domain/backup/application/ports/database-du
 import { DumperRegistry, DumperFactory } from '@domain/backup/application/registries/dumper.registry';
 import { ProjectConfig } from '@domain/config/domain/project-config.model';
 import { RetentionPolicy } from '@domain/config/domain/retention-policy.model';
+import { buildProjectConfig } from '@test/support/project-config.builder';
 
 function buildConfig(): ProjectConfig {
-  return new ProjectConfig({
-    name: 'test',
-    enabled: true,
-    cron: '0 2 * * *',
-    timeoutMinutes: null,
-    database: { type: 'postgres', host: 'localhost', port: 5432, name: 'testdb', user: 'u', password: 'p', dumpTimeoutMinutes: null },
-    compression: { enabled: true },
-    assets: { paths: [] },
-    restic: { repositoryPath: '/repo', password: 'pass', snapshotMode: 'combined' },
-    retention: new RetentionPolicy(7, 7, 4, 3),
-    encryption: null,
-    hooks: null,
-    verification: { enabled: false },
-    notification: null,
-    monitor: null,
-  });
+  return buildProjectConfig({ name: 'test', retention: new RetentionPolicy(7, 7, 4, 3) });
 }
 
 function createMockDumper(): DatabaseDumperPort {

@@ -4,6 +4,7 @@ import { ConfigLoaderPort } from '@domain/config/application/ports/config-loader
 import { DockerNetworkPort } from '@domain/network/application/ports/docker-network.port';
 import { ProjectConfig } from '@domain/config/domain/project-config.model';
 import { RetentionPolicy } from '@domain/config/domain/retention-policy.model';
+import { buildProjectConfig } from '@test/support/project-config.builder';
 import { ConfigService } from '@nestjs/config';
 
 describe('ConnectNetworkUseCase', () => {
@@ -13,22 +14,11 @@ describe('ConnectNetworkUseCase', () => {
   let mockConfigService: jest.Mocked<ConfigService>;
 
   const createProjectConfig = (name: string, dockerNetwork: string | null = null): ProjectConfig =>
-    new ProjectConfig({
+    buildProjectConfig({
       name,
-      enabled: true,
-      cron: '0 2 * * *',
-      timeoutMinutes: null,
       dockerNetwork,
       database: { type: 'postgres', host: 'postgres', port: 5432, name: 'db', user: 'u', password: 'p', dumpTimeoutMinutes: null },
-      compression: { enabled: true },
-      assets: { paths: [] },
-      restic: { repositoryPath: '/repo', password: 'secret', snapshotMode: 'combined' },
       retention: new RetentionPolicy(7, 7, 4, 6),
-      encryption: null,
-      hooks: null,
-      verification: { enabled: false },
-      notification: null,
-      monitor: null,
     });
 
   beforeEach(() => {

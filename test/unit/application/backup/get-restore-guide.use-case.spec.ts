@@ -3,23 +3,12 @@ import { GetRestoreGuideQuery } from '@domain/backup/application/use-cases/get-r
 import { ConfigLoaderPort } from '@domain/config/application/ports/config-loader.port';
 import { ProjectConfig, ProjectConfigParams } from '@domain/config/domain/project-config.model';
 import { RetentionPolicy } from '@domain/config/domain/retention-policy.model';
+import { buildProjectConfig } from '@test/support/project-config.builder';
 
 function buildConfig(overrides: Partial<ProjectConfigParams> = {}): ProjectConfig {
-  return new ProjectConfig({
-    name: 'test-project',
-    enabled: true,
-    cron: '0 2 * * *',
-    timeoutMinutes: null,
+  return buildProjectConfig({
     database: { type: 'postgres', host: 'db.example.com', port: 5432, name: 'mydb', user: 'admin', password: 'secret', dumpTimeoutMinutes: null },
-    compression: { enabled: true },
-    assets: { paths: [] },
-    restic: { repositoryPath: '/repo', password: 'pass', snapshotMode: 'combined' },
     retention: new RetentionPolicy(7, 7, 4, 3),
-    encryption: null,
-    hooks: null,
-    verification: { enabled: false },
-    notification: null,
-    monitor: null,
     ...overrides,
   });
 }

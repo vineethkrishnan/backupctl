@@ -2,6 +2,7 @@ import { ConfigService } from '@nestjs/config';
 import { ResticStorageFactory } from '@domain/backup/infrastructure/adapters/storage/restic-storage.factory';
 import { ProjectConfig } from '@domain/config/domain/project-config.model';
 import { RetentionPolicy } from '@domain/config/domain/retention-policy.model';
+import { buildProjectConfig } from '@test/support/project-config.builder';
 
 describe('ResticStorageFactory', () => {
   let factory: ResticStorageFactory;
@@ -28,25 +29,13 @@ describe('ResticStorageFactory', () => {
   });
 
   function buildConfig(overrides: Partial<{ resticPassword: string; repoPath: string }> = {}): ProjectConfig {
-    return new ProjectConfig({
-      name: 'test-project',
-      enabled: true,
-      cron: '0 2 * * *',
-      timeoutMinutes: null,
-      database: { type: 'postgres', host: 'db', port: 5432, name: 'testdb', user: 'u', password: 'p', dumpTimeoutMinutes: null },
-      compression: { enabled: true },
-      assets: { paths: [] },
+    return buildProjectConfig({
       restic: {
         repositoryPath: overrides.repoPath ?? 'backups/test-project',
         password: overrides.resticPassword ?? '',
         snapshotMode: 'combined',
       },
       retention: new RetentionPolicy(7, 7, 4, 3),
-      encryption: null,
-      hooks: null,
-      verification: { enabled: false },
-      notification: null,
-      monitor: null,
     });
   }
 

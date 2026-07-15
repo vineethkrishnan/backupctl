@@ -2,6 +2,7 @@ import { DumperBootstrapService } from '@domain/backup/infrastructure/adapters/d
 import { DumperRegistry } from '@domain/backup/application/registries/dumper.registry';
 import { ProjectConfig } from '@domain/config/domain/project-config.model';
 import { RetentionPolicy } from '@domain/config/domain/retention-policy.model';
+import { buildProjectConfig } from '@test/support/project-config.builder';
 
 describe('DumperBootstrapService', () => {
   let registry: DumperRegistry;
@@ -13,21 +14,10 @@ describe('DumperBootstrapService', () => {
   });
 
   function buildConfig(dbType: string): ProjectConfig {
-    return new ProjectConfig({
+    return buildProjectConfig({
       name: 'test',
-      enabled: true,
-      cron: '0 2 * * *',
-      timeoutMinutes: null,
       database: { type: dbType, host: 'db', port: 5432, name: 'testdb', user: 'admin', password: 'secret', dumpTimeoutMinutes: null },
-      compression: { enabled: true },
-      assets: { paths: [] },
-      restic: { repositoryPath: '/repo', password: 'pass', snapshotMode: 'combined' },
       retention: new RetentionPolicy(7, 7, 4, 3),
-      encryption: null,
-      hooks: null,
-      verification: { enabled: false },
-      notification: null,
-      monitor: null,
     });
   }
 

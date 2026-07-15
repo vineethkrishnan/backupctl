@@ -8,13 +8,11 @@ import {
 import { ConfigLoaderPort } from '@domain/config/application/ports/config-loader.port';
 import { ProjectConfig } from '@domain/config/domain/project-config.model';
 import { RetentionPolicy } from '@domain/config/domain/retention-policy.model';
+import { buildProjectConfig as buildBaseProjectConfig } from '@test/support/project-config.builder';
 import { GpgKeyManagerAdapter as GpgKeyManager } from '@domain/backup/infrastructure/adapters/encryptors/gpg-key-manager.adapter';
 
 function buildProjectConfig(): ProjectConfig {
-  return new ProjectConfig({
-    name: 'test-project',
-    enabled: true,
-    cron: '0 2 * * *',
+  return buildBaseProjectConfig({
     timeoutMinutes: 60,
     database: {
       type: 'postgres',
@@ -25,7 +23,6 @@ function buildProjectConfig(): ProjectConfig {
       password: 'super-secret',
       dumpTimeoutMinutes: null,
     },
-    compression: { enabled: true },
     assets: { paths: ['/data/uploads'] },
     restic: {
       repositoryPath: '/backups/test',
@@ -33,11 +30,8 @@ function buildProjectConfig(): ProjectConfig {
       snapshotMode: 'combined',
     },
     retention: new RetentionPolicy(7, 7, 4),
-    encryption: null,
-    hooks: null,
     verification: { enabled: true },
     notification: { type: 'slack', config: {} },
-    monitor: null,
   });
 }
 
@@ -117,21 +111,13 @@ describe('ConfigShowSubCommand', () => {
   });
 
   it('should print null database for files-only project', async () => {
-    const filesOnlyConfig = new ProjectConfig({
+    const filesOnlyConfig = buildBaseProjectConfig({
       name: 'static-assets',
-      enabled: true,
       cron: '0 3 * * *',
-      timeoutMinutes: null,
       database: null,
-      compression: { enabled: true },
       assets: { paths: ['/data/uploads'] },
       restic: { repositoryPath: '/backups/test', password: 'restic-secret', snapshotMode: 'combined' },
       retention: new RetentionPolicy(7, 7, 4),
-      encryption: null,
-      hooks: null,
-      verification: { enabled: false },
-      notification: null,
-      monitor: null,
     });
     configLoader.getProject.mockReturnValue(filesOnlyConfig);
 

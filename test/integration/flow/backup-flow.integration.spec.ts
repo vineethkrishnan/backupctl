@@ -31,6 +31,7 @@ import { SyncResult } from '@domain/backup/domain/value-objects/sync-result.mode
 import { PruneResult } from '@domain/backup/domain/value-objects/prune-result.model';
 import { CleanupResult } from '@domain/backup/domain/value-objects/cleanup-result.model';
 import { RetentionPolicy } from '@domain/config/domain/retention-policy.model';
+import { buildProjectConfig } from '@test/support/project-config.builder';
 import { CacheInfo } from '@domain/backup/domain/value-objects/cache-info.model';
 
 import {
@@ -55,11 +56,8 @@ jest.setTimeout(30000);
 // ── Test project config ─────────────────────────────────────────────────
 
 function buildTestConfig(overrides: Partial<ProjectConfig> = {}): ProjectConfig {
-  return new ProjectConfig({
+  return buildProjectConfig({
     name: 'vinsware',
-    enabled: true,
-    cron: '0 2 * * *',
-    timeoutMinutes: null,
     database: {
       type: 'postgres',
       host: 'localhost',
@@ -69,19 +67,13 @@ function buildTestConfig(overrides: Partial<ProjectConfig> = {}): ProjectConfig 
       password: 'test-pass',
       dumpTimeoutMinutes: null,
     },
-    compression: { enabled: true },
-    assets: { paths: [] },
     restic: {
       repositoryPath: 'sftp:storage:/backups/vinsware',
       password: 'restic-pass',
       snapshotMode: 'combined',
     },
     retention: new RetentionPolicy(7, 7, 4, 3),
-    encryption: null,
-    hooks: null,
-    verification: { enabled: false },
     notification: { type: 'slack', config: {} },
-    monitor: null,
     ...overrides,
   });
 }

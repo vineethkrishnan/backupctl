@@ -23,6 +23,7 @@ import { HealthCheckResult } from '@domain/audit/domain/health-check-result.mode
 import { SnapshotInfo } from '@domain/backup/domain/value-objects/snapshot-info.model';
 import { ProjectConfig } from '@domain/config/domain/project-config.model';
 import { RetentionPolicy } from '@domain/config/domain/retention-policy.model';
+import { buildProjectConfig } from '@test/support/project-config.builder';
 import { GpgKeyManagerPort } from '@domain/backup/application/ports/gpg-key-manager.port';
 import { CONFIG_LOADER_PORT, GPG_KEY_MANAGER_PORT } from '@common/di/injection-tokens';
 
@@ -53,11 +54,8 @@ function buildResult(overrides: Partial<BackupResult> = {}): BackupResult {
 }
 
 function buildTestConfig(): ProjectConfig {
-  return new ProjectConfig({
+  return buildProjectConfig({
     name: 'vinsware',
-    enabled: true,
-    cron: '0 2 * * *',
-    timeoutMinutes: null,
     database: {
       type: 'postgres',
       host: 'localhost',
@@ -67,19 +65,12 @@ function buildTestConfig(): ProjectConfig {
       password: 'pass',
       dumpTimeoutMinutes: null,
     },
-    compression: { enabled: true },
-    assets: { paths: [] },
     restic: {
       repositoryPath: '/backups/vinsware',
       password: 'rpass',
       snapshotMode: 'combined',
     },
     retention: new RetentionPolicy(7, 7, 4),
-    encryption: null,
-    hooks: null,
-    verification: { enabled: false },
-    notification: null,
-    monitor: null,
   });
 }
 

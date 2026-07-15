@@ -23,6 +23,7 @@ import { ClockPort } from '@common/clock/clock.port';
 import { FileSystemPort } from '@common/filesystem/filesystem.port';
 import { ProjectConfig } from '@domain/config/domain/project-config.model';
 import { RetentionPolicy } from '@domain/config/domain/retention-policy.model';
+import { buildProjectConfig as buildBaseProjectConfig } from '@test/support/project-config.builder';
 import { BackupStage } from '@domain/backup/domain/value-objects/backup-stage.enum';
 import { BackupStatus } from '@domain/backup/domain/value-objects/backup-status.enum';
 import { CleanupResult } from '@domain/backup/domain/value-objects/cleanup-result.model';
@@ -172,33 +173,9 @@ function createMockGpgKeyManager(): jest.Mocked<GpgKeyManagerPort> {
 }
 
 function buildProjectConfig(overrides: Partial<ConstructorParameters<typeof ProjectConfig>[0]> = {}): ProjectConfig {
-  return new ProjectConfig({
-    name: 'test-project',
-    enabled: true,
-    cron: '0 2 * * *',
-    timeoutMinutes: null,
-    database: {
-      type: 'postgres',
-      host: 'localhost',
-      port: 5432,
-      name: 'testdb',
-      user: 'admin',
-      password: 'secret',
-      dumpTimeoutMinutes: null,
-    },
-    compression: { enabled: true },
-    assets: { paths: [] },
-    restic: {
-      repositoryPath: '/repo/test',
-      password: 'restic-pass',
-      snapshotMode: 'combined',
-    },
+  return buildBaseProjectConfig({
     retention: new RetentionPolicy(7, 7, 4, 3),
-    encryption: null,
-    hooks: null,
-    verification: { enabled: false },
     notification: { type: 'slack', config: {} },
-    monitor: null,
     ...overrides,
   });
 }

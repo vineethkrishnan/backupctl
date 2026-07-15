@@ -6,6 +6,7 @@ import { RemoteStoragePort } from '@domain/backup/application/ports/remote-stora
 import { SnapshotInfo } from '@domain/backup/domain/value-objects/snapshot-info.model';
 import { ProjectConfig } from '@domain/config/domain/project-config.model';
 import { RetentionPolicy } from '@domain/config/domain/retention-policy.model';
+import { buildProjectConfig } from '@test/support/project-config.builder';
 
 describe('ListSnapshotsUseCase', () => {
   let service: ListSnapshotsUseCase;
@@ -33,21 +34,9 @@ describe('ListSnapshotsUseCase', () => {
       create: jest.fn().mockReturnValue(mockStorage),
     };
 
-    projectConfig = new ProjectConfig({
-      name: 'test-project',
-      enabled: true,
-      cron: '0 2 * * *',
-      timeoutMinutes: null,
+    projectConfig = buildProjectConfig({
       database: { type: 'postgres', host: 'localhost', port: 5432, name: 'testdb', user: 'user', password: 'pass', dumpTimeoutMinutes: null },
-      compression: { enabled: true },
-      assets: { paths: [] },
-      restic: { repositoryPath: '/repo', password: 'secret', snapshotMode: 'combined' },
       retention: new RetentionPolicy(7, 7, 4, 6),
-      encryption: null,
-      hooks: null,
-      verification: { enabled: false },
-      notification: null,
-      monitor: null,
     });
 
     mockConfigLoader = {

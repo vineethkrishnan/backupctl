@@ -7,6 +7,7 @@ import { RemoteStoragePort } from '@domain/backup/application/ports/remote-stora
 import { PruneResult } from '@domain/backup/domain/value-objects/prune-result.model';
 import { ProjectConfig } from '@domain/config/domain/project-config.model';
 import { RetentionPolicy } from '@domain/config/domain/retention-policy.model';
+import { buildProjectConfig } from '@test/support/project-config.builder';
 
 describe('PruneBackupUseCase', () => {
   let useCase: PruneBackupUseCase;
@@ -16,22 +17,7 @@ describe('PruneBackupUseCase', () => {
   let loggerErrorSpy: jest.SpyInstance;
 
   const createProjectConfig = (name: string, enabled = true): ProjectConfig =>
-    new ProjectConfig({
-      name,
-      enabled,
-      cron: '0 2 * * *',
-      timeoutMinutes: null,
-      database: { type: 'postgres', host: 'localhost', port: 5432, name: 'db', user: 'u', password: 'p', dumpTimeoutMinutes: null },
-      compression: { enabled: true },
-      assets: { paths: [] },
-      restic: { repositoryPath: '/repo', password: 'secret', snapshotMode: 'combined' },
-      retention: new RetentionPolicy(7, 7, 4, 6),
-      encryption: null,
-      hooks: null,
-      verification: { enabled: false },
-      notification: null,
-      monitor: null,
-    });
+    buildProjectConfig({ name, enabled, retention: new RetentionPolicy(7, 7, 4, 6) });
 
   beforeEach(() => {
     mockStorage = {

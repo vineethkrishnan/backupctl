@@ -4,24 +4,10 @@ import { RemoteStorageFactoryPort } from '@domain/backup/application/ports/remot
 import { RemoteStoragePort } from '@domain/backup/application/ports/remote-storage.port';
 import { ProjectConfig } from '@domain/config/domain/project-config.model';
 import { RetentionPolicy } from '@domain/config/domain/retention-policy.model';
+import { buildProjectConfig as buildBaseProjectConfig } from '@test/support/project-config.builder';
 
 function buildProjectConfig(): ProjectConfig {
-  return new ProjectConfig({
-    name: 'test-project',
-    enabled: true,
-    cron: '0 2 * * *',
-    timeoutMinutes: null,
-    database: {
-      type: 'postgres',
-      host: 'localhost',
-      port: 5432,
-      name: 'testdb',
-      user: 'admin',
-      password: 'secret',
-      dumpTimeoutMinutes: null,
-    },
-    compression: { enabled: true },
-    assets: { paths: [] },
+  return buildBaseProjectConfig({
     restic: {
       repositoryPath: '/backups/test',
       password: 'restic-pass',

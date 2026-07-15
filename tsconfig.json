@@ -22,7 +22,8 @@
     "esModuleInterop": true,
     "paths": {
       "@domain/*": ["src/domain/*"],
-      "@common/*": ["src/common/*"]
+      "@common/*": ["src/common/*"],
+      "@test/*": ["test/*"]
     }
   },
   "include": ["src/**/*", "test/**/*"],

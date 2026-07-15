@@ -8,6 +8,7 @@ import { BackupLockPort } from '@domain/backup/application/ports/backup-lock.por
 import { ConfigLoaderPort } from '@domain/config/application/ports/config-loader.port';
 import { ProjectConfig } from '@domain/config/domain/project-config.model';
 import { RetentionPolicy } from '@domain/config/domain/retention-policy.model';
+import { buildProjectConfig } from '@test/support/project-config.builder';
 import { BackupResult } from '@domain/backup/domain/backup-result.model';
 import { BackupStatus } from '@domain/backup/domain/value-objects/backup-status.enum';
 import { BackupStage } from '@domain/backup/domain/value-objects/backup-stage.enum';
@@ -15,27 +16,10 @@ import { RunBackupCommand } from '@domain/backup/application/use-cases/run-backu
 import { NotifierPort } from '@domain/notification/application/ports/notifier.port';
 
 function createProjectConfig(overrides: Partial<{ name: string; cron: string; enabled: boolean }> = {}): ProjectConfig {
-  return new ProjectConfig({
+  return buildProjectConfig({
     name: overrides.name ?? 'test-project',
     enabled: overrides.enabled ?? true,
     cron: overrides.cron ?? '0 2 * * *',
-    timeoutMinutes: null,
-    database: {
-      type: 'postgres',
-      host: 'localhost',
-      port: 5432,
-      name: 'testdb',
-      user: 'testuser',
-      password: 'testpass',
-      dumpTimeoutMinutes: null,
-    },
-    compression: { enabled: true },
-    assets: { paths: [] },
-    restic: {
-      repositoryPath: '/repo/test',
-      password: 'restic-pass',
-      snapshotMode: 'combined',
-    },
     retention: new RetentionPolicy(3, 7, 4, 6),
     encryption: null,
     hooks: null,
