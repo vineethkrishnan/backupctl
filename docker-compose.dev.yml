@@ -20,6 +20,8 @@ services:
       - ./test:/app/test
       - ./ssh-keys:/home/node/.ssh:ro
       - ./gpg-keys:/app/gpg-keys:ro
+      # Deliberately writable: rclone rewrites refreshed OAuth tokens into this file.
+      - ./rclone-config:/home/node/.config/rclone
       - ./eslint.config.mjs:/app/eslint.config.mjs:ro
       - ./knip.json:/app/knip.json:ro
       - ./.jscpd.json:/app/.jscpd.json:ro

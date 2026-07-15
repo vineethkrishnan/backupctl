@@ -27,14 +27,16 @@ RUN apk upgrade --no-cache \
     openssh-client \
     gnupg \
     fuse3 \
+    rclone \
     curl
 
 COPY --from=restic-builder /restic /usr/local/bin/restic
 
 # Run as non-root — SSH keys mounted to /home/node/.ssh
-RUN mkdir -p /home/node/.ssh /home/node/.gnupg \
-    && chmod 700 /home/node/.gnupg \
-    && chown -R node:node /home/node/.ssh /home/node/.gnupg
+# rclone rewrites refreshed OAuth tokens into its config, so .config/rclone must stay writable.
+RUN mkdir -p /home/node/.ssh /home/node/.gnupg /home/node/.config/rclone \
+    && chmod 700 /home/node/.gnupg /home/node/.config/rclone \
+    && chown -R node:node /home/node/.ssh /home/node/.gnupg /home/node/.config
 
 WORKDIR /app
 

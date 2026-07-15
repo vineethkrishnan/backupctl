@@ -14,6 +14,8 @@ services:
       - ./config:/app/config:ro
       - ./ssh-keys:/home/node/.ssh:ro
       - ./gpg-keys:/app/gpg-keys:ro
+      # Deliberately writable: rclone rewrites refreshed OAuth tokens into this file.
+      - ./rclone-config:/home/node/.config/rclone
       - /var/run/docker.sock:/var/run/docker.sock:ro
     group_add:
       - '${DOCKER_GID:-999}'
