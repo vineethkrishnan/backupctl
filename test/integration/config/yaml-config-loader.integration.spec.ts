@@ -93,9 +93,16 @@ describe('YamlConfigLoaderAdapter (integration)', () => {
   }
 
   function createAdapter(envOverrides: Record<string, string> = {}): YamlConfigLoaderAdapter {
+    const env: Record<string, string> = {
+      HETZNER_SSH_HOST: 'storage.example.com',
+      HETZNER_SSH_USER: 'u123',
+      HETZNER_SSH_KEY_PATH: '/home/node/.ssh/id_ed25519',
+      ...envOverrides,
+    };
+
     const configService = {
       get: jest.fn((key: string, defaultValue?: string) => {
-        if (key in envOverrides) return envOverrides[key];
+        if (key in env) return env[key];
         return defaultValue;
       }),
     } as unknown as ConfigService;
@@ -160,7 +167,7 @@ describe('YamlConfigLoaderAdapter (integration)', () => {
       const result = adapter.loadAll();
 
       expect(result[0].database?.password).toBe('resolved-db-pass');
-      expect(result[0].restic.password).toBe('resolved-restic-pass');
+      expect(result[0].storage.password).toBe('resolved-restic-pass');
     });
   });
 

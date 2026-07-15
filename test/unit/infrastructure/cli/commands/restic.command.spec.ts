@@ -8,10 +8,12 @@ import { buildProjectConfig as buildBaseProjectConfig } from '@test/support/proj
 
 function buildProjectConfig(): ProjectConfig {
   return buildBaseProjectConfig({
-    restic: {
-      repositoryPath: '/backups/test',
+    storage: {
+      type: 'sftp',
+      repository: '/backups/test',
       password: 'restic-pass',
       snapshotMode: 'combined',
+      config: {},
     },
     retention: new RetentionPolicy(7, 7, 4),
     encryption: null,

@@ -1,4 +1,5 @@
 import { RetentionPolicy } from './retention-policy.model';
+import { StorageConfig } from './storage-config.model';
 
 export interface ProjectConfigParams {
   readonly name: string;
@@ -17,11 +18,7 @@ export interface ProjectConfigParams {
   } | null;
   readonly compression: { readonly enabled: boolean };
   readonly assets: { readonly paths: readonly string[] };
-  readonly restic: {
-    readonly repositoryPath: string;
-    readonly password: string;
-    readonly snapshotMode: 'combined' | 'separate';
-  };
+  readonly storage: StorageConfig;
   readonly retention: RetentionPolicy;
   readonly encryption: { readonly enabled: boolean; readonly type: string; readonly recipient: string } | null;
   readonly hooks: { readonly preBackup: string | null; readonly postBackup: string | null } | null;
@@ -47,11 +44,7 @@ export class ProjectConfig {
   } | null;
   readonly compression: { readonly enabled: boolean };
   readonly assets: { readonly paths: readonly string[] };
-  readonly restic: {
-    readonly repositoryPath: string;
-    readonly password: string;
-    readonly snapshotMode: 'combined' | 'separate';
-  };
+  readonly storage: StorageConfig;
   readonly retention: RetentionPolicy;
   readonly encryption: {
     readonly enabled: boolean;
@@ -72,7 +65,7 @@ export class ProjectConfig {
     this.database = params.database;
     this.compression = params.compression;
     this.assets = params.assets;
-    this.restic = params.restic;
+    this.storage = params.storage;
     this.retention = params.retention;
     this.encryption = params.encryption;
     this.hooks = params.hooks;

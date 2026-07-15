@@ -24,10 +24,12 @@ function buildProjectConfig(): ProjectConfig {
       dumpTimeoutMinutes: null,
     },
     assets: { paths: ['/data/uploads'] },
-    restic: {
-      repositoryPath: '/backups/test',
+    storage: {
+      type: 'sftp',
+      repository: '/backups/test',
       password: 'restic-secret',
       snapshotMode: 'combined',
+      config: {},
     },
     retention: new RetentionPolicy(7, 7, 4),
     verification: { enabled: true },
@@ -107,7 +109,48 @@ describe('ConfigShowSubCommand', () => {
     const output = (console.log as jest.Mock).mock.calls[0][0] as string;
     const parsed = JSON.parse(output) as Record<string, unknown>;
     expect((parsed.database as Record<string, unknown>).password).toBe('********');
-    expect((parsed.restic as Record<string, unknown>).password).toBe('********');
+    expect((parsed.storage as Record<string, unknown>).password).toBe('********');
+  });
+
+  it('should mask secret values inside the storage config bag', async () => {
+    configLoader.getProject.mockReturnValue(
+      buildBaseProjectConfig({
+        storage: {
+          type: 's3',
+          repository: 'my-bucket/test',
+          password: 'restic-secret',
+          snapshotMode: 'combined',
+          config: {
+            endpoint: 'https://s3.example.com',
+            access_key_id: 'AKIAEXAMPLE',
+            secret_access_key: 'super-secret-value',
+          },
+        },
+      }),
+    );
+
+    await command.run(['test-project']);
+
+    const output = (console.log as jest.Mock).mock.calls[0][0] as string;
+    const storageConfig = (JSON.parse(output) as { storage: { config: Record<string, string> } }).storage.config;
+
+    expect(storageConfig.endpoint).toBe('https://s3.example.com');
+    expect(storageConfig.secret_access_key).toBe('********');
+    expect(storageConfig.access_key_id).toBe('********');
+    expect(output).not.toContain('super-secret-value');
+  });
+
+  it('should mask notification webhook url', async () => {
+    configLoader.getProject.mockReturnValue(
+      buildBaseProjectConfig({
+        notification: { type: 'slack', config: { webhook_url: 'https://hooks.slack.com/services/SECRET' } },
+      }),
+    );
+
+    await command.run(['test-project']);
+
+    const output = (console.log as jest.Mock).mock.calls[0][0] as string;
+    expect(output).not.toContain('hooks.slack.com');
   });
 
   it('should print null database for files-only project', async () => {
@@ -116,7 +159,7 @@ describe('ConfigShowSubCommand', () => {
       cron: '0 3 * * *',
       database: null,
       assets: { paths: ['/data/uploads'] },
-      restic: { repositoryPath: '/backups/test', password: 'restic-secret', snapshotMode: 'combined' },
+      storage: { type: 'sftp', repository: '/backups/test', password: 'restic-secret', snapshotMode: 'combined', config: {} },
       retention: new RetentionPolicy(7, 7, 4),
     });
     configLoader.getProject.mockReturnValue(filesOnlyConfig);

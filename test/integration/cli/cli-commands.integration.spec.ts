@@ -65,10 +65,12 @@ function buildTestConfig(): ProjectConfig {
       password: 'pass',
       dumpTimeoutMinutes: null,
     },
-    restic: {
-      repositoryPath: '/backups/vinsware',
+    storage: {
+      type: 'sftp',
+      repository: '/backups/vinsware',
       password: 'rpass',
       snapshotMode: 'combined',
+      config: {},
     },
     retention: new RetentionPolicy(7, 7, 4),
   });

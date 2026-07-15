@@ -21,10 +21,12 @@ export function buildProjectConfigParams(
     },
     compression: { enabled: true },
     assets: { paths: [] },
-    restic: {
-      repositoryPath: '/repo/test',
+    storage: {
+      type: 'sftp',
+      repository: '/repo/test',
       password: 'restic-pass',
       snapshotMode: 'combined',
+      config: {},
     },
     retention: new RetentionPolicy(7, 14, 4),
     encryption: null,

@@ -67,10 +67,12 @@ function buildTestConfig(overrides: Partial<ProjectConfig> = {}): ProjectConfig 
       password: 'test-pass',
       dumpTimeoutMinutes: null,
     },
-    restic: {
-      repositoryPath: 'sftp:storage:/backups/vinsware',
+    storage: {
+      type: 'sftp',
+      repository: 'sftp:storage:/backups/vinsware',
       password: 'restic-pass',
       snapshotMode: 'combined',
+      config: {},
     },
     retention: new RetentionPolicy(7, 7, 4, 3),
     notification: { type: 'slack', config: {} },

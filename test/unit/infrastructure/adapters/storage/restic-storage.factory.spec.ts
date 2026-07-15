@@ -42,10 +42,12 @@ describe('ResticStorageFactory', () => {
 
   function buildConfig(overrides: Partial<{ resticPassword: string; repoPath: string }> = {}): ProjectConfig {
     return buildProjectConfig({
-      restic: {
-        repositoryPath: overrides.repoPath ?? '/backups/test-project',
+      storage: {
+        type: 'sftp',
+        repository: overrides.repoPath ?? '/backups/test-project',
         password: overrides.resticPassword ?? '',
         snapshotMode: 'combined',
+        config: {},
       },
       retention: new RetentionPolicy(7, 7, 4, 3),
     });

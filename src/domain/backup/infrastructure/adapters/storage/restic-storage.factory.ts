@@ -17,7 +17,7 @@ export class ResticStorageFactory implements RemoteStorageFactoryPort {
     const sshPort = parseInt(String(this.configService.get('HETZNER_SSH_PORT', '22')), 10);
     const globalPassword = this.configService.get<string>('RESTIC_PASSWORD', '');
 
-    const password = config.restic.password || globalPassword;
+    const password = config.storage.password || globalPassword;
 
     if (!password) {
       throw new Error(
@@ -27,7 +27,7 @@ export class ResticStorageFactory implements RemoteStorageFactoryPort {
     }
 
     return new ResticStorageAdapter(
-      config.restic.repositoryPath,
+      config.storage.repository,
       password,
       sshHost,
       sshUser,
