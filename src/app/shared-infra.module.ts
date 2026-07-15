@@ -6,6 +6,12 @@ import { EnvValidationService } from '@common/validation/env-validation.service'
 import { UpgradeCheckService } from '@common/upgrade/upgrade-check.service';
 import { FileBackupLockAdapter } from '@domain/backup/infrastructure/adapters/lock/file-backup-lock.adapter';
 import { ResticStorageFactory } from '@domain/backup/infrastructure/adapters/storage/restic-storage.factory';
+import { ResticBackendRegistry } from '@domain/backup/infrastructure/adapters/storage/backends/restic-backend.registry';
+import { SftpBackendResolver } from '@domain/backup/infrastructure/adapters/storage/backends/sftp-backend.resolver';
+import { S3BackendResolver } from '@domain/backup/infrastructure/adapters/storage/backends/s3-backend.resolver';
+import { B2BackendResolver } from '@domain/backup/infrastructure/adapters/storage/backends/b2-backend.resolver';
+import { RcloneBackendResolver } from '@domain/backup/infrastructure/adapters/storage/backends/rclone-backend.resolver';
+import { LocalBackendResolver } from '@domain/backup/infrastructure/adapters/storage/backends/local-backend.resolver';
 import { GpgKeyManagerAdapter } from '@domain/backup/infrastructure/adapters/encryptors/gpg-key-manager.adapter';
 
 import {
@@ -24,6 +30,12 @@ import {
     { provide: CLOCK_PORT, useClass: SystemClockAdapter },
     { provide: FILESYSTEM_PORT, useClass: LocalFilesystemAdapter },
     { provide: BACKUP_LOCK_PORT, useClass: FileBackupLockAdapter },
+    SftpBackendResolver,
+    S3BackendResolver,
+    B2BackendResolver,
+    RcloneBackendResolver,
+    LocalBackendResolver,
+    ResticBackendRegistry,
     { provide: REMOTE_STORAGE_FACTORY, useClass: ResticStorageFactory },
     { provide: GPG_KEY_MANAGER_PORT, useClass: GpgKeyManagerAdapter },
   ],

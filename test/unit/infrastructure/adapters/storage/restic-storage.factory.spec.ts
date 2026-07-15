@@ -1,7 +1,14 @@
 import { ConfigService } from '@nestjs/config';
 import { ResticStorageFactory } from '@domain/backup/infrastructure/adapters/storage/restic-storage.factory';
+import { ResticBackendRegistry } from '@domain/backup/infrastructure/adapters/storage/backends/restic-backend.registry';
+import { SftpBackendResolver } from '@domain/backup/infrastructure/adapters/storage/backends/sftp-backend.resolver';
+import { S3BackendResolver } from '@domain/backup/infrastructure/adapters/storage/backends/s3-backend.resolver';
+import { B2BackendResolver } from '@domain/backup/infrastructure/adapters/storage/backends/b2-backend.resolver';
+import { RcloneBackendResolver } from '@domain/backup/infrastructure/adapters/storage/backends/rclone-backend.resolver';
+import { LocalBackendResolver } from '@domain/backup/infrastructure/adapters/storage/backends/local-backend.resolver';
 import { ProjectConfig } from '@domain/config/domain/project-config.model';
 import { RetentionPolicy } from '@domain/config/domain/retention-policy.model';
+import { StorageConfig } from '@domain/config/domain/storage-config.model';
 import { buildProjectConfig } from '@test/support/project-config.builder';
 
 jest.mock('@common/helpers/child-process.util');
@@ -22,7 +29,15 @@ describe('ResticStorageFactory', () => {
       }),
     } as unknown as ConfigService;
 
-    return new ResticStorageFactory(mockConfigService);
+    const registry = new ResticBackendRegistry(
+      new SftpBackendResolver(mockConfigService),
+      new S3BackendResolver(),
+      new B2BackendResolver(),
+      new RcloneBackendResolver(mockConfigService),
+      new LocalBackendResolver(),
+    );
+
+    return new ResticStorageFactory(mockConfigService, registry);
   }
 
   beforeEach(() => {
@@ -50,6 +65,19 @@ describe('ResticStorageFactory', () => {
         config: {},
       },
       retention: new RetentionPolicy(7, 7, 4, 3),
+    });
+  }
+
+  function buildStorageConfig(storage: Partial<StorageConfig>): ProjectConfig {
+    return buildProjectConfig({
+      storage: {
+        type: 'sftp',
+        repository: '/backups/test-project',
+        password: 'restic-pass',
+        snapshotMode: 'combined',
+        config: {},
+        ...storage,
+      },
     });
   }
 
@@ -114,5 +142,144 @@ describe('ResticStorageFactory', () => {
     factory = createFactory();
 
     expect(() => factory.create(buildConfig())).toThrow('Config key "HETZNER_SSH_HOST" not found');
+  });
+
+  describe('s3 backend', () => {
+    const s3Config = {
+      type: 's3' as const,
+      repository: 'my-bucket/vinsware',
+      config: {
+        endpoint: 'https://s3.eu-central-003.backblazeb2.com',
+        access_key_id: 'key-id',
+        secret_access_key: 'secret-key',
+      },
+    };
+
+    it('builds the s3 repository URL and credential env', async () => {
+      const env = await envFromCreatedStorage(buildStorageConfig(s3Config));
+
+      expect(env.RESTIC_REPOSITORY).toBe('s3:https://s3.eu-central-003.backblazeb2.com/my-bucket/vinsware');
+      expect(env.AWS_ACCESS_KEY_ID).toBe('key-id');
+      expect(env.AWS_SECRET_ACCESS_KEY).toBe('secret-key');
+    });
+
+    it('does not leak the SSH command into a non-sftp backend', async () => {
+      const env = await envFromCreatedStorage(buildStorageConfig(s3Config));
+
+      expect(env.RESTIC_SSH_COMMAND).toBeUndefined();
+    });
+
+    it('does not require Hetzner SSH config', async () => {
+      delete configValues['HETZNER_SSH_HOST'];
+      delete configValues['HETZNER_SSH_USER'];
+      delete configValues['HETZNER_SSH_KEY_PATH'];
+      factory = createFactory();
+
+      const env = await envFromCreatedStorage(buildStorageConfig(s3Config));
+
+      expect(env.RESTIC_REPOSITORY).toContain('s3:');
+    });
+
+    it('strips a trailing slash from the endpoint', async () => {
+      const env = await envFromCreatedStorage(
+        buildStorageConfig({ ...s3Config, config: { ...s3Config.config, endpoint: 'https://s3.example.com/' } }),
+      );
+
+      expect(env.RESTIC_REPOSITORY).toBe('s3:https://s3.example.com/my-bucket/vinsware');
+    });
+
+    it('passes region through when configured', async () => {
+      const env = await envFromCreatedStorage(
+        buildStorageConfig({ ...s3Config, config: { ...s3Config.config, region: 'eu-central-1' } }),
+      );
+
+      expect(env.AWS_DEFAULT_REGION).toBe('eu-central-1');
+    });
+
+    it('omits region when not configured', async () => {
+      const env = await envFromCreatedStorage(buildStorageConfig(s3Config));
+
+      expect(env.AWS_DEFAULT_REGION).toBeUndefined();
+    });
+
+    it('throws with an actionable message when credentials are missing', () => {
+      const config = buildStorageConfig({ ...s3Config, config: { endpoint: 'https://s3.example.com' } });
+
+      expect(() => factory.create(config)).toThrow('requires config.access_key_id');
+    });
+  });
+
+  describe('b2 backend', () => {
+    it('builds the b2 repository and credential env', async () => {
+      const env = await envFromCreatedStorage(
+        buildStorageConfig({
+          type: 'b2',
+          repository: 'my-bucket:vinsware',
+          config: { account_id: 'acct', account_key: 'acct-key' },
+        }),
+      );
+
+      expect(env.RESTIC_REPOSITORY).toBe('b2:my-bucket:vinsware');
+      expect(env.B2_ACCOUNT_ID).toBe('acct');
+      expect(env.B2_ACCOUNT_KEY).toBe('acct-key');
+    });
+  });
+
+  describe('rclone backend', () => {
+    it('builds the rclone repository from a remote:path target', async () => {
+      const env = await envFromCreatedStorage(
+        buildStorageConfig({ type: 'rclone', repository: 'gdrive:backups/vinsware' }),
+      );
+
+      expect(env.RESTIC_REPOSITORY).toBe('rclone:gdrive:backups/vinsware');
+    });
+
+    it('sets RCLONE_CONFIG from the project config bag', async () => {
+      const env = await envFromCreatedStorage(
+        buildStorageConfig({
+          type: 'rclone',
+          repository: 'gdrive:backups/vinsware',
+          config: { config_path: '/custom/rclone.conf' },
+        }),
+      );
+
+      expect(env.RCLONE_CONFIG).toBe('/custom/rclone.conf');
+    });
+
+    it('falls back to RCLONE_CONFIG_PATH from env', async () => {
+      configValues['RCLONE_CONFIG_PATH'] = '/home/node/.config/rclone/rclone.conf';
+      factory = createFactory();
+
+      const env = await envFromCreatedStorage(
+        buildStorageConfig({ type: 'rclone', repository: 'gdrive:backups/vinsware' }),
+      );
+
+      expect(env.RCLONE_CONFIG).toBe('/home/node/.config/rclone/rclone.conf');
+    });
+
+    it('leaves RCLONE_CONFIG unset so rclone uses its default path', async () => {
+      const env = await envFromCreatedStorage(
+        buildStorageConfig({ type: 'rclone', repository: 'gdrive:backups/vinsware' }),
+      );
+
+      expect(env.RCLONE_CONFIG).toBeUndefined();
+    });
+
+    it('rejects a repository that is not a remote:path target', () => {
+      const config = buildStorageConfig({ type: 'rclone', repository: 'backups/vinsware' });
+
+      expect(() => factory.create(config)).toThrow('is not a valid rclone target');
+    });
+  });
+
+  describe('local backend', () => {
+    it('uses the repository path verbatim with no extra env', async () => {
+      const env = await envFromCreatedStorage(
+        buildStorageConfig({ type: 'local', repository: '/srv/restic-repo' }),
+      );
+
+      expect(env.RESTIC_REPOSITORY).toBe('/srv/restic-repo');
+      expect(env.RESTIC_SSH_COMMAND).toBeUndefined();
+    });
   });
 });

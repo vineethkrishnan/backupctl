@@ -32,22 +32,12 @@ interface ResticForgetGroup {
 }
 
 export class ResticStorageAdapter implements RemoteStoragePort {
-  private readonly repository: string;
-
-  private readonly sshCommand: string;
-
   constructor(
-    repositoryPath: string,
+    private readonly repository: string,
     private readonly password: string,
-    sshHost: string,
-    sshUser: string,
-    sshKeyPath: string,
+    private readonly backendEnv: Record<string, string>,
     private readonly projectName: string,
-    sshPort = 22,
-  ) {
-    this.repository = `sftp:${sshUser}@${sshHost}:${repositoryPath}`;
-    this.sshCommand = `ssh -i "${sshKeyPath}" -p ${sshPort} -o StrictHostKeyChecking=accept-new`;
-  }
+  ) {}
 
   async sync(paths: string[], options: SyncOptions): Promise<SyncResult> {
     const args = ['backup', ...paths];
@@ -165,7 +155,7 @@ export class ResticStorageAdapter implements RemoteStoragePort {
     return {
       RESTIC_REPOSITORY: this.repository,
       RESTIC_PASSWORD: this.password,
-      RESTIC_SSH_COMMAND: this.sshCommand,
+      ...this.backendEnv,
     };
   }
 
