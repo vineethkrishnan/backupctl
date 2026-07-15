@@ -5,6 +5,7 @@ import { ConfigLoaderPort } from '@domain/config/application/ports/config-loader
 import { BackupLockPort } from '@domain/backup/application/ports/backup-lock.port';
 import { RemoteStorageFactoryPort } from '@domain/backup/application/ports/remote-storage-factory.port';
 import { RemoteStoragePort } from '@domain/backup/application/ports/remote-storage.port';
+import { createMockRemoteStorage } from '@test/support/remote-storage.mock';
 import { GpgKeyManagerPort } from '@domain/backup/application/ports/gpg-key-manager.port';
 import { ClockPort } from '@common/clock/clock.port';
 import { FileSystemPort } from '@common/filesystem/filesystem.port';
@@ -57,16 +58,7 @@ describe('RecoverStartupUseCase', () => {
     });
 
   beforeEach(() => {
-    mockStorage = {
-      sync: jest.fn(),
-      prune: jest.fn(),
-      listSnapshots: jest.fn(),
-      restore: jest.fn(),
-      exec: jest.fn(),
-      getCacheInfo: jest.fn(),
-      clearCache: jest.fn(),
-      unlock: jest.fn(),
-    };
+    mockStorage = createMockRemoteStorage();
 
     mockAuditLog = {
       startRun: jest.fn(),

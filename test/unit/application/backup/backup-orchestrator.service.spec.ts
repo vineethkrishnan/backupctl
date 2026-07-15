@@ -14,6 +14,7 @@ import { GpgKeyManagerPort } from '@domain/backup/application/ports/gpg-key-mana
 import { HookExecutorPort } from '@domain/backup/application/ports/hook-executor.port';
 import { LocalCleanupPort } from '@domain/backup/application/ports/local-cleanup.port';
 import { RemoteStoragePort } from '@domain/backup/application/ports/remote-storage.port';
+import { createMockRemoteStorage } from '@test/support/remote-storage.mock';
 import { AuditLogPort } from '@domain/audit/application/ports/audit-log.port';
 import { FallbackWriterPort } from '@domain/audit/application/ports/fallback-writer.port';
 import { NotifierPort } from '@domain/notification/application/ports/notifier.port';
@@ -68,16 +69,7 @@ function createMockDumper(): jest.Mocked<DatabaseDumperPort> {
 }
 
 function createMockStorage(): jest.Mocked<RemoteStoragePort> {
-  return {
-    sync: jest.fn(),
-    prune: jest.fn(),
-    listSnapshots: jest.fn(),
-    restore: jest.fn(),
-    exec: jest.fn(),
-    getCacheInfo: jest.fn(),
-    clearCache: jest.fn(),
-    unlock: jest.fn(),
-  };
+  return createMockRemoteStorage();
 }
 
 function createMockNotifier(): jest.Mocked<NotifierPort> {

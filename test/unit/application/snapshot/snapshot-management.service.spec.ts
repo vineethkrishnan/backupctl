@@ -3,6 +3,7 @@ import { ListSnapshotsQuery } from '@domain/backup/application/use-cases/list-sn
 import { ConfigLoaderPort } from '@domain/config/application/ports/config-loader.port';
 import { RemoteStorageFactoryPort } from '@domain/backup/application/ports/remote-storage-factory.port';
 import { RemoteStoragePort } from '@domain/backup/application/ports/remote-storage.port';
+import { createMockRemoteStorage } from '@test/support/remote-storage.mock';
 import { SnapshotInfo } from '@domain/backup/domain/value-objects/snapshot-info.model';
 import { ProjectConfig } from '@domain/config/domain/project-config.model';
 import { RetentionPolicy } from '@domain/config/domain/retention-policy.model';
@@ -19,16 +20,7 @@ describe('ListSnapshotsUseCase', () => {
     new SnapshotInfo(id, time, ['/data/backups/test'], 'host', ['db'], '100MB');
 
   beforeEach(() => {
-    mockStorage = {
-      sync: jest.fn(),
-      prune: jest.fn(),
-      listSnapshots: jest.fn(),
-      restore: jest.fn(),
-      exec: jest.fn(),
-      getCacheInfo: jest.fn(),
-      clearCache: jest.fn(),
-      unlock: jest.fn(),
-    };
+    mockStorage = createMockRemoteStorage();
 
     mockStorageFactory = {
       create: jest.fn().mockReturnValue(mockStorage),

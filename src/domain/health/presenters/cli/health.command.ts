@@ -20,9 +20,13 @@ export class HealthCommand extends CommandRunner {
       console.log('');
       this.printCheck('Audit DB', result.auditDbConnected);
       this.printCheck('Disk space', result.diskSpaceAvailable, `${result.diskFreeGb} GB free`);
-      this.printCheck('SSH connection', result.sshConnected);
-      this.printCheck('SSH auth', result.sshAuthenticated);
-      this.printCheck('Restic repos', result.resticReposHealthy);
+      for (const check of result.storageChecks) {
+        this.printCheck(
+          `Storage: ${check.project} (${check.backendType})`,
+          check.reachable,
+          check.error ?? undefined,
+        );
+      }
       if (result.uptimeKumaConfigured) {
         this.printCheck('Uptime Kuma', result.uptimeKumaConnected);
       }

@@ -19,7 +19,7 @@ import { ConfigLoaderPort, ValidationResult } from '@domain/config/application/p
 import { BackupResult } from '@domain/backup/domain/backup-result.model';
 import { BackupStage } from '@domain/backup/domain/value-objects/backup-stage.enum';
 import { BackupStatus } from '@domain/backup/domain/value-objects/backup-status.enum';
-import { HealthCheckResult } from '@domain/audit/domain/health-check-result.model';
+import { buildHealthCheckResult } from '@test/support/health-check-result.builder';
 import { SnapshotInfo } from '@domain/backup/domain/value-objects/snapshot-info.model';
 import { ProjectConfig } from '@domain/config/domain/project-config.model';
 import { RetentionPolicy } from '@domain/config/domain/retention-policy.model';
@@ -180,7 +180,7 @@ describe('CLI commands (integration)', () => {
   describe('health command', () => {
     it('should call health check and display results', async () => {
       mockHealthCheck.execute.mockResolvedValue(
-        new HealthCheckResult(true, true, 50, true, true, true, 3600),
+        buildHealthCheckResult(),
       );
 
       await CommandTestFactory.run(commandModule, ['health']);
@@ -191,7 +191,7 @@ describe('CLI commands (integration)', () => {
 
     it('should report unhealthy when audit DB is down', async () => {
       mockHealthCheck.execute.mockResolvedValue(
-        new HealthCheckResult(false, true, 50, true, true, true, 3600),
+        buildHealthCheckResult({ auditDbConnected: false }),
       );
 
       await CommandTestFactory.run(commandModule, ['health']);

@@ -1,7 +1,7 @@
 import { HttpException, HttpStatus } from '@nestjs/common';
 import { HealthController } from '@domain/health/presenters/http/health.controller';
 import { CheckHealthUseCase } from '@domain/health/application/use-cases/check-health/check-health.use-case';
-import { HealthCheckResult } from '@domain/audit/domain/health-check-result.model';
+import { buildHealthCheckResult, buildStorageHealthCheck } from '@test/support/health-check-result.builder';
 
 describe('HealthController', () => {
   let controller: HealthController;
@@ -16,8 +16,7 @@ describe('HealthController', () => {
   });
 
   it('should return healthy response when all checks pass', async () => {
-    const healthyResult = new HealthCheckResult(true, true, 50, true, true, true, 3600);
-    checkHealth.execute.mockResolvedValue(healthyResult);
+    checkHealth.execute.mockResolvedValue(buildHealthCheckResult());
 
     const body = await controller.check();
 
@@ -25,15 +24,14 @@ describe('HealthController', () => {
     expect(body.checks.auditDb).toBe(true);
     expect(body.checks.diskSpace.available).toBe(true);
     expect(body.checks.diskSpace.freeGb).toBe(50);
-    expect(body.checks.ssh.connected).toBe(true);
-    expect(body.checks.ssh.authenticated).toBe(true);
-    expect(body.checks.resticRepos).toBe(true);
+    expect(body.checks.storage).toEqual([
+      { project: 'vinsware', backendType: 'sftp', reachable: true },
+    ]);
     expect(body.uptime).toBe(3600);
   });
 
   it('should throw 503 HttpException when audit DB is down', async () => {
-    const unhealthyResult = new HealthCheckResult(false, true, 50, true, true, true, 3600);
-    checkHealth.execute.mockResolvedValue(unhealthyResult);
+    checkHealth.execute.mockResolvedValue(buildHealthCheckResult({ auditDbConnected: false }));
 
     try {
       await controller.check();
@@ -48,8 +46,9 @@ describe('HealthController', () => {
   });
 
   it('should throw 503 HttpException when disk space is low', async () => {
-    const unhealthyResult = new HealthCheckResult(true, false, 1, true, true, true, 3600);
-    checkHealth.execute.mockResolvedValue(unhealthyResult);
+    checkHealth.execute.mockResolvedValue(
+      buildHealthCheckResult({ diskSpaceAvailable: false, diskFreeGb: 1 }),
+    );
 
     try {
       await controller.check();
@@ -65,9 +64,19 @@ describe('HealthController', () => {
     }
   });
 
-  it('should throw 503 HttpException when SSH is disconnected', async () => {
-    const unhealthyResult = new HealthCheckResult(true, true, 50, false, false, true, 3600);
-    checkHealth.execute.mockResolvedValue(unhealthyResult);
+  it('should throw 503 HttpException when a storage backend is unreachable', async () => {
+    checkHealth.execute.mockResolvedValue(
+      buildHealthCheckResult({
+        storageChecks: [
+          buildStorageHealthCheck({
+            project: 'vinsware',
+            backendType: 's3',
+            reachable: false,
+            error: 'Fatal: unable to open config file',
+          }),
+        ],
+      }),
+    );
 
     try {
       await controller.check();
@@ -77,15 +86,51 @@ describe('HealthController', () => {
       expect(exception.getStatus()).toBe(HttpStatus.SERVICE_UNAVAILABLE);
       const response = exception.getResponse() as Record<string, unknown>;
       const checks = response.checks as Record<string, unknown>;
-      const ssh = checks.ssh as Record<string, unknown>;
-      expect(ssh.connected).toBe(false);
-      expect(ssh.authenticated).toBe(false);
+      expect(checks.storage).toEqual([
+        {
+          project: 'vinsware',
+          backendType: 's3',
+          reachable: false,
+          error: 'Fatal: unable to open config file',
+        },
+      ]);
+    }
+  });
+
+  it('should report healthy when no projects are configured', async () => {
+    checkHealth.execute.mockResolvedValue(buildHealthCheckResult({ storageChecks: [] }));
+
+    const body = await controller.check();
+
+    expect(body.status).toBe('healthy');
+    expect(body.checks.storage).toEqual([]);
+  });
+
+  it('should report per-project results for mixed backends', async () => {
+    checkHealth.execute.mockResolvedValue(
+      buildHealthCheckResult({
+        storageChecks: [
+          buildStorageHealthCheck({ project: 'a', backendType: 's3', reachable: true }),
+          buildStorageHealthCheck({ project: 'b', backendType: 'rclone', reachable: false, error: 'token expired' }),
+        ],
+      }),
+    );
+
+    try {
+      await controller.check();
+      fail('Expected HttpException to be thrown');
+    } catch (error) {
+      const response = (error as HttpException).getResponse() as Record<string, unknown>;
+      const checks = response.checks as Record<string, unknown>;
+      expect(checks.storage).toEqual([
+        { project: 'a', backendType: 's3', reachable: true },
+        { project: 'b', backendType: 'rclone', reachable: false, error: 'token expired' },
+      ]);
     }
   });
 
   it('should match expected response shape', async () => {
-    const result = new HealthCheckResult(true, true, 25, true, true, true, 120);
-    checkHealth.execute.mockResolvedValue(result);
+    checkHealth.execute.mockResolvedValue(buildHealthCheckResult({ diskFreeGb: 25, uptime: 120 }));
 
     const body = await controller.check();
 
@@ -94,27 +139,16 @@ describe('HealthController', () => {
       checks: {
         auditDb: true,
         diskSpace: { available: true, freeGb: 25 },
-        ssh: { connected: true, authenticated: true },
-        resticRepos: true,
+        storage: [{ project: 'vinsware', backendType: 'sftp', reachable: true }],
       },
       uptime: 120,
     });
   });
 
   it('should include uptimeKuma in response when configured', async () => {
-    const result = new HealthCheckResult(
-      true,
-      true,
-      50,
-      true,
-      true,
-      true,
-      3600,
-      true,
-      true,
-      true,
+    checkHealth.execute.mockResolvedValue(
+      buildHealthCheckResult({ uptimeKumaConfigured: true, uptimeKumaConnected: true }),
     );
-    checkHealth.execute.mockResolvedValue(result);
 
     const body = await controller.check();
 
@@ -123,19 +157,9 @@ describe('HealthController', () => {
   });
 
   it('should include uptimeKuma when configured but disconnected without affecting healthy status', async () => {
-    const result = new HealthCheckResult(
-      true,
-      true,
-      50,
-      true,
-      true,
-      true,
-      3600,
-      true,
-      false,
-      true,
+    checkHealth.execute.mockResolvedValue(
+      buildHealthCheckResult({ uptimeKumaConfigured: true, uptimeKumaConnected: false }),
     );
-    checkHealth.execute.mockResolvedValue(result);
 
     const body = await controller.check();
 

@@ -151,6 +151,17 @@ export class ResticStorageAdapter implements RemoteStoragePort {
     await safeExecFile('restic', ['unlock'], { env: this.getEnv() });
   }
 
+  /**
+   * Reads the repository config, which proves reachability, credentials and the
+   * repository password in one round trip. Throws with restic's own message.
+   */
+  async checkConnectivity(): Promise<void> {
+    await safeExecFile('restic', ['cat', 'config'], {
+      env: this.getEnv(),
+      timeout: 30000,
+    });
+  }
+
   private getEnv(): Record<string, string> {
     return {
       RESTIC_REPOSITORY: this.repository,

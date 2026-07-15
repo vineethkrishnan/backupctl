@@ -18,4 +18,5 @@ export interface RemoteStoragePort {
   getCacheInfo(): Promise<CacheInfo>;
   clearCache(): Promise<void>;
   unlock(): Promise<void>;
+  checkConnectivity(): Promise<void>;
 }

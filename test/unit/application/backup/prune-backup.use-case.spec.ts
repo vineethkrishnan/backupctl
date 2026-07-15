@@ -4,6 +4,7 @@ import { PruneBackupCommand } from '@domain/backup/application/use-cases/prune-b
 import { ConfigLoaderPort } from '@domain/config/application/ports/config-loader.port';
 import { RemoteStorageFactoryPort } from '@domain/backup/application/ports/remote-storage-factory.port';
 import { RemoteStoragePort } from '@domain/backup/application/ports/remote-storage.port';
+import { createMockRemoteStorage } from '@test/support/remote-storage.mock';
 import { PruneResult } from '@domain/backup/domain/value-objects/prune-result.model';
 import { ProjectConfig } from '@domain/config/domain/project-config.model';
 import { RetentionPolicy } from '@domain/config/domain/retention-policy.model';
@@ -20,16 +21,7 @@ describe('PruneBackupUseCase', () => {
     buildProjectConfig({ name, enabled, retention: new RetentionPolicy(7, 7, 4, 6) });
 
   beforeEach(() => {
-    mockStorage = {
-      sync: jest.fn(),
-      prune: jest.fn(),
-      listSnapshots: jest.fn(),
-      restore: jest.fn(),
-      exec: jest.fn(),
-      getCacheInfo: jest.fn(),
-      clearCache: jest.fn(),
-      unlock: jest.fn(),
-    };
+    mockStorage = createMockRemoteStorage();
 
     mockStorageFactory = {
       create: jest.fn().mockReturnValue(mockStorage),

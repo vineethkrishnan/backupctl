@@ -7,8 +7,7 @@ interface HealthResponse {
   checks: {
     auditDb: boolean;
     diskSpace: { available: boolean; freeGb: number };
-    ssh: { connected: boolean; authenticated: boolean };
-    resticRepos: boolean;
+    storage: Array<{ project: string; backendType: string; reachable: boolean; error?: string }>;
     uptimeKuma?: { configured: boolean; connected: boolean };
   };
   uptime: number;
@@ -30,11 +29,12 @@ export class HealthController {
           available: result.diskSpaceAvailable,
           freeGb: result.diskFreeGb,
         },
-        ssh: {
-          connected: result.sshConnected,
-          authenticated: result.sshAuthenticated,
-        },
-        resticRepos: result.resticReposHealthy,
+        storage: result.storageChecks.map((check) => ({
+          project: check.project,
+          backendType: check.backendType,
+          reachable: check.reachable,
+          ...(check.error ? { error: check.error } : {}),
+        })),
         ...(result.uptimeKumaConfigured && {
           uptimeKuma: {
             configured: result.uptimeKumaConfigured,

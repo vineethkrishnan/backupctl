@@ -32,6 +32,7 @@ import { PruneResult } from '@domain/backup/domain/value-objects/prune-result.mo
 import { CleanupResult } from '@domain/backup/domain/value-objects/cleanup-result.model';
 import { RetentionPolicy } from '@domain/config/domain/retention-policy.model';
 import { buildProjectConfig } from '@test/support/project-config.builder';
+import { createMockRemoteStorage } from '@test/support/remote-storage.mock';
 import { CacheInfo } from '@domain/backup/domain/value-objects/cache-info.model';
 
 import {
@@ -235,7 +236,7 @@ describe('RunBackupUseCase (integration flow)', () => {
       testConnection: jest.fn().mockResolvedValue(undefined),
     };
 
-    mockStorage = {
+    mockStorage = createMockRemoteStorage({
       sync: jest.fn().mockResolvedValue(new SyncResult('snap-abc123', 2, 1, 512000, 8000)),
       prune: jest.fn().mockResolvedValue(new PruneResult(1, '100MB')),
       listSnapshots: jest.fn().mockResolvedValue([]),
@@ -244,7 +245,7 @@ describe('RunBackupUseCase (integration flow)', () => {
       getCacheInfo: jest.fn().mockResolvedValue({ totalSize: '10MB', location: '/tmp/cache' } as unknown as CacheInfo),
       clearCache: jest.fn().mockResolvedValue(undefined),
       unlock: jest.fn().mockResolvedValue(undefined),
-    };
+    });
 
     mockNotifier = {
       notifyStarted: jest.fn().mockResolvedValue(undefined),
