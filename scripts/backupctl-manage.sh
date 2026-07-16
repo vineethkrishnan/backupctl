@@ -142,8 +142,9 @@ projects: []
   #     password: ${DB_PASSWORD}
   #   compression:
   #     enabled: true
-  #   restic:
-  #     repository_path: backups/myproject
+  #   storage:
+  #     type: sftp            # sftp | s3 | b2 | rclone | local
+  #     repository: backups/myproject
   #     password: ${RESTIC_PASSWORD}
   #     snapshot_mode: combined
   #   retention:
