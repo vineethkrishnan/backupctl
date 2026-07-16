@@ -13,3 +13,15 @@ export interface StorageConfig {
   readonly snapshotMode: SnapshotMode;
   readonly config: Record<string, string>;
 }
+
+/**
+ * Shared by config validation and the backend resolvers so the two cannot disagree
+ * about what a backend needs.
+ */
+export const REQUIRED_STORAGE_CONFIG_KEYS: Record<StorageBackendType, readonly string[]> = {
+  sftp: [],
+  s3: ['endpoint', 'access_key_id', 'secret_access_key'],
+  b2: ['account_id', 'account_key'],
+  rclone: [],
+  local: [],
+};

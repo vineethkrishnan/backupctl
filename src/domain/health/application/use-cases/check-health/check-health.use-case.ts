@@ -4,6 +4,7 @@ import { AuditLogPort } from '@domain/audit/application/ports/audit-log.port';
 import { HeartbeatMonitorPort } from '@domain/backup/application/ports/heartbeat-monitor.port';
 import { RemoteStorageFactoryPort } from '@domain/backup/application/ports/remote-storage-factory.port';
 import { ConfigLoaderPort } from '@domain/config/application/ports/config-loader.port';
+import { ProjectConfig } from '@domain/config/domain/project-config.model';
 import { SystemHealthPort } from '@domain/health/application/ports/system-health.port';
 import { HealthCheckResult, StorageHealthCheck } from '@domain/audit/domain/health-check-result.model';
 import { ClockPort } from '@common/clock/clock.port';
@@ -89,7 +90,7 @@ export class CheckHealthUseCase {
   }
 
   private async probeStorageBackends(): Promise<StorageHealthCheck[]> {
-    let projects;
+    let projects: ProjectConfig[];
     try {
       projects = this.configLoader.loadAll().filter((project) => project.enabled);
     } catch (error) {
@@ -97,18 +98,20 @@ export class CheckHealthUseCase {
       return [];
     }
 
-    return Promise.all(projects.map((project) => this.probeProject(project.name, project.storage.type)));
+    return Promise.all(projects.map((project) => this.probeProject(project)));
   }
 
-  private async probeProject(projectName: string, backendType: string): Promise<StorageHealthCheck> {
+  private async probeProject(project: ProjectConfig): Promise<StorageHealthCheck> {
+    const check = { project: project.name, backendType: project.storage.type };
+
     try {
-      const storage = this.storageFactory.create(this.configLoader.getProject(projectName));
+      const storage = this.storageFactory.create(project);
       await storage.checkConnectivity();
-      return { project: projectName, backendType, reachable: true, error: null };
+      return { ...check, reachable: true, error: null };
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      this.logger.warn(`Storage check failed for ${projectName}: ${message}`);
-      return { project: projectName, backendType, reachable: false, error: message };
+      this.logger.warn(`Storage check failed for ${project.name}: ${message}`);
+      return { ...check, reachable: false, error: message };
     }
   }
 }

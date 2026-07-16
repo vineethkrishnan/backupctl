@@ -1,5 +1,6 @@
 import * as fs from 'fs';
 import * as yaml from 'js-yaml';
+import { Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { YamlConfigLoaderAdapter } from '@domain/config/infrastructure/yaml-config-loader.adapter';
 import { ProjectConfig } from '@domain/config/domain/project-config.model';
@@ -304,6 +305,37 @@ describe('YamlConfigLoaderAdapter', () => {
       mockedFs.readFileSync.mockReturnValue(buildMinimalYaml());
 
       expect(createAdapter().validate().isValid).toBe(true);
+    });
+
+    it('warns about the deprecated block only once, however often loadAll is called', () => {
+      mockedFs.readFileSync.mockReturnValue(buildMinimalYaml());
+      const warnSpy = jest.spyOn(Logger.prototype, 'warn').mockImplementation();
+      const adapter = createAdapter();
+
+      adapter.loadAll();
+      adapter.loadAll();
+      adapter.loadAll();
+
+      const deprecationWarnings = warnSpy.mock.calls.filter((call) =>
+        String(call[0]).includes('is deprecated'),
+      );
+      expect(deprecationWarnings).toHaveLength(1);
+      warnSpy.mockRestore();
+    });
+
+    it('warns again after an explicit reload', () => {
+      mockedFs.readFileSync.mockReturnValue(buildMinimalYaml());
+      const warnSpy = jest.spyOn(Logger.prototype, 'warn').mockImplementation();
+      const adapter = createAdapter();
+
+      adapter.loadAll();
+      adapter.reload();
+
+      const deprecationWarnings = warnSpy.mock.calls.filter((call) =>
+        String(call[0]).includes('is deprecated'),
+      );
+      expect(deprecationWarnings).toHaveLength(2);
+      warnSpy.mockRestore();
     });
 
     it('rejects a config carrying both restic and storage', () => {

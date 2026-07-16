@@ -180,6 +180,12 @@ describe('ResticStorageFactory', () => {
       expect(env.RESTIC_REPOSITORY).toContain('s3:');
     });
 
+    it('tolerates a leading slash on the repository, as carried over from an sftp config', async () => {
+      const env = await envFromCreatedStorage(buildStorageConfig({ ...s3Config, repository: '/my-bucket/vinsware' }));
+
+      expect(env.RESTIC_REPOSITORY).toBe('s3:https://s3.eu-central-003.backblazeb2.com/my-bucket/vinsware');
+    });
+
     it('strips a trailing slash from the endpoint', async () => {
       const env = await envFromCreatedStorage(
         buildStorageConfig({ ...s3Config, config: { ...s3Config.config, endpoint: 'https://s3.example.com/' } }),
@@ -222,6 +228,16 @@ describe('ResticStorageFactory', () => {
       expect(env.RESTIC_REPOSITORY).toBe('b2:my-bucket:vinsware');
       expect(env.B2_ACCOUNT_ID).toBe('acct');
       expect(env.B2_ACCOUNT_KEY).toBe('acct-key');
+    });
+
+    it('rejects the s3-style bucket/path form, which b2 does not accept', () => {
+      const config = buildStorageConfig({
+        type: 'b2',
+        repository: 'my-bucket/vinsware',
+        config: { account_id: 'acct', account_key: 'acct-key' },
+      });
+
+      expect(() => factory.create(config)).toThrow('is not a valid b2 target');
     });
   });
 

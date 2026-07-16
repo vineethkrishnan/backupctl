@@ -7,19 +7,12 @@ import { ConfigLoaderPort, ValidationResult } from '@domain/config/application/p
 import { ProjectConfig } from '@domain/config/domain/project-config.model';
 import { RetentionPolicy } from '@domain/config/domain/retention-policy.model';
 import {
+  REQUIRED_STORAGE_CONFIG_KEYS,
   SNAPSHOT_MODES,
   STORAGE_BACKEND_TYPES,
   SnapshotMode,
   StorageBackendType,
 } from '@domain/config/domain/storage-config.model';
-
-const REQUIRED_STORAGE_CONFIG_KEYS: Record<StorageBackendType, string[]> = {
-  sftp: [],
-  s3: ['endpoint', 'access_key_id', 'secret_access_key'],
-  b2: ['account_id', 'account_key'],
-  rclone: [],
-  local: [],
-};
 
 interface RawProjectEntry {
   name: string;
@@ -85,6 +78,7 @@ interface RawYamlConfig {
 export class YamlConfigLoaderAdapter implements ConfigLoaderPort {
   private readonly logger = new Logger(YamlConfigLoaderAdapter.name);
   private projects: ProjectConfig[] | null = null;
+  private readonly warnedLegacyProjects = new Set<string>();
   private readonly configPath: string;
 
   constructor(private readonly configService: ConfigService) {
@@ -255,6 +249,7 @@ export class YamlConfigLoaderAdapter implements ConfigLoaderPort {
   reload(): void {
     this.logger.log('Reloading project configuration');
     this.projects = null;
+    this.warnedLegacyProjects.clear();
     this.loadAll();
   }
 
@@ -364,19 +359,20 @@ export class YamlConfigLoaderAdapter implements ConfigLoaderPort {
    * Remove once no deployment carries a legacy config.
    */
   private normalizeLegacyStorage(entry: RawProjectEntry): void {
-    if (!entry.restic || entry.storage) return;
+    const legacyStorage = this.legacyStorageView(entry);
+    if (!legacyStorage || entry.storage) return;
 
-    this.logger.warn(
-      `Project "${entry.name}": the "restic" config block is deprecated — rename it to "storage" ` +
-        'with "type: sftp" and "repository" in place of "repository_path".',
-    );
+    // loadAll() re-reads the file on every call, and callers include the health probe
+    // on a 5-minute timer — warn once per project rather than forever.
+    if (!this.warnedLegacyProjects.has(entry.name)) {
+      this.warnedLegacyProjects.add(entry.name);
+      this.logger.warn(
+        `Project "${entry.name}": the "restic" config block is deprecated — rename it to "storage" ` +
+          'with "type: sftp" and "repository" in place of "repository_path".',
+      );
+    }
 
-    entry.storage = {
-      type: 'sftp',
-      repository: entry.restic.repository_path,
-      password: entry.restic.password,
-      snapshot_mode: entry.restic.snapshot_mode,
-    };
+    entry.storage = legacyStorage;
   }
 
   private buildProjectConfig(raw: RawProjectEntry): ProjectConfig {
