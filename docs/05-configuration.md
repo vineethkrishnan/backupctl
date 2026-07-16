@@ -31,12 +31,25 @@ Most configuration changes in `projects.yml` take effect automatically on the ne
 
 ### Hetzner Storage Box
 
+Only required when a project uses `storage.type: sftp`. An S3-only or rclone-only deployment can leave these unset.
+
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `HETZNER_SSH_HOST` | — | **Required.** Storage box hostname (e.g., `u123456.your-storagebox.de`) |
-| `HETZNER_SSH_USER` | — | **Required.** Storage box SSH user (e.g., `u123456`) |
+| `HETZNER_SSH_HOST` | — | Storage box hostname (e.g., `u123456.your-storagebox.de`) |
+| `HETZNER_SSH_USER` | — | Storage box SSH user (e.g., `u123456`) |
 | `HETZNER_SSH_PORT` | `23` | SSH port for the storage box |
 | `HETZNER_SSH_KEY_PATH` | `/home/node/.ssh/id_ed25519` | Path to SSH private key inside the container |
+
+### Storage Backend Credentials
+
+Referenced from `projects.yml` via `${}` under `storage.config`. Only set what you use. See [Storage](#storage) for the full backend list.
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `B2_ENDPOINT` | — | S3 endpoint, e.g. `https://s3.eu-central-003.backblazeb2.com` |
+| `B2_KEY_ID` | — | S3 access key ID |
+| `B2_APP_KEY` | — | S3 secret access key |
+| `RCLONE_CONFIG_PATH` | rclone's default (`/home/node/.config/rclone/rclone.conf`) | Path to the rclone config file. Must be writable — rclone rewrites refreshed OAuth tokens into it |
 
 ### Restic
 
@@ -90,6 +103,7 @@ These are used when a project has no `encryption` block in YAML.
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `HEALTH_DISK_MIN_FREE_GB` | `5` | Minimum free disk space in GB before health check fails |
+| `HEALTH_STORAGE_CHECK_TTL_SECONDS` | `300` | How long `/health` caches its per-project storage reachability probe. Each probe is a real restic round trip, so lowering this increases API calls (and cost) against billed backends like B2 |
 
 ### Daily Summary
 
@@ -155,13 +169,92 @@ Only applies when `database` is configured.
 |-------|------|----------|---------|-------------|
 | `assets.paths` | string[] | no | `[]` | Filesystem paths to include in the backup alongside the database dump (or as the sole backup target for files-only projects). Paths that don't exist at backup time are skipped with a warning |
 
-### Restic
+### Storage
+
+Each project chooses its own backend. Whatever the backend, restic encrypts the repository, so the provider never sees plaintext.
 
 | Field | Type | Required | Default | Description |
 |-------|------|----------|---------|-------------|
-| `restic.repository_path` | string | yes | — | Path on the Hetzner Storage Box for this project's restic repo. **Must be relative** (e.g., `backups/myproject`, not `/backups/myproject`) — Hetzner Storage Box chroots to the user home directory |
-| `restic.password` | string | no | `RESTIC_PASSWORD` from `.env` | Per-project restic repo password |
-| `restic.snapshot_mode` | string | no | `combined` | `combined` (one snapshot for dump + assets) or `separate` (individual snapshots) |
+| `storage.type` | string | no | `sftp` | One of `sftp`, `s3`, `b2`, `rclone`, `local` |
+| `storage.repository` | string | yes | — | Repository location. Meaning depends on `type` — see the table below |
+| `storage.password` | string | no | `RESTIC_PASSWORD` from `.env` | Per-project restic repo password |
+| `storage.snapshot_mode` | string | no | `combined` | `combined` (one snapshot for dump + assets) or `separate` (individual snapshots) |
+| `storage.config` | map | depends | `{}` | Per-backend credentials. Required keys depend on `type` |
+
+#### Backends
+
+| `type` | `repository` format | Required `config` keys | Notes |
+|--------|--------------------|------------------------|-------|
+| `sftp` | `backups/myproject` | none — uses `HETZNER_SSH_*` from `.env` | **Must be relative** — Hetzner Storage Box chroots to the user home directory |
+| `s3` | `<bucket>/<path>` | `endpoint`, `access_key_id`, `secret_access_key`. Optional `region` | Backblaze B2, Wasabi, Cloudflare R2, MinIO, AWS S3 |
+| `b2` | `<bucket>:<path>` | `account_id`, `account_key` | B2's native API. Restic recommends using `s3` against B2 instead |
+| `rclone` | `<remote>:<path>` | none. Optional `config_path` | Google Drive, OneDrive, Dropbox. Requires an authorized rclone remote |
+| `local` | `/srv/restic-repo` | none | A path inside the container. Useful for testing or a mounted disk |
+
+`config validate` checks the required keys for the chosen type, so a missing credential is caught before a backup runs rather than at 2am.
+
+#### Backblaze B2 / S3-compatible
+
+The recommended cloud backend. One block covers every S3-compatible provider; only the endpoint changes.
+
+```yaml
+storage:
+  type: s3
+  repository: my-backup-bucket/myproject
+  password: ${MYPROJECT_RESTIC_PASSWORD}
+  snapshot_mode: combined
+  config:
+    endpoint: ${B2_ENDPOINT}          # https://s3.eu-central-003.backblazeb2.com
+    access_key_id: ${B2_KEY_ID}
+    secret_access_key: ${B2_APP_KEY}
+```
+
+#### Google Drive, OneDrive, Dropbox (rclone)
+
+These go through rclone, which needs an authorized remote. OAuth needs a browser, so authorize on your laptop and paste the token into the container:
+
+```bash
+rclone authorize "drive"                    # on a machine with a browser
+docker exec -it backupctl rclone config     # paste the token here
+```
+
+The remote name becomes the repository prefix:
+
+```yaml
+storage:
+  type: rclone
+  repository: gdrive:backups/myproject
+  password: ${MYPROJECT_RESTIC_PASSWORD}
+```
+
+rclone's config lives at `/home/node/.config/rclone/rclone.conf`, mounted read-write from `./rclone-config`. That mount **must stay writable**: rclone rewrites refreshed OAuth tokens into it, and a read-only mount loses them on every container recreate, surfacing later as an expired-token failure.
+
+Worth knowing before you pick these: a restic repository is thousands of small pack files, and consumer Drive/OneDrive/Dropbox APIs are rate-limited and slow for that access pattern. Fine for modest data; prefer `s3` for anything large. Automated bulk storage on consumer tiers is also a grey area in those providers' terms.
+
+::: warning iCloud is not supported
+rclone's iCloud Drive backend is experimental, rejects app-specific passwords, and needs interactive 2FA with a trust token that expires every 30 days — which breaks unattended cron backups and would put your primary Apple ID password in `.env`.
+:::
+
+#### Deprecated: the `restic:` block
+
+The old SFTP-only block still works and is read as `storage:` with `type: sftp`, logging a warning on load. Migrate by renaming the key and `repository_path` → `repository`:
+
+```yaml
+# Before
+restic:
+  repository_path: backups/myproject
+  password: ${MYPROJECT_RESTIC_PASSWORD}
+  snapshot_mode: combined
+
+# After
+storage:
+  type: sftp
+  repository: backups/myproject
+  password: ${MYPROJECT_RESTIC_PASSWORD}
+  snapshot_mode: combined
+```
+
+Specifying both `restic:` and `storage:` is a validation error.
 
 ### Retention
 
@@ -256,7 +349,7 @@ Times are interpreted in the timezone set by the `TIMEZONE` environment variable
 A single restic snapshot contains both the database dump and all asset paths. Tagged with `backupctl:combined,project:{name}`.
 
 ```yaml
-restic:
+storage:
   snapshot_mode: combined
 ```
 
@@ -269,7 +362,7 @@ Cons: any change in assets triggers a new snapshot even if the DB hasn't changed
 Individual restic snapshots for the database dump and each asset path. The dump snapshot is tagged `backupctl:db,project:{name}`. Each asset snapshot is tagged `backupctl:assets:{path},project:{name}`.
 
 ```yaml
-restic:
+storage:
   snapshot_mode: separate
 ```
 
@@ -364,8 +457,9 @@ projects:
         - /data/vinsware/uploads
         - /data/vinsware/assets
 
-    restic:
-      repository_path: backups/vinsware
+    storage:
+      type: sftp
+      repository: backups/vinsware
       password: ${VINSWARE_RESTIC_PASSWORD}
       snapshot_mode: combined
 
@@ -414,8 +508,9 @@ projects:
       paths:
         - /data/projectx/storage
 
-    restic:
-      repository_path: backups/project-x
+    storage:
+      type: sftp
+      repository: backups/project-x
       snapshot_mode: separate
 
     retention:
@@ -449,8 +544,9 @@ projects:
     assets:
       paths: []
 
-    restic:
-      repository_path: backups/analytics
+    storage:
+      type: sftp
+      repository: backups/analytics
       snapshot_mode: combined
 
     retention:
@@ -471,8 +567,9 @@ projects:
         - /data/static/uploads
         - /data/static/media
 
-    restic:
-      repository_path: backups/static-assets
+    storage:
+      type: sftp
+      repository: backups/static-assets
       snapshot_mode: combined
 
     retention:

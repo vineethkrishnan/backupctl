@@ -229,7 +229,7 @@ Generates `.env` and `config/projects.yml` from all collected values.
 [10/14] Generating configuration files
   ✓ .env created
   ✓ config/projects.yml created
-  ✓ Directories created: config/, ssh-keys/, gpg-keys/
+  ✓ Directories created: config/, ssh-keys/, gpg-keys/, rclone-config/
 ```
 
 ### 11. Build and Deploy
@@ -295,7 +295,7 @@ You can also install shortcuts separately at any time:
 
 ```bash
 mkdir backupctl && cd backupctl
-mkdir -p config ssh-keys gpg-keys
+mkdir -p config ssh-keys gpg-keys rclone-config
 ```
 
 **Or from source:**
@@ -303,7 +303,7 @@ mkdir -p config ssh-keys gpg-keys
 ```bash
 git clone https://github.com/vineethkrishnan/backupctl.git && cd backupctl
 npm ci
-mkdir -p config ssh-keys gpg-keys
+mkdir -p config ssh-keys gpg-keys rclone-config
 ```
 
 ### 2. Create docker-compose.yml
@@ -325,6 +325,9 @@ services:
       - ./config:/app/config:ro
       - ./ssh-keys:/home/node/.ssh:ro
       - ./gpg-keys:/app/gpg-keys:ro
+      # Deliberately writable, unlike the mounts above: rclone rewrites refreshed
+      # OAuth tokens into its config. Only needed for storage.type: rclone.
+      - ./rclone-config:/home/node/.config/rclone
       - /var/run/docker.sock:/var/run/docker.sock:ro
     group_add:
       - '${DOCKER_GID:-999}'
@@ -420,8 +423,9 @@ projects:
       user: backup_user
       password: ${VINSWARE_DB_PASSWORD}
 
-    restic:
-      repository_path: backups/vinsware
+    storage:
+      type: sftp
+      repository: backups/vinsware
       snapshot_mode: combined
 
     retention:

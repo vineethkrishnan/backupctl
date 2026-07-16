@@ -14,8 +14,10 @@ projects:
       paths:
         - /data/vinsware/uploads
         - /data/vinsware/assets
-    restic:
-      repository_path: /backups/vinsware
+    # Hetzner Storage Box over SSH. Credentials come from the HETZNER_SSH_* vars in .env.
+    storage:
+      type: sftp
+      repository: /backups/vinsware
       password: ${VINSWARE_RESTIC_PASSWORD}
       snapshot_mode: combined
     retention:
@@ -54,9 +56,19 @@ projects:
     assets:
       paths:
         - /data/projectx/storage
-    restic:
-      repository_path: /backups/project-x
+    # Backblaze B2 via its S3-compatible API — restic recommends this over the native
+    # b2: backend. The same block works for Wasabi, Cloudflare R2, MinIO and AWS S3:
+    # only the endpoint changes. `repository` is <bucket>/<path>.
+    # Omitting `password` falls back to RESTIC_PASSWORD in .env.
+    storage:
+      type: s3
+      repository: my-backup-bucket/project-x
       snapshot_mode: separate
+      config:
+        endpoint: ${B2_ENDPOINT}
+        access_key_id: ${B2_KEY_ID}
+        secret_access_key: ${B2_APP_KEY}
+        # region: eu-central-1   # only needed by providers that require it
     retention:
       local_days: 14
       keep_daily: 14
@@ -87,8 +99,38 @@ projects:
       password: ${PROJECTY_DB_PASSWORD}
     assets:
       paths: []
+    # DEPRECATED shape, still accepted: a bare `restic:` block is read as
+    # `storage: { type: sftp }` and logs a warning. Prefer `storage:` as above.
     restic:
       repository_path: /backups/project-y
+      snapshot_mode: combined
+    retention:
+      local_days: 7
+      keep_daily: 7
+      keep_weekly: 4
+
+  # Google Drive / OneDrive / Dropbox via rclone. Authorize the remote first:
+  #   rclone authorize "drive"                    # on a machine with a browser
+  #   docker exec -it backupctl rclone config     # paste the token in here
+  # `repository` is <rclone-remote>:<path>. Consumer cloud APIs are rate-limited and
+  # slow for restic's many small pack files — fine for modest data, but prefer s3 for
+  # anything large.
+  - name: project-z
+    enabled: false
+    cron: '0 4 * * *'
+    database:
+      type: postgres
+      host: postgres-projectz
+      port: 5432
+      name: projectz_db
+      user: backup_user
+      password: ${PROJECTZ_DB_PASSWORD}
+    assets:
+      paths: []
+    storage:
+      type: rclone
+      repository: gdrive:backups/project-z
+      password: ${PROJECTZ_RESTIC_PASSWORD}
       snapshot_mode: combined
     retention:
       local_days: 7

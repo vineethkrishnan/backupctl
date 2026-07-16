@@ -153,8 +153,9 @@ backupctl restic myproject init
 
 ```yaml
 # Relative to the storage box user's home (avoid a leading slash, e.g. not `/backups/...`)
-restic:
-  repository_path: backups/myproject
+storage:
+  type: sftp
+  repository: backups/myproject
 ```
 
 The resulting SFTP URI should look like `sftp:user@host:backups/myproject` (no leading `/` after the colon).

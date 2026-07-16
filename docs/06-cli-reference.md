@@ -232,19 +232,19 @@ None.
 ```
 $ backupctl health
 
-=== System Health Check ===
+System unhealthy
 
-  ✅ Audit DB — Connected (PostgreSQL 16.2, 142 records)
-  ❌ Disk space — 3.2 GB free (minimum: 5 GB)
-  ✅ SSH — Connection to u123456.your-storagebox.de successful
-  ✅ Restic repo (vinsware) — Repository OK, 42 snapshots
-  ❌ Restic repo (project-x) — Lock detected, may need unlock
-  ✅ Restic repo (project-y) — Repository OK, 14 snapshots
-
-⚠️  2 check(s) failed. Run "backupctl restic project-x unlock" for stale locks.
+  ✓ Audit DB
+  ✗ Disk space (3.2 GB free)
+  ✓ Storage: vinsware (sftp)
+  ✗ Storage: project-x (s3) (Fatal: unable to open config file: Stat: The request signature we calculated does not match the signature you provided)
+  ✓ Storage: project-y (rclone)
+  Uptime: 2h 15m
 
 Exit code: 1
 ```
+
+Each project is probed through its own backend, so one unreachable repository does not mask the others.
 
 ---
 
