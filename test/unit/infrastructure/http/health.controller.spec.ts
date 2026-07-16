@@ -1,18 +1,89 @@
 import { HttpException, HttpStatus } from '@nestjs/common';
 import { HealthController } from '@domain/health/presenters/http/health.controller';
 import { CheckHealthUseCase } from '@domain/health/application/use-cases/check-health/check-health.use-case';
+import { CheckLivenessUseCase } from '@domain/health/application/use-cases/check-liveness/check-liveness.use-case';
+import { LivenessResult } from '@domain/health/domain/liveness-result.model';
 import { buildHealthCheckResult, buildStorageHealthCheck } from '@test/support/health-check-result.builder';
 
 describe('HealthController', () => {
   let controller: HealthController;
   let checkHealth: jest.Mocked<CheckHealthUseCase>;
+  let checkLiveness: jest.Mocked<CheckLivenessUseCase>;
 
   beforeEach(() => {
     checkHealth = {
       execute: jest.fn(),
     } as unknown as jest.Mocked<CheckHealthUseCase>;
 
-    controller = new HealthController(checkHealth);
+    checkLiveness = {
+      execute: jest.fn().mockResolvedValue(
+        new LivenessResult({
+          auditDbConnected: true,
+          diskSpaceAvailable: true,
+          diskFreeGb: 50,
+          uptime: 3600,
+        }),
+      ),
+    } as unknown as jest.Mocked<CheckLivenessUseCase>;
+
+    controller = new HealthController(checkHealth, checkLiveness);
+  });
+
+  describe('GET /health/live', () => {
+    it('returns healthy without probing remote storage', async () => {
+      const body = await controller.live();
+
+      expect(body).toEqual({
+        status: 'healthy',
+        checks: { auditDb: true, diskSpace: { available: true, freeGb: 50 } },
+        uptime: 3600,
+      });
+      expect(checkHealth.execute).not.toHaveBeenCalled();
+    });
+
+    it('stays healthy when a storage backend is down, so Docker will not restart the container', async () => {
+      checkHealth.execute.mockResolvedValue(
+        buildHealthCheckResult({
+          storageChecks: [buildStorageHealthCheck({ reachable: false, error: 'B2 outage' })],
+        }),
+      );
+
+      const body = await controller.live();
+
+      expect(body.status).toBe('healthy');
+      expect(checkHealth.execute).not.toHaveBeenCalled();
+    });
+
+    it('returns 503 when the audit DB is down', async () => {
+      checkLiveness.execute.mockResolvedValue(
+        new LivenessResult({
+          auditDbConnected: false,
+          diskSpaceAvailable: true,
+          diskFreeGb: 50,
+          uptime: 3600,
+        }),
+      );
+
+      await expect(controller.live()).rejects.toThrow(HttpException);
+    });
+
+    it('returns 503 when disk space is low', async () => {
+      checkLiveness.execute.mockResolvedValue(
+        new LivenessResult({
+          auditDbConnected: true,
+          diskSpaceAvailable: false,
+          diskFreeGb: 1,
+          uptime: 3600,
+        }),
+      );
+
+      try {
+        await controller.live();
+        fail('Expected HttpException to be thrown');
+      } catch (error) {
+        expect((error as HttpException).getStatus()).toBe(HttpStatus.SERVICE_UNAVAILABLE);
+      }
+    });
   });
 
   it('should return healthy response when all checks pass', async () => {

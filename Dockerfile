@@ -88,7 +88,9 @@ RUN chmod +x /usr/local/bin/docker-entrypoint.sh \
 USER node
 
 EXPOSE 3100
+# /health/live is container-local only. /health additionally probes remote storage,
+# which must not restart the container when a cloud backend has an outage.
 HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 \
-  CMD curl -f http://localhost:${APP_PORT:-3100}/health || exit 1
+  CMD curl -f http://localhost:${APP_PORT:-3100}/health/live || exit 1
 ENTRYPOINT ["/sbin/tini", "--", "docker-entrypoint.sh"]
 CMD ["node", "dist/main.js"]

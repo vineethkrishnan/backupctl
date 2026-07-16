@@ -4,6 +4,7 @@ import { AuditModule } from '@domain/audit/audit.module';
 import { BackupModule } from '@domain/backup/backup.module';
 import { SystemHealthAdapter } from './infrastructure/adapters/system-health.adapter';
 import { CheckHealthUseCase } from './application/use-cases/check-health/check-health.use-case';
+import { CheckLivenessUseCase } from './application/use-cases/check-liveness/check-liveness.use-case';
 import { HealthCommand } from './presenters/cli/health.command';
 import { HealthController } from './presenters/http/health.controller';
 import { SYSTEM_HEALTH_PORT } from '@common/di/injection-tokens';
@@ -13,6 +14,7 @@ import { SYSTEM_HEALTH_PORT } from '@common/di/injection-tokens';
   controllers: [HealthController],
   providers: [
     CheckHealthUseCase,
+    CheckLivenessUseCase,
     HealthCommand,
     { provide: SYSTEM_HEALTH_PORT, useClass: SystemHealthAdapter },
   ],
