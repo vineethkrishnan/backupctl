@@ -8,7 +8,7 @@ export function buildStorageHealthCheck(
   overrides: Partial<StorageHealthCheck> = {},
 ): StorageHealthCheck {
   return {
-    project: 'vinsware',
+    project: 'vinelab',
     backendType: 'sftp',
     reachable: true,
     error: null,

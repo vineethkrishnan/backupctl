@@ -259,8 +259,8 @@ LOG_MAX_FILES=5
 GPG_KEYS_DIR=/app/gpg-keys
 
 # Project DB passwords (referenced in projects.yml via ${})
-VINSWARE_DB_PASSWORD=secret
-VINSWARE_RESTIC_PASSWORD=restic-secret
+VINELAB_DB_PASSWORD=secret
+VINELAB_RESTIC_PASSWORD=restic-secret
 PROJECTX_DB_PASSWORD=secret
 PROJECTY_DB_PASSWORD=secret
 EMAIL_PASSWORD=smtp-secret
@@ -270,30 +270,30 @@ EMAIL_PASSWORD=smtp-secret
 
 ```yaml
 projects:
-  - name: vinsware
+  - name: vinelab
     enabled: true
     cron: "0 0 * * *"
     timeout_minutes: 30
 
     database:
       type: postgres
-      host: postgres-vinsware
+      host: postgres-vinelab
       port: 5432
-      name: vinsware_db
+      name: vinelab_db
       user: backup_user
-      password: ${VINSWARE_DB_PASSWORD}
+      password: ${VINELAB_DB_PASSWORD}
 
     compression:
       enabled: true              # per-project override (default: true)
 
     assets:
       paths:
-        - /data/vinsware/uploads
-        - /data/vinsware/assets
+        - /data/vinelab/uploads
+        - /data/vinelab/assets
 
     restic:
-      repository_path: /backups/vinsware
-      password: ${VINSWARE_RESTIC_PASSWORD}
+      repository_path: /backups/vinelab
+      password: ${VINELAB_RESTIC_PASSWORD}
       snapshot_mode: combined
 
     retention:
@@ -305,11 +305,11 @@ projects:
     encryption:
       enabled: true
       type: gpg
-      recipient: vinsware-backup@company.com
+      recipient: vinelab-backup@company.com
 
     hooks:
-      pre_backup: "curl -s http://vinsware-app:3000/maintenance/on"
-      post_backup: "curl -s http://vinsware-app:3000/maintenance/off"
+      pre_backup: "curl -s http://vinelab-app:3000/maintenance/on"
+      post_backup: "curl -s http://vinelab-app:3000/maintenance/off"
 
     verification:
       enabled: true
@@ -317,7 +317,7 @@ projects:
     notification:
       type: slack
       config:
-        webhook_url: https://hooks.slack.com/services/VINSWARE/SPECIFIC/HOOK
+        webhook_url: https://hooks.slack.com/services/VINELAB/SPECIFIC/HOOK
 
   - name: project-x
     enabled: true
@@ -400,9 +400,9 @@ projects:
 
 ```
 ${BACKUP_BASE_DIR}/                        # default: /data/backups
-├── vinsware/
-│   ├── vinsware_backup_20260318_000000_a1b2.sql.gz
-│   ├── vinsware_backup_20260317_000000_c3d4.sql.gz
+├── vinelab/
+│   ├── vinelab_backup_20260318_000000_a1b2.sql.gz
+│   ├── vinelab_backup_20260317_000000_c3d4.sql.gz
 │   └── .lock                              # file-based lock (present while backup running)
 ├── project-x/
 │   └── ...
@@ -443,7 +443,7 @@ export interface DatabaseDumperPort {
 
 ```typescript
 export interface SyncOptions {
-  tags: string[];                              // e.g. ['backupctl:db', 'project:vinsware']
+  tags: string[];                              // e.g. ['backupctl:db', 'project:vinelab']
   snapshotMode: 'combined' | 'separate';
 }
 
@@ -646,7 +646,7 @@ Per-project backup execution (triggered by cron or CLI):
 A per-project lock prevents concurrent backups for the same project:
 
 - **Cron overlap:** If a cron-triggered backup is still running when the next cron fires for the same project, the new run is **queued** and executes after the current one completes.
-- **CLI collision:** If a user runs `backupctl run vinsware` while a backup is already in progress, the CLI **rejects with an error**: "Backup already in progress for vinsware".
+- **CLI collision:** If a user runs `backupctl run vinelab` while a backup is already in progress, the CLI **rejects with an error**: "Backup already in progress for vinelab".
 - **`run --all`:** Runs projects **sequentially** in YAML order. If one project fails, the remaining projects still execute.
 
 ### 7.2 Failure Recovery
@@ -704,7 +704,7 @@ After `backupctl restore` extracts files, two additional flags help with the nex
   - MySQL: `mysql -u ... -p ... < <file>`
   - MongoDB: `mongorestore --gzip --archive=<file> --db=...`
 
-Both flags can be combined: `backupctl restore vinsware latest /data/restore/ --decompress --guide`
+Both flags can be combined: `backupctl restore vinelab latest /data/restore/ --decompress --guide`
 
 ### 7.6 Restic Cache Management
 
@@ -770,37 +770,37 @@ The `restic` subcommand resolves the project's `RESTIC_REPOSITORY` and `RESTIC_P
 
 ```bash
 # List snapshots (raw restic output)
-backupctl restic vinsware snapshots
+backupctl restic vinelab snapshots
 
 # Check repo integrity
-backupctl restic vinsware check
+backupctl restic vinelab check
 
 # Show repo stats
-backupctl restic vinsware stats
+backupctl restic vinelab stats
 
 # Diff two snapshots
-backupctl restic vinsware diff abc123 def456
+backupctl restic vinelab diff abc123 def456
 
 # Mount repo for browsing (requires FUSE)
-backupctl restic vinsware mount /mnt/restore
+backupctl restic vinelab mount /mnt/restore
 
 # Show files in a snapshot
-backupctl restic vinsware ls latest
+backupctl restic vinelab ls latest
 
 # Find a file across snapshots
-backupctl restic vinsware find "*.sql.gz"
+backupctl restic vinelab find "*.sql.gz"
 
 # Unlock a stuck repo
-backupctl restic vinsware unlock
+backupctl restic vinelab unlock
 
 # Show raw key info
-backupctl restic vinsware key list
+backupctl restic vinelab key list
 
 # Cat a file from a snapshot
-backupctl restic vinsware dump latest /data/backups/vinsware/backup_2026-03-18.sql.gz
+backupctl restic vinelab dump latest /data/backups/vinelab/backup_2026-03-18.sql.gz
 
 # Initialize repo (one-time setup)
-backupctl restic vinsware init
+backupctl restic vinelab init
 ```
 
 **How it works internally:**
@@ -829,62 +829,62 @@ async run(project: string, resticArgs: string[]): Promise<void> {
 
 ```bash
 # --- Backup operations ---
-backupctl run vinsware                          # Run backup now
+backupctl run vinelab                          # Run backup now
 backupctl run --all                            # Backup all projects (sequential)
 
 # --- Status & monitoring ---
 backupctl health                               # Full health check
 backupctl status                               # All projects summary
-backupctl status vinsware                       # Detailed vinsware history
-backupctl status vinsware --last 5              # Last 5 entries
+backupctl status vinelab                       # Detailed vinelab history
+backupctl status vinelab --last 5              # Last 5 entries
 
 # --- Restore ---
-backupctl restore vinsware a1b2c3d4 /data/restore/vinsware
-backupctl restore vinsware latest /data/restore/vinsware
-backupctl restore vinsware latest /data/restore/vinsware --only db      # DB dump only
-backupctl restore vinsware latest /data/restore/vinsware --only assets  # Assets only
+backupctl restore vinelab a1b2c3d4 /data/restore/vinelab
+backupctl restore vinelab latest /data/restore/vinelab
+backupctl restore vinelab latest /data/restore/vinelab --only db      # DB dump only
+backupctl restore vinelab latest /data/restore/vinelab --only assets  # Assets only
 
 # --- Snapshots ---
-backupctl snapshots vinsware                    # All snapshots (with tags)
-backupctl snapshots vinsware --last 10          # Last 10
+backupctl snapshots vinelab                    # All snapshots (with tags)
+backupctl snapshots vinelab --last 10          # Last 10
 
 # --- Prune ---
-backupctl prune vinsware                        # Prune vinsware
+backupctl prune vinelab                        # Prune vinelab
 backupctl prune --all                          # Prune all
 
 # --- Logs ---
-backupctl logs vinsware                         # All logs
-backupctl logs vinsware --last 20               # Last 20
-backupctl logs vinsware --failed                # Failed only
+backupctl logs vinelab                         # All logs
+backupctl logs vinelab --last 20               # Last 20
+backupctl logs vinelab --failed                # Failed only
 
 # --- Config ---
 backupctl config validate                      # Validate everything
-backupctl config show vinsware                  # Show resolved config
+backupctl config show vinelab                  # Show resolved config
 backupctl config reload                        # Reload YAML + re-register crons
-backupctl config import-gpg-key ./keys/vinsware.pub.gpg  # Import GPG key
+backupctl config import-gpg-key ./keys/vinelab.pub.gpg  # Import GPG key
 
 # --- Dry run ---
-backupctl run vinsware --dry-run                # Validate without executing
+backupctl run vinelab --dry-run                # Validate without executing
 
 # --- Restore with guidance ---
-backupctl restore vinsware latest /data/restore/vinsware --decompress         # Extract + decompress
-backupctl restore vinsware latest /data/restore/vinsware --guide              # Print import instructions
-backupctl restore vinsware latest /data/restore/vinsware --decompress --guide # Both
+backupctl restore vinelab latest /data/restore/vinelab --decompress         # Extract + decompress
+backupctl restore vinelab latest /data/restore/vinelab --guide              # Print import instructions
+backupctl restore vinelab latest /data/restore/vinelab --decompress --guide # Both
 
 # --- Cache management ---
-backupctl cache vinsware                        # Show cache size
-backupctl cache vinsware --clear                # Clear project cache
+backupctl cache vinelab                        # Show cache size
+backupctl cache vinelab --clear                # Clear project cache
 backupctl cache --clear-all                    # Clear all caches
 
 # --- Restic passthrough ---
-backupctl restic vinsware snapshots             # Raw restic snapshots
-backupctl restic vinsware check                 # Repo integrity
-backupctl restic vinsware stats                 # Repo stats
-backupctl restic vinsware diff abc123 def456    # Diff snapshots
-backupctl restic vinsware ls latest             # List files in latest
-backupctl restic vinsware find "*.sql.gz"       # Find files
-backupctl restic vinsware unlock                # Unlock stuck repo
-backupctl restic vinsware init                  # Init new repo
+backupctl restic vinelab snapshots             # Raw restic snapshots
+backupctl restic vinelab check                 # Repo integrity
+backupctl restic vinelab stats                 # Repo stats
+backupctl restic vinelab diff abc123 def456    # Diff snapshots
+backupctl restic vinelab ls latest             # List files in latest
+backupctl restic vinelab find "*.sql.gz"       # Find files
+backupctl restic vinelab unlock                # Unlock stuck repo
+backupctl restic vinelab init                  # Init new repo
 ```
 
 ### 8.4 Deploy Script (`scripts/deploy.sh`) — Host Only
@@ -1046,8 +1046,8 @@ services:
       - ./ssh-keys:/root/.ssh:ro
       - ./gpg-keys:/app/gpg-keys:ro
       # Mount asset directories (add all paths referenced in projects.yml)
-      - /data/vinsware/uploads:/data/vinsware/uploads:ro
-      - /data/vinsware/assets:/data/vinsware/assets:ro
+      - /data/vinelab/uploads:/data/vinelab/uploads:ro
+      - /data/vinelab/assets:/data/vinelab/assets:ro
       - /data/projectx/storage:/data/projectx/storage:ro
     networks:
       - backupctl-network
@@ -1101,7 +1101,7 @@ scripts/deploy.sh
 # and prompts for confirmation (interactive only, fails in cron)
 
 # 5. Initialize restic repo per project
-backupctl restic vinsware init
+backupctl restic vinelab init
 backupctl restic project-x init
 backupctl restic project-y init
 ```
@@ -1112,7 +1112,7 @@ backupctl restic project-y init
 
 ```
 /backups/
-├── vinsware/
+├── vinelab/
 │   ├── config
 │   ├── data/
 │   ├── index/
@@ -1181,15 +1181,15 @@ npx typeorm migration:generate -d src/adapters/audit/data-source.ts src/adapters
 ### 13.1 Backup Started
 
 ```
-🔄 Backup started — vinsware
+🔄 Backup started — vinelab
 Time: 2026-03-18 00:00:00 IST
 ```
 
 ### 13.2 Backup Success
 
 ```
-✅ Backup completed — vinsware
-DB: vinsware_db | Dump: 245 MB | Encrypted: Yes | Verified: Yes
+✅ Backup completed — vinelab
+DB: vinelab_db | Dump: 245 MB | Encrypted: Yes | Verified: Yes
 Snapshot: a1b2c3d4 | Mode: combined
 New files: 12 | Changed: 3 | Added: 52 MB
 Pruned: 2 snapshots | Local cleaned: 1 file
@@ -1199,17 +1199,17 @@ Duration: 3m 12s
 ### 13.3 Backup Failed
 
 ```
-❌ Backup failed — vinsware
+❌ Backup failed — vinelab
 Stage: restic sync | Retry: 3/3
 Error: connection timeout to storage box
-Dump file: /data/backups/vinsware/backup_2026-03-18_000000.sql.gz
+Dump file: /data/backups/vinelab/backup_2026-03-18_000000.sql.gz
 Duration: 5m 42s
 ```
 
 ### 13.4 Backup Timeout Warning
 
 ```
-⚠️ Backup timeout warning — vinsware
+⚠️ Backup timeout warning — vinelab
 Elapsed: 35m | Timeout threshold: 30m
 Current stage: restic sync
 Backup is still running — this is a warning, not a failure.
@@ -1220,7 +1220,7 @@ Backup is still running — this is a warning, not a failure.
 ```
 📊 Daily Backup Summary — 2026-03-18
 
-✅ vinsware      — 245 MB — 3m 12s — a1b2c3d4
+✅ vinelab      — 245 MB — 3m 12s — a1b2c3d4
 ✅ project-x    — 128 MB — 1m 45s — e5f6g7h8
 ❌ project-y    — FAILED — restic sync timeout
 
@@ -1234,11 +1234,11 @@ The webhook notifier POSTs `application/json` with a `text` field containing the
 ```json
 {
   "event": "backup_success",
-  "project": "vinsware",
-  "text": "✅ Backup completed — vinsware\nDB: vinsware_db | Dump: 245 MB | Encrypted: Yes | Verified: Yes\nSnapshot: a1b2c3d4 | Mode: combined\nNew files: 12 | Changed: 3 | Added: 52 MB\nPruned: 2 snapshots | Local cleaned: 1 file\nDuration: 3m 12s",
+  "project": "vinelab",
+  "text": "✅ Backup completed — vinelab\nDB: vinelab_db | Dump: 245 MB | Encrypted: Yes | Verified: Yes\nSnapshot: a1b2c3d4 | Mode: combined\nNew files: 12 | Changed: 3 | Added: 52 MB\nPruned: 2 snapshots | Local cleaned: 1 file\nDuration: 3m 12s",
   "data": {
     "run_id": "uuid",
-    "project_name": "vinsware",
+    "project_name": "vinelab",
     "status": "success",
     "snapshot_id": "a1b2c3d4",
     "dump_size_bytes": 257949696,

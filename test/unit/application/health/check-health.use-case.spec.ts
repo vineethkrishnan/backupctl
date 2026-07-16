@@ -112,7 +112,7 @@ describe('CheckHealthUseCase', () => {
     }).compile();
 
     service = module.get(CheckHealthUseCase);
-    setProjects([{ name: 'vinsware', type: 'sftp' }]);
+    setProjects([{ name: 'vinelab', type: 'sftp' }]);
   });
 
   afterEach(() => {
@@ -126,7 +126,7 @@ describe('CheckHealthUseCase', () => {
     expect(result.diskSpaceAvailable).toBe(true);
     expect(result.diskFreeGb).toBe(20);
     expect(result.storageChecks).toEqual([
-      { project: 'vinsware', backendType: 'sftp', reachable: true, error: null },
+      { project: 'vinelab', backendType: 'sftp', reachable: true, error: null },
     ]);
     expect(result.isHealthy()).toBe(true);
     expect(mockHeartbeatMonitor.checkConnectivity).not.toHaveBeenCalled();
@@ -225,7 +225,7 @@ describe('CheckHealthUseCase', () => {
 
       expect(result.storageChecks).toEqual([
         {
-          project: 'vinsware',
+          project: 'vinelab',
           backendType: 'sftp',
           reachable: false,
           error: 'Fatal: unable to open config file',

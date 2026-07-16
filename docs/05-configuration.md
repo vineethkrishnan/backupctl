@@ -116,13 +116,13 @@ These are used when a project has no `encryption` block in YAML.
 Project-specific secrets follow the naming pattern `{PROJECT}_DB_PASSWORD` and `{PROJECT}_RESTIC_PASSWORD` (uppercase project name with hyphens replaced by underscores):
 
 ```env
-VINSWARE_DB_PASSWORD=secret
-VINSWARE_RESTIC_PASSWORD=restic-secret
+VINELAB_DB_PASSWORD=secret
+VINELAB_RESTIC_PASSWORD=restic-secret
 PROJECTX_DB_PASSWORD=secret
 PROJECTY_DB_PASSWORD=secret
 ```
 
-These are referenced in `projects.yml` via `${VINSWARE_DB_PASSWORD}`.
+These are referenced in `projects.yml` via `${VINELAB_DB_PASSWORD}`.
 
 ## Project Configuration (projects.yml)
 
@@ -416,7 +416,7 @@ The webhook notifier POSTs `application/json` with an `event` field, a `text` fi
 encryption:
   enabled: true
   type: gpg
-  recipient: vinsware-backup@company.com
+  recipient: vinelab-backup@company.com
 ```
 
 ### Global (via .env)
@@ -438,29 +438,29 @@ A full `config/projects.yml` with three projects using different databases and s
 ```yaml
 projects:
   # PostgreSQL with full configuration
-  - name: vinsware
+  - name: vinelab
     enabled: true
     cron: "0 0 * * *"
     timeout_minutes: 30
-    docker_network: vinsware_vinsware-network
+    docker_network: vinelab_vinelab-network
 
     database:
       type: postgres
-      host: postgres-vinsware
+      host: postgres-vinelab
       port: 5432
-      name: vinsware_db
+      name: vinelab_db
       user: backup_user
-      password: ${VINSWARE_DB_PASSWORD}
+      password: ${VINELAB_DB_PASSWORD}
 
     assets:
       paths:
-        - /data/vinsware/uploads
-        - /data/vinsware/assets
+        - /data/vinelab/uploads
+        - /data/vinelab/assets
 
     storage:
       type: sftp
-      repository: backups/vinsware
-      password: ${VINSWARE_RESTIC_PASSWORD}
+      repository: backups/vinelab
+      password: ${VINELAB_RESTIC_PASSWORD}
       snapshot_mode: combined
 
     retention:
@@ -472,11 +472,11 @@ projects:
     encryption:
       enabled: true
       type: gpg
-      recipient: vinsware-backup@company.com
+      recipient: vinelab-backup@company.com
 
     hooks:
-      pre_backup: "curl -s http://vinsware-app:3000/maintenance/on"
-      post_backup: "curl -s http://vinsware-app:3000/maintenance/off"
+      pre_backup: "curl -s http://vinelab-app:3000/maintenance/on"
+      post_backup: "curl -s http://vinelab-app:3000/maintenance/off"
 
     verification:
       enabled: true
@@ -484,12 +484,12 @@ projects:
     notification:
       type: slack
       config:
-        webhook_url: https://hooks.slack.com/services/VINSWARE/SPECIFIC/HOOK
+        webhook_url: https://hooks.slack.com/services/VINELAB/SPECIFIC/HOOK
 
     monitor:
       type: uptime-kuma
       config:
-        push_token: YOUR_VINSWARE_PUSH_TOKEN
+        push_token: YOUR_VINELAB_PUSH_TOKEN
 
   # MySQL with email notifications and separate snapshots
   - name: project-x
@@ -584,10 +584,10 @@ backupctl organizes all data under `BACKUP_BASE_DIR` (default `/data/backups`):
 
 ```
 ${BACKUP_BASE_DIR}/
-├── vinsware/
-│   ├── vinsware_backup_20260318_000000_a1b2.sql.gz       # compressed dump
-│   ├── vinsware_backup_20260318_000000_a1b2.sql.gz.gpg   # encrypted dump (if enabled)
-│   ├── vinsware_backup_20260317_000000_c3d4.sql.gz
+├── vinelab/
+│   ├── vinelab_backup_20260318_000000_a1b2.sql.gz       # compressed dump
+│   ├── vinelab_backup_20260318_000000_a1b2.sql.gz.gpg   # encrypted dump (if enabled)
+│   ├── vinelab_backup_20260317_000000_c3d4.sql.gz
 │   └── .lock                                             # present while backup is running
 ├── project-x/
 │   ├── project-x_backup_20260318_013000_e5f6.sql.gz
@@ -612,7 +612,7 @@ Use the CLI to validate configuration at any time:
 backupctl config validate
 
 # Show resolved config for a specific project (secrets masked)
-backupctl config show vinsware
+backupctl config show vinelab
 ```
 
 `config validate` checks:

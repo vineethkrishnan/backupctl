@@ -367,7 +367,7 @@ scripts/backupctl-manage.sh check            # validate prerequisites
 
 # Inside container
 docker exec backupctl node dist/cli.js health
-docker exec backupctl node dist/cli.js run vinsware --dry-run
+docker exec backupctl node dist/cli.js run vinelab --dry-run
 
 # Migrations — dev (manual via scripts/dev.sh)
 scripts/dev.sh migrate:run                    # run pending

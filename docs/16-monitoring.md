@@ -53,7 +53,7 @@ Add a `monitor` block to any project in `config/projects.yml`:
 
 ```yaml
 projects:
-  - name: vinsware
+  - name: vinelab
     cron: '0 0 * * *'
     # ... existing config ...
     monitor:
@@ -89,7 +89,7 @@ For each project you want to monitor:
 1. Open your Uptime Kuma dashboard
 2. Click **Add New Monitor**
 3. Set **Monitor Type** to **Push**
-4. Set **Friendly Name** (e.g., `vinsware-backup`)
+4. Set **Friendly Name** (e.g., `vinelab-backup`)
 5. Set **Heartbeat Interval** to match your backup schedule (see [Recommended Intervals](#recommended-intervals))
 6. Set **Retries** to `0` (backupctl sends `status=down` on failure — no need for Kuma to retry)
 7. Click **Save**
@@ -180,7 +180,7 @@ System healthy
 
   ✓ Audit DB
   ✓ Disk space (42 GB free)
-  ✓ Storage: vinsware (sftp)
+  ✓ Storage: vinelab (sftp)
   ✓ Storage: project-x (s3)
   ✓ Uptime Kuma
   Uptime: 2h 15m
@@ -212,7 +212,7 @@ curl -s localhost:3100/health | jq
     "auditDb": true,
     "diskSpace": { "available": true, "freeGb": 42.1 },
     "storage": [
-      { "project": "vinsware", "backendType": "sftp", "reachable": true },
+      { "project": "vinelab", "backendType": "sftp", "reachable": true },
       {
         "project": "project-x",
         "backendType": "s3",

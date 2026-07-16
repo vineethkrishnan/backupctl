@@ -94,9 +94,9 @@ describe('ResticStorageFactory', () => {
   });
 
   it('builds the sftp repository URL from SSH config and repository path', async () => {
-    const env = await envFromCreatedStorage(buildConfig({ repoPath: '/backups/vinsware' }));
+    const env = await envFromCreatedStorage(buildConfig({ repoPath: '/backups/vinelab' }));
 
-    expect(env.RESTIC_REPOSITORY).toBe('sftp:u123@storage.example.com:/backups/vinsware');
+    expect(env.RESTIC_REPOSITORY).toBe('sftp:u123@storage.example.com:/backups/vinelab');
   });
 
   it('builds the SSH command with the key path and port', async () => {
@@ -147,7 +147,7 @@ describe('ResticStorageFactory', () => {
   describe('s3 backend', () => {
     const s3Config = {
       type: 's3' as const,
-      repository: 'my-bucket/vinsware',
+      repository: 'my-bucket/vinelab',
       config: {
         endpoint: 'https://s3.eu-central-003.backblazeb2.com',
         access_key_id: 'key-id',
@@ -158,7 +158,7 @@ describe('ResticStorageFactory', () => {
     it('builds the s3 repository URL and credential env', async () => {
       const env = await envFromCreatedStorage(buildStorageConfig(s3Config));
 
-      expect(env.RESTIC_REPOSITORY).toBe('s3:https://s3.eu-central-003.backblazeb2.com/my-bucket/vinsware');
+      expect(env.RESTIC_REPOSITORY).toBe('s3:https://s3.eu-central-003.backblazeb2.com/my-bucket/vinelab');
       expect(env.AWS_ACCESS_KEY_ID).toBe('key-id');
       expect(env.AWS_SECRET_ACCESS_KEY).toBe('secret-key');
     });
@@ -181,9 +181,9 @@ describe('ResticStorageFactory', () => {
     });
 
     it('tolerates a leading slash on the repository, as carried over from an sftp config', async () => {
-      const env = await envFromCreatedStorage(buildStorageConfig({ ...s3Config, repository: '/my-bucket/vinsware' }));
+      const env = await envFromCreatedStorage(buildStorageConfig({ ...s3Config, repository: '/my-bucket/vinelab' }));
 
-      expect(env.RESTIC_REPOSITORY).toBe('s3:https://s3.eu-central-003.backblazeb2.com/my-bucket/vinsware');
+      expect(env.RESTIC_REPOSITORY).toBe('s3:https://s3.eu-central-003.backblazeb2.com/my-bucket/vinelab');
     });
 
     it('strips a trailing slash from the endpoint', async () => {
@@ -191,7 +191,7 @@ describe('ResticStorageFactory', () => {
         buildStorageConfig({ ...s3Config, config: { ...s3Config.config, endpoint: 'https://s3.example.com/' } }),
       );
 
-      expect(env.RESTIC_REPOSITORY).toBe('s3:https://s3.example.com/my-bucket/vinsware');
+      expect(env.RESTIC_REPOSITORY).toBe('s3:https://s3.example.com/my-bucket/vinelab');
     });
 
     it('passes region through when configured', async () => {
@@ -220,12 +220,12 @@ describe('ResticStorageFactory', () => {
       const env = await envFromCreatedStorage(
         buildStorageConfig({
           type: 'b2',
-          repository: 'my-bucket:vinsware',
+          repository: 'my-bucket:vinelab',
           config: { account_id: 'acct', account_key: 'acct-key' },
         }),
       );
 
-      expect(env.RESTIC_REPOSITORY).toBe('b2:my-bucket:vinsware');
+      expect(env.RESTIC_REPOSITORY).toBe('b2:my-bucket:vinelab');
       expect(env.B2_ACCOUNT_ID).toBe('acct');
       expect(env.B2_ACCOUNT_KEY).toBe('acct-key');
     });
@@ -233,7 +233,7 @@ describe('ResticStorageFactory', () => {
     it('rejects the s3-style bucket/path form, which b2 does not accept', () => {
       const config = buildStorageConfig({
         type: 'b2',
-        repository: 'my-bucket/vinsware',
+        repository: 'my-bucket/vinelab',
         config: { account_id: 'acct', account_key: 'acct-key' },
       });
 
@@ -244,17 +244,17 @@ describe('ResticStorageFactory', () => {
   describe('rclone backend', () => {
     it('builds the rclone repository from a remote:path target', async () => {
       const env = await envFromCreatedStorage(
-        buildStorageConfig({ type: 'rclone', repository: 'gdrive:backups/vinsware' }),
+        buildStorageConfig({ type: 'rclone', repository: 'gdrive:backups/vinelab' }),
       );
 
-      expect(env.RESTIC_REPOSITORY).toBe('rclone:gdrive:backups/vinsware');
+      expect(env.RESTIC_REPOSITORY).toBe('rclone:gdrive:backups/vinelab');
     });
 
     it('sets RCLONE_CONFIG from the project config bag', async () => {
       const env = await envFromCreatedStorage(
         buildStorageConfig({
           type: 'rclone',
-          repository: 'gdrive:backups/vinsware',
+          repository: 'gdrive:backups/vinelab',
           config: { config_path: '/custom/rclone.conf' },
         }),
       );
@@ -267,7 +267,7 @@ describe('ResticStorageFactory', () => {
       factory = createFactory();
 
       const env = await envFromCreatedStorage(
-        buildStorageConfig({ type: 'rclone', repository: 'gdrive:backups/vinsware' }),
+        buildStorageConfig({ type: 'rclone', repository: 'gdrive:backups/vinelab' }),
       );
 
       expect(env.RCLONE_CONFIG).toBe('/home/node/.config/rclone/rclone.conf');
@@ -275,14 +275,14 @@ describe('ResticStorageFactory', () => {
 
     it('leaves RCLONE_CONFIG unset so rclone uses its default path', async () => {
       const env = await envFromCreatedStorage(
-        buildStorageConfig({ type: 'rclone', repository: 'gdrive:backups/vinsware' }),
+        buildStorageConfig({ type: 'rclone', repository: 'gdrive:backups/vinelab' }),
       );
 
       expect(env.RCLONE_CONFIG).toBeUndefined();
     });
 
     it('rejects a repository that is not a remote:path target', () => {
-      const config = buildStorageConfig({ type: 'rclone', repository: 'backups/vinsware' });
+      const config = buildStorageConfig({ type: 'rclone', repository: 'backups/vinelab' });
 
       expect(() => factory.create(config)).toThrow('is not a valid rclone target');
     });

@@ -32,7 +32,7 @@ jest.setTimeout(30000);
 function buildResult(overrides: Partial<BackupResult> = {}): BackupResult {
   return new BackupResult({
     runId: 'run-1',
-    projectName: 'vinsware',
+    projectName: 'vinelab',
     status: BackupStatus.Success,
     currentStage: BackupStage.NotifyResult,
     startedAt: new Date('2026-03-18T02:00:00Z'),
@@ -55,19 +55,19 @@ function buildResult(overrides: Partial<BackupResult> = {}): BackupResult {
 
 function buildTestConfig(): ProjectConfig {
   return buildProjectConfig({
-    name: 'vinsware',
+    name: 'vinelab',
     database: {
       type: 'postgres',
       host: 'localhost',
       port: 5432,
-      name: 'vinsware_prod',
+      name: 'vinelab_prod',
       user: 'user',
       password: 'pass',
       dumpTimeoutMinutes: null,
     },
     storage: {
       type: 'sftp',
-      repository: '/backups/vinsware',
+      repository: '/backups/vinelab',
       password: 'rpass',
       snapshotMode: 'combined',
       config: {},
@@ -146,10 +146,10 @@ describe('CLI commands (integration)', () => {
     it('should trigger backup for a named project', async () => {
       mockOrchestrator.execute.mockResolvedValue([buildResult()]);
 
-      await CommandTestFactory.run(commandModule, ['run', 'vinsware']);
+      await CommandTestFactory.run(commandModule, ['run', 'vinelab']);
 
       expect(mockOrchestrator.execute).toHaveBeenCalledWith(
-        expect.objectContaining({ projectName: 'vinsware', isAll: false }),
+        expect.objectContaining({ projectName: 'vinelab', isAll: false }),
       );
     });
 
@@ -165,14 +165,14 @@ describe('CLI commands (integration)', () => {
 
     it('should call getDryRunReport for --dry-run flag', async () => {
       mockOrchestrator.getDryRunReport.mockResolvedValue({
-        projectName: 'vinsware',
+        projectName: 'vinelab',
         checks: [{ name: 'Config loaded', passed: true, message: 'OK' }],
         allPassed: true,
       });
 
-      await CommandTestFactory.run(commandModule, ['run', 'vinsware', '--dry-run']);
+      await CommandTestFactory.run(commandModule, ['run', 'vinelab', '--dry-run']);
 
-      expect(mockOrchestrator.getDryRunReport).toHaveBeenCalledWith('vinsware', { verifyDump: undefined });
+      expect(mockOrchestrator.getDryRunReport).toHaveBeenCalledWith('vinelab', { verifyDump: undefined });
       expect(mockOrchestrator.execute).not.toHaveBeenCalled();
     });
   });
@@ -211,7 +211,7 @@ describe('CLI commands (integration)', () => {
     it('should report configuration errors', async () => {
       mockConfigLoader.validate.mockReturnValue({
         isValid: false,
-        errors: ['Project "vinsware": missing required field: cron'],
+        errors: ['Project "vinelab": missing required field: cron'],
       });
 
       await CommandTestFactory.run(commandModule, ['config', 'validate']);
@@ -226,26 +226,26 @@ describe('CLI commands (integration)', () => {
         new SnapshotInfo(
           'abc123def456',
           '2026-03-18T02:05:00Z',
-          ['/data/backups/vinsware'],
+          ['/data/backups/vinelab'],
           'backupctl',
-          ['project:vinsware', 'db:postgres'],
+          ['project:vinelab', 'db:postgres'],
           '512MB',
         ),
       ]);
 
-      await CommandTestFactory.run(commandModule, ['snapshots', 'vinsware']);
+      await CommandTestFactory.run(commandModule, ['snapshots', 'vinelab']);
 
       expect(mockSnapshotManagement.execute).toHaveBeenCalledWith(
-        expect.objectContaining({ projectName: 'vinsware' }),
+        expect.objectContaining({ projectName: 'vinelab' }),
       );
     });
 
     it('should display message when no snapshots found', async () => {
       mockSnapshotManagement.execute.mockResolvedValue([]);
 
-      await CommandTestFactory.run(commandModule, ['snapshots', 'vinsware']);
+      await CommandTestFactory.run(commandModule, ['snapshots', 'vinelab']);
 
-      expect(console.log).toHaveBeenCalledWith('No snapshots found for vinsware.');
+      expect(console.log).toHaveBeenCalledWith('No snapshots found for vinelab.');
     });
   });
 });

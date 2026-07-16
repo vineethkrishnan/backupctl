@@ -59,7 +59,7 @@ describe('HealthCommand', () => {
     checkHealth.execute.mockResolvedValue(
       buildHealthCheckResult({
         storageChecks: [
-          buildStorageHealthCheck({ project: 'vinsware', backendType: 's3' }),
+          buildStorageHealthCheck({ project: 'vinelab', backendType: 's3' }),
           buildStorageHealthCheck({ project: 'project-x', backendType: 'rclone' }),
         ],
       }),
@@ -68,7 +68,7 @@ describe('HealthCommand', () => {
     await command.run([]);
 
     const printed = (console.log as jest.Mock).mock.calls.map((call) => String(call[0])).join('\n');
-    expect(printed).toContain('Storage: vinsware (s3)');
+    expect(printed).toContain('Storage: vinelab (s3)');
     expect(printed).toContain('Storage: project-x (rclone)');
   });
 
@@ -77,7 +77,7 @@ describe('HealthCommand', () => {
       buildHealthCheckResult({
         storageChecks: [
           buildStorageHealthCheck({
-            project: 'vinsware',
+            project: 'vinelab',
             backendType: 's3',
             reachable: false,
             error: 'Fatal: unable to open config file',

@@ -1,24 +1,24 @@
 projects:
-  - name: vinsware
+  - name: vinelab
     enabled: true
     cron: '0 0 * * *'
     timeout_minutes: 30
     database:
       type: postgres
-      host: postgres-vinsware
+      host: postgres-vinelab
       port: 5432
-      name: vinsware_db
+      name: vinelab_db
       user: backup_user
-      password: ${VINSWARE_DB_PASSWORD}
+      password: ${VINELAB_DB_PASSWORD}
     assets:
       paths:
-        - /data/vinsware/uploads
-        - /data/vinsware/assets
+        - /data/vinelab/uploads
+        - /data/vinelab/assets
     # Hetzner Storage Box over SSH. Credentials come from the HETZNER_SSH_* vars in .env.
     storage:
       type: sftp
-      repository: /backups/vinsware
-      password: ${VINSWARE_RESTIC_PASSWORD}
+      repository: /backups/vinelab
+      password: ${VINELAB_RESTIC_PASSWORD}
       snapshot_mode: combined
     retention:
       local_days: 7
@@ -28,20 +28,20 @@ projects:
     encryption:
       enabled: true
       type: gpg
-      recipient: vineeth.nk@vinsware.com
+      recipient: vineeth.nk@vinelab.in
     hooks:
-      pre_backup: 'curl -s http://vinsware-app:3000/maintenance/on'
-      post_backup: 'curl -s http://vinsware-app:3000/maintenance/off'
+      pre_backup: 'curl -s http://vinelab-app:3000/maintenance/on'
+      post_backup: 'curl -s http://vinelab-app:3000/maintenance/off'
     verification:
       enabled: true
     notification:
       type: slack
       config:
-        webhook_url: https://hooks.slack.com/services/VINSWARE/SPECIFIC/HOOK
+        webhook_url: https://hooks.slack.com/services/VINELAB/SPECIFIC/HOOK
     monitor:
       type: uptime-kuma
       config:
-        push_token: YOUR_VINSWARE_PUSH_TOKEN
+        push_token: YOUR_VINELAB_PUSH_TOKEN
 
   - name: project-x
     enabled: true

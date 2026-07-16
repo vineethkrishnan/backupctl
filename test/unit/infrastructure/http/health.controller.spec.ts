@@ -96,7 +96,7 @@ describe('HealthController', () => {
     expect(body.checks.diskSpace.available).toBe(true);
     expect(body.checks.diskSpace.freeGb).toBe(50);
     expect(body.checks.storage).toEqual([
-      { project: 'vinsware', backendType: 'sftp', reachable: true },
+      { project: 'vinelab', backendType: 'sftp', reachable: true },
     ]);
     expect(body.uptime).toBe(3600);
   });
@@ -140,7 +140,7 @@ describe('HealthController', () => {
       buildHealthCheckResult({
         storageChecks: [
           buildStorageHealthCheck({
-            project: 'vinsware',
+            project: 'vinelab',
             backendType: 's3',
             reachable: false,
             error: 'Fatal: unable to open config file',
@@ -159,7 +159,7 @@ describe('HealthController', () => {
       const checks = response.checks as Record<string, unknown>;
       expect(checks.storage).toEqual([
         {
-          project: 'vinsware',
+          project: 'vinelab',
           backendType: 's3',
           reachable: false,
           error: 'Fatal: unable to open config file',
@@ -210,7 +210,7 @@ describe('HealthController', () => {
       checks: {
         auditDb: true,
         diskSpace: { available: true, freeGb: 25 },
-        storage: [{ project: 'vinsware', backendType: 'sftp', reachable: true }],
+        storage: [{ project: 'vinelab', backendType: 'sftp', reachable: true }],
       },
       uptime: 120,
     });

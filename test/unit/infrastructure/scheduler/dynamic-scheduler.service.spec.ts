@@ -130,14 +130,14 @@ describe('DynamicSchedulerService', () => {
 
   describe('onModuleInit', () => {
     it('should register cron jobs for each enabled project', async () => {
-      const vinsware = createProjectConfig({ name: 'vinsware', cron: '0 2 * * *' });
+      const vinelab = createProjectConfig({ name: 'vinelab', cron: '0 2 * * *' });
       const shopify = createProjectConfig({ name: 'shopify', cron: '0 3 * * *' });
-      configLoader.loadAll.mockReturnValue([vinsware, shopify]);
+      configLoader.loadAll.mockReturnValue([vinelab, shopify]);
 
       await service.onModuleInit();
 
       expect(schedulerRegistry.addCronJob).toHaveBeenCalledWith(
-        'backup-vinsware',
+        'backup-vinelab',
         expect.objectContaining({ cronTime: expect.anything() }),
       );
       expect(schedulerRegistry.addCronJob).toHaveBeenCalledWith(
@@ -172,25 +172,25 @@ describe('DynamicSchedulerService', () => {
 
   describe('executeScheduledBackup', () => {
     it('should acquire lock, run backup with lockHeldExternally, then release', async () => {
-      await service.executeScheduledBackup('vinsware');
+      await service.executeScheduledBackup('vinelab');
 
-      expect(backupLock.acquireOrQueue).toHaveBeenCalledWith('vinsware');
+      expect(backupLock.acquireOrQueue).toHaveBeenCalledWith('vinelab');
       expect(runBackup.execute).toHaveBeenCalledWith(
         expect.objectContaining({
-          projectName: 'vinsware',
+          projectName: 'vinelab',
           lockHeldExternally: true,
         }),
       );
-      expect(backupLock.release).toHaveBeenCalledWith('vinsware');
+      expect(backupLock.release).toHaveBeenCalledWith('vinelab');
     });
 
     it('should release lock even when backup throws', async () => {
       runBackup.execute.mockRejectedValueOnce(new Error('dump failed'));
 
-      await expect(service.executeScheduledBackup('vinsware')).rejects.toThrow('dump failed');
+      await expect(service.executeScheduledBackup('vinelab')).rejects.toThrow('dump failed');
 
-      expect(backupLock.acquireOrQueue).toHaveBeenCalledWith('vinsware');
-      expect(backupLock.release).toHaveBeenCalledWith('vinsware');
+      expect(backupLock.acquireOrQueue).toHaveBeenCalledWith('vinelab');
+      expect(backupLock.release).toHaveBeenCalledWith('vinelab');
     });
 
     it('should pass correct RunBackupCommand', async () => {
@@ -215,7 +215,7 @@ describe('DynamicSchedulerService', () => {
 
     it('should send daily summary to all registered notifiers', async () => {
       const recentResult = createBackupResult({
-        projectName: 'vinsware',
+        projectName: 'vinelab',
         startedAt: new Date(),
       });
       getBackupStatus.execute.mockResolvedValue([recentResult]);
@@ -256,14 +256,14 @@ describe('DynamicSchedulerService', () => {
 
   describe('backup cron callback', () => {
     it('registers backup job with correct name for each project', async () => {
-      const vinsware = createProjectConfig({ name: 'vinsware' });
+      const vinelab = createProjectConfig({ name: 'vinelab' });
       const shopify = createProjectConfig({ name: 'shopify' });
-      configLoader.loadAll.mockReturnValue([vinsware, shopify]);
+      configLoader.loadAll.mockReturnValue([vinelab, shopify]);
 
       await service.onModuleInit();
 
       const jobNames = schedulerRegistry.addCronJob.mock.calls.map((call) => call[0] as string);
-      expect(jobNames).toContain('backup-vinsware');
+      expect(jobNames).toContain('backup-vinelab');
       expect(jobNames).toContain('backup-shopify');
       expect(jobNames).toContain('daily-summary');
     });
