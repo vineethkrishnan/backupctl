@@ -5,6 +5,27 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.0](https://github.com/vineethkrishnan/backupctl/compare/v0.1.26...v0.2.0) (2026-07-16)
+
+
+### ⚠ BREAKING CHANGES
+
+* **restic-adapter:** the /health response replaces checks.ssh and checks.resticRepos with a checks.storage array of per-project results ({ project, backendType, reachable, error? }). Alerts querying checks.ssh.connected or checks.resticRepos will silently match nothing — repoint them at checks.storage[].reachable. `backupctl health` prints one line per project instead of the SSH/restic lines.
+
+### Features
+
+* **restic-adapter:** add pluggable storage backends for S3, B2, and rclone ([#96](https://github.com/vineethkrishnan/backupctl/issues/96)) ([d2e23f3](https://github.com/vineethkrishnan/backupctl/commit/d2e23f3f771318e7f9b833d0a19a15e2211df1b6))
+
+
+### Bug Fixes
+
+* **deps:** patch form-data, multer, and nodemailer security advisories ([#97](https://github.com/vineethkrishnan/backupctl/issues/97)) ([8af40cb](https://github.com/vineethkrishnan/backupctl/commit/8af40cb183c875a326b53aad52f4a26c3208bc53))
+
+
+### CI/CD
+
+* **deps:** bump the actions group with 2 updates ([#89](https://github.com/vineethkrishnan/backupctl/issues/89)) ([36f610d](https://github.com/vineethkrishnan/backupctl/commit/36f610d10ff8030bbf3b91159d3f933ed8e6868a))
+
 ## [0.1.26](https://github.com/vineethkrishnan/backupctl/compare/v0.1.25...v0.1.26) (2026-05-31)
 
 
