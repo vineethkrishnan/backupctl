@@ -31,6 +31,8 @@ import { SyncResult } from '@domain/backup/domain/value-objects/sync-result.mode
 import { PruneResult } from '@domain/backup/domain/value-objects/prune-result.model';
 import { CleanupResult } from '@domain/backup/domain/value-objects/cleanup-result.model';
 import { RetentionPolicy } from '@domain/config/domain/retention-policy.model';
+import { buildProjectConfig } from '@test/support/project-config.builder';
+import { createMockRemoteStorage } from '@test/support/remote-storage.mock';
 import { CacheInfo } from '@domain/backup/domain/value-objects/cache-info.model';
 
 import {
@@ -55,33 +57,26 @@ jest.setTimeout(30000);
 // ── Test project config ─────────────────────────────────────────────────
 
 function buildTestConfig(overrides: Partial<ProjectConfig> = {}): ProjectConfig {
-  return new ProjectConfig({
-    name: 'vinsware',
-    enabled: true,
-    cron: '0 2 * * *',
-    timeoutMinutes: null,
+  return buildProjectConfig({
+    name: 'vinelab',
     database: {
       type: 'postgres',
       host: 'localhost',
       port: 5432,
-      name: 'vinsware_prod',
-      user: 'vinsware_user',
+      name: 'vinelab_prod',
+      user: 'vinelab_user',
       password: 'test-pass',
       dumpTimeoutMinutes: null,
     },
-    compression: { enabled: true },
-    assets: { paths: [] },
-    restic: {
-      repositoryPath: 'sftp:storage:/backups/vinsware',
+    storage: {
+      type: 'sftp',
+      repository: 'sftp:storage:/backups/vinelab',
       password: 'restic-pass',
       snapshotMode: 'combined',
+      config: {},
     },
     retention: new RetentionPolicy(7, 7, 4, 3),
-    encryption: null,
-    hooks: null,
-    verification: { enabled: false },
     notification: { type: 'slack', config: {} },
-    monitor: null,
     ...overrides,
   });
 }
@@ -225,7 +220,7 @@ describe('RunBackupUseCase (integration flow)', () => {
   const configLoader: ConfigLoaderPort = {
     loadAll: () => [testConfig],
     getProject: (name: string) => {
-      if (name === 'vinsware') return testConfig;
+      if (name === 'vinelab') return testConfig;
       throw new Error(`Project "${name}" not found in configuration`);
     },
     validate: (): ValidationResult => ({ isValid: true, errors: [] }),
@@ -236,12 +231,12 @@ describe('RunBackupUseCase (integration flow)', () => {
     tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'backupctl-flow-test-'));
 
     mockDumper = {
-      dump: jest.fn().mockResolvedValue(new DumpResult('/data/backups/vinsware/dump.sql.gz', 1024000, 5000)),
+      dump: jest.fn().mockResolvedValue(new DumpResult('/data/backups/vinelab/dump.sql.gz', 1024000, 5000)),
       verify: jest.fn().mockResolvedValue(true),
       testConnection: jest.fn().mockResolvedValue(undefined),
     };
 
-    mockStorage = {
+    mockStorage = createMockRemoteStorage({
       sync: jest.fn().mockResolvedValue(new SyncResult('snap-abc123', 2, 1, 512000, 8000)),
       prune: jest.fn().mockResolvedValue(new PruneResult(1, '100MB')),
       listSnapshots: jest.fn().mockResolvedValue([]),
@@ -250,7 +245,7 @@ describe('RunBackupUseCase (integration flow)', () => {
       getCacheInfo: jest.fn().mockResolvedValue({ totalSize: '10MB', location: '/tmp/cache' } as unknown as CacheInfo),
       clearCache: jest.fn().mockResolvedValue(undefined),
       unlock: jest.fn().mockResolvedValue(undefined),
-    };
+    });
 
     mockNotifier = {
       notifyStarted: jest.fn().mockResolvedValue(undefined),
@@ -261,8 +256,8 @@ describe('RunBackupUseCase (integration flow)', () => {
     };
 
     mockEncryptor = {
-      encrypt: jest.fn().mockResolvedValue('/data/backups/vinsware/dump.sql.gz.gpg'),
-      decrypt: jest.fn().mockResolvedValue('/data/backups/vinsware/dump.sql.gz'),
+      encrypt: jest.fn().mockResolvedValue('/data/backups/vinelab/dump.sql.gz.gpg'),
+      decrypt: jest.fn().mockResolvedValue('/data/backups/vinelab/dump.sql.gz'),
     };
 
     mockHookExecutor = {
@@ -320,14 +315,14 @@ describe('RunBackupUseCase (integration flow)', () => {
   // ── Happy path ──────────────────────────────────────────────────────
 
   it('should complete full backup flow: dump → sync → prune → cleanup → audit → notify', async () => {
-    const [result] = await orchestrator.execute(new RunBackupCommand({ projectName: 'vinsware' }));
+    const [result] = await orchestrator.execute(new RunBackupCommand({ projectName: 'vinelab' }));
 
     expect(result.status).toBe(BackupStatus.Success);
-    expect(result.projectName).toBe('vinsware');
+    expect(result.projectName).toBe('vinelab');
     expect(result.durationMs).toBeGreaterThanOrEqual(0);
 
     // Verify each step was called
-    expect(mockNotifier.notifyStarted).toHaveBeenCalledWith('vinsware');
+    expect(mockNotifier.notifyStarted).toHaveBeenCalledWith('vinelab');
     expect(mockDumper.dump).toHaveBeenCalled();
     expect(mockStorage.sync).toHaveBeenCalled();
     expect(mockStorage.prune).toHaveBeenCalled();
@@ -342,29 +337,29 @@ describe('RunBackupUseCase (integration flow)', () => {
     expect(auditLog.records[0].result).not.toBeNull();
 
     // Verify lock was released
-    expect(backupLock.isLocked('vinsware')).toBe(false);
+    expect(backupLock.isLocked('vinelab')).toBe(false);
   });
 
   // ── Lock prevents concurrent backup ────────────────────────────────
 
   it('should prevent concurrent backup via lock', async () => {
     // Manually acquire the lock
-    await backupLock.acquire('vinsware');
+    await backupLock.acquire('vinelab');
 
-    await expect(orchestrator.execute(new RunBackupCommand({ projectName: 'vinsware' }))).rejects.toThrow(
-      'Backup already in progress for vinsware',
+    await expect(orchestrator.execute(new RunBackupCommand({ projectName: 'vinelab' }))).rejects.toThrow(
+      'Backup already in progress for vinelab',
     );
 
     // Release for cleanup
-    await backupLock.release('vinsware');
+    await backupLock.release('vinelab');
   });
 
   // ── Dry run ────────────────────────────────────────────────────────
 
   it('should not execute backup steps during dry run', async () => {
-    const [result] = await orchestrator.execute(new RunBackupCommand({ projectName: 'vinsware', isDryRun: true }));
+    const [result] = await orchestrator.execute(new RunBackupCommand({ projectName: 'vinelab', isDryRun: true }));
 
-    expect(result.projectName).toBe('vinsware');
+    expect(result.projectName).toBe('vinelab');
     expect(result.runId).toBe('dry-run');
     expect(result.status).toBe(BackupStatus.Success);
 
@@ -384,10 +379,10 @@ describe('RunBackupUseCase (integration flow)', () => {
       if (callCount < 3) {
         throw new Error('pg_dump connection refused');
       }
-      return new DumpResult('/data/backups/vinsware/dump.sql.gz', 1024000, 5000);
+      return new DumpResult('/data/backups/vinelab/dump.sql.gz', 1024000, 5000);
     });
 
-    const [result] = await orchestrator.execute(new RunBackupCommand({ projectName: 'vinsware' }));
+    const [result] = await orchestrator.execute(new RunBackupCommand({ projectName: 'vinelab' }));
 
     expect(result.status).toBe(BackupStatus.Success);
     // First call + 2 retries = 3 total calls
@@ -400,7 +395,7 @@ describe('RunBackupUseCase (integration flow)', () => {
   it('should fail after exhausting retries', async () => {
     mockDumper.dump.mockRejectedValue(new Error('pg_dump persistent failure'));
 
-    const [result] = await orchestrator.execute(new RunBackupCommand({ projectName: 'vinsware' }));
+    const [result] = await orchestrator.execute(new RunBackupCommand({ projectName: 'vinelab' }));
 
     expect(result.status).toBe(BackupStatus.Failed);
     expect(result.errorStage).toBe(BackupStage.Dump);
@@ -410,7 +405,7 @@ describe('RunBackupUseCase (integration flow)', () => {
     expect(mockNotifier.notifyFailure).toHaveBeenCalled();
 
     // Verify lock was still released
-    expect(backupLock.isLocked('vinsware')).toBe(false);
+    expect(backupLock.isLocked('vinelab')).toBe(false);
   });
 
   // ── Audit records stages ──────────────────────────────────────────
@@ -418,7 +413,7 @@ describe('RunBackupUseCase (integration flow)', () => {
   it('should track progress through audit log stages', async () => {
     const trackSpy = jest.spyOn(auditLog, 'trackProgress');
 
-    await orchestrator.execute(new RunBackupCommand({ projectName: 'vinsware' }));
+    await orchestrator.execute(new RunBackupCommand({ projectName: 'vinelab' }));
 
     expect(trackSpy).toHaveBeenCalledWith(expect.any(String), BackupStage.NotifyStarted);
     expect(trackSpy).toHaveBeenCalledWith(expect.any(String), BackupStage.Dump);
@@ -430,13 +425,13 @@ describe('RunBackupUseCase (integration flow)', () => {
   // ── Sync receives correct paths and tags ──────────────────────────
 
   it('should pass dump file path and tags to storage sync', async () => {
-    await orchestrator.execute(new RunBackupCommand({ projectName: 'vinsware' }));
+    await orchestrator.execute(new RunBackupCommand({ projectName: 'vinelab' }));
 
     expect(mockStorage.sync).toHaveBeenCalledWith(
-      ['/data/backups/vinsware/dump.sql.gz'],
+      ['/data/backups/vinelab/dump.sql.gz'],
       expect.objectContaining({
         tags: expect.arrayContaining([
-          'project:vinsware',
+          'project:vinelab',
           'db:postgres',
         ]),
         snapshotMode: 'combined',

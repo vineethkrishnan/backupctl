@@ -112,7 +112,7 @@ For each backup project that should report heartbeats:
 
 1. In Kuma UI, click **Add New Monitor**
 2. Set **Monitor Type** to **Push**
-3. Set a descriptive **Friendly Name** (e.g., `vinsware-backup`)
+3. Set a descriptive **Friendly Name** (e.g., `vinelab-backup`)
 4. Set **Heartbeat Interval** to match the project's cron schedule:
 
    | Cron Schedule | Description | Interval | Grace Period |
@@ -221,7 +221,7 @@ For each project, add a `monitor` block with the push token from step 5:
 
 ```yaml
 projects:
-  - name: vinsware
+  - name: vinelab
     enabled: true
     cron: '0 0 * * *'
     # ... existing database, assets, restic, notification config ...
@@ -248,10 +248,10 @@ This verifies that `UPTIME_KUMA_BASE_URL` is set when any project has a `monitor
 Trigger a backup and confirm the heartbeat reaches Kuma:
 
 ```bash
-backupctl run vinsware
+backupctl run vinelab
 ```
 
-In the Kuma dashboard, the `vinsware-backup` monitor should show a green UP status with the backup duration displayed as response time.
+In the Kuma dashboard, the `vinelab-backup` monitor should show a green UP status with the backup duration displayed as response time.
 
 To test failure detection, stop sending heartbeats (or run a backup that fails). After the configured interval + grace period, Kuma will mark the monitor as DOWN and send alerts through its notification channels.
 

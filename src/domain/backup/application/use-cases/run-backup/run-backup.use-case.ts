@@ -262,7 +262,7 @@ export class RunBackupUseCase {
     try {
       const storage = this.storageFactory.create(config);
       await storage.listSnapshots();
-      checks.push({ name: 'Restic repo', passed: true, message: `Repository accessible at ${config.restic.repositoryPath}` });
+      checks.push({ name: 'Restic repo', passed: true, message: `Repository accessible at ${config.storage.repository}` });
     } catch (error) {
       checks.push({ name: 'Restic repo', passed: false, message: `Repository unreachable: ${(error as Error).message}` });
     }
@@ -421,7 +421,7 @@ export class RunBackupUseCase {
         () =>
           storage.sync(syncPaths, {
             tags: this.buildTags(config, timestamp),
-            snapshotMode: config.restic.snapshotMode,
+            snapshotMode: config.storage.snapshotMode,
           }),
         (retries) => { totalRetries += retries; },
       );
@@ -481,7 +481,7 @@ export class RunBackupUseCase {
       encrypted,
       verified,
       backupType: this.resolveBackupType(config),
-      snapshotMode: config.restic.snapshotMode,
+      snapshotMode: config.storage.snapshotMode,
       errorStage,
       errorMessage,
       retryCount: totalRetries,

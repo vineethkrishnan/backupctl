@@ -6,6 +6,13 @@ import * as yaml from 'js-yaml';
 import { ConfigLoaderPort, ValidationResult } from '@domain/config/application/ports/config-loader.port';
 import { ProjectConfig } from '@domain/config/domain/project-config.model';
 import { RetentionPolicy } from '@domain/config/domain/retention-policy.model';
+import {
+  REQUIRED_STORAGE_CONFIG_KEYS,
+  SNAPSHOT_MODES,
+  STORAGE_BACKEND_TYPES,
+  SnapshotMode,
+  StorageBackendType,
+} from '@domain/config/domain/storage-config.model';
 
 interface RawProjectEntry {
   name: string;
@@ -24,7 +31,15 @@ interface RawProjectEntry {
   };
   compression?: { enabled?: boolean };
   assets?: { paths?: string[] };
-  restic: {
+  storage?: {
+    type?: string;
+    repository?: string;
+    password?: string;
+    snapshot_mode?: string;
+    config?: Record<string, string>;
+  };
+  /** @deprecated Use `storage` with `type: sftp`. Normalized away at load time. */
+  restic?: {
     repository_path: string;
     password?: string;
     snapshot_mode?: string;
@@ -63,6 +78,7 @@ interface RawYamlConfig {
 export class YamlConfigLoaderAdapter implements ConfigLoaderPort {
   private readonly logger = new Logger(YamlConfigLoaderAdapter.name);
   private projects: ProjectConfig[] | null = null;
+  private readonly warnedLegacyProjects = new Set<string>();
   private readonly configPath: string;
 
   constructor(private readonly configService: ConfigService) {
@@ -124,9 +140,8 @@ export class YamlConfigLoaderAdapter implements ConfigLoaderPort {
         if (!hasDb && !hasAssets) {
           errors.push(`Project "${resolved.name}": must have at least one of "database" or "assets"`);
         }
-        if (!resolved.restic) {
-          errors.push(`Project "${resolved.name}": missing required field: restic`);
-        }
+        errors.push(...this.validateStorage(resolved));
+
         if (!resolved.retention) {
           errors.push(`Project "${resolved.name}": missing required field: retention`);
         }
@@ -164,9 +179,77 @@ export class YamlConfigLoaderAdapter implements ConfigLoaderPort {
     return { isValid: errors.length === 0, errors };
   }
 
+  private validateStorage(entry: RawProjectEntry): string[] {
+    const errors: string[] = [];
+    const project = `Project "${entry.name}"`;
+
+    if (entry.restic && entry.storage) {
+      errors.push(`${project}: has both "restic" and "storage" — keep only "storage"`);
+      return errors;
+    }
+
+    const storage = entry.storage ?? this.legacyStorageView(entry);
+
+    if (!storage) {
+      errors.push(`${project}: missing required field: storage`);
+      return errors;
+    }
+
+    const type = storage.type ?? 'sftp';
+    if (!STORAGE_BACKEND_TYPES.includes(type as StorageBackendType)) {
+      errors.push(
+        `${project}: invalid storage type "${type}" (expected one of: ${STORAGE_BACKEND_TYPES.join(', ')})`,
+      );
+      return errors;
+    }
+
+    if (!storage.repository) {
+      errors.push(`${project}: storage missing required field: repository`);
+    }
+
+    if (storage.snapshot_mode && !SNAPSHOT_MODES.includes(storage.snapshot_mode as SnapshotMode)) {
+      errors.push(
+        `${project}: invalid snapshot_mode "${storage.snapshot_mode}" ` +
+          `(expected one of: ${SNAPSHOT_MODES.join(', ')})`,
+      );
+    }
+
+    for (const key of REQUIRED_STORAGE_CONFIG_KEYS[type as StorageBackendType]) {
+      if (!storage.config?.[key]) {
+        errors.push(`${project}: storage type "${type}" requires config.${key}`);
+      }
+    }
+
+    if (type === 'sftp') {
+      for (const key of ['HETZNER_SSH_HOST', 'HETZNER_SSH_USER', 'HETZNER_SSH_KEY_PATH']) {
+        if (!this.configService.get<string>(key)) {
+          errors.push(`${project}: storage type "sftp" requires ${key} in .env`);
+        }
+      }
+    }
+
+    if (!storage.password && !this.configService.get<string>('RESTIC_PASSWORD')) {
+      errors.push(`${project}: storage requires a password, or RESTIC_PASSWORD in .env`);
+    }
+
+    return errors;
+  }
+
+  private legacyStorageView(entry: RawProjectEntry): RawProjectEntry['storage'] | null {
+    if (!entry.restic) return null;
+
+    return {
+      type: 'sftp',
+      repository: entry.restic.repository_path,
+      password: entry.restic.password,
+      snapshot_mode: entry.restic.snapshot_mode,
+    };
+  }
+
   reload(): void {
     this.logger.log('Reloading project configuration');
     this.projects = null;
+    this.warnedLegacyProjects.clear();
     this.loadAll();
   }
 
@@ -260,7 +343,9 @@ export class YamlConfigLoaderAdapter implements ConfigLoaderPort {
       }
     }
 
-    entry.restic.password ??= this.configService.get<string>('RESTIC_PASSWORD') ?? undefined;
+    if (entry.storage) {
+      entry.storage.password ??= this.configService.get<string>('RESTIC_PASSWORD') ?? undefined;
+    }
 
     if (!entry.compression) {
       entry.compression = { enabled: true };
@@ -269,12 +354,38 @@ export class YamlConfigLoaderAdapter implements ConfigLoaderPort {
     }
   }
 
+  /**
+   * Maps the deprecated `restic:` block onto `storage:` with `type: sftp`.
+   * Remove once no deployment carries a legacy config.
+   */
+  private normalizeLegacyStorage(entry: RawProjectEntry): void {
+    const legacyStorage = this.legacyStorageView(entry);
+    if (!legacyStorage || entry.storage) return;
+
+    // loadAll() re-reads the file on every call, and callers include the health probe
+    // on a 5-minute timer — warn once per project rather than forever.
+    if (!this.warnedLegacyProjects.has(entry.name)) {
+      this.warnedLegacyProjects.add(entry.name);
+      this.logger.warn(
+        `Project "${entry.name}": the "restic" config block is deprecated — rename it to "storage" ` +
+          'with "type: sftp" and "repository" in place of "repository_path".',
+      );
+    }
+
+    entry.storage = legacyStorage;
+  }
+
   private buildProjectConfig(raw: RawProjectEntry): ProjectConfig {
     const resolved = this.resolveEnvVarsInObject(
       raw as unknown as Record<string, unknown>,
     ) as unknown as RawProjectEntry;
 
+    this.normalizeLegacyStorage(resolved);
     this.applyFallbacks(resolved);
+
+    if (!resolved.storage) {
+      throw new Error(`Project "${resolved.name}": missing required field: storage`);
+    }
 
     const retention = new RetentionPolicy(
       resolved.retention.local_days,
@@ -302,10 +413,12 @@ export class YamlConfigLoaderAdapter implements ConfigLoaderPort {
         : null,
       compression: { enabled: resolved.compression?.enabled ?? true },
       assets: { paths: resolved.assets?.paths ?? [] },
-      restic: {
-        repositoryPath: resolved.restic.repository_path,
-        password: resolved.restic.password ?? '',
-        snapshotMode: (resolved.restic.snapshot_mode as 'combined' | 'separate') ?? 'combined',
+      storage: {
+        type: (resolved.storage.type as StorageBackendType) ?? 'sftp',
+        repository: resolved.storage.repository ?? '',
+        password: resolved.storage.password ?? '',
+        snapshotMode: (resolved.storage.snapshot_mode as SnapshotMode) ?? 'combined',
+        config: resolved.storage.config ?? {},
       },
       retention,
       encryption: resolved.encryption

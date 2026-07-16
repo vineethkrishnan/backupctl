@@ -31,12 +31,25 @@ Most configuration changes in `projects.yml` take effect automatically on the ne
 
 ### Hetzner Storage Box
 
+Only required when a project uses `storage.type: sftp`. An S3-only or rclone-only deployment can leave these unset.
+
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `HETZNER_SSH_HOST` | — | **Required.** Storage box hostname (e.g., `u123456.your-storagebox.de`) |
-| `HETZNER_SSH_USER` | — | **Required.** Storage box SSH user (e.g., `u123456`) |
+| `HETZNER_SSH_HOST` | — | Storage box hostname (e.g., `u123456.your-storagebox.de`) |
+| `HETZNER_SSH_USER` | — | Storage box SSH user (e.g., `u123456`) |
 | `HETZNER_SSH_PORT` | `23` | SSH port for the storage box |
 | `HETZNER_SSH_KEY_PATH` | `/home/node/.ssh/id_ed25519` | Path to SSH private key inside the container |
+
+### Storage Backend Credentials
+
+Referenced from `projects.yml` via `${}` under `storage.config`. Only set what you use. See [Storage](#storage) for the full backend list.
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `B2_ENDPOINT` | — | S3 endpoint, e.g. `https://s3.eu-central-003.backblazeb2.com` |
+| `B2_KEY_ID` | — | S3 access key ID |
+| `B2_APP_KEY` | — | S3 secret access key |
+| `RCLONE_CONFIG_PATH` | rclone's default (`/home/node/.config/rclone/rclone.conf`) | Path to the rclone config file. Must be writable — rclone rewrites refreshed OAuth tokens into it |
 
 ### Restic
 
@@ -90,6 +103,7 @@ These are used when a project has no `encryption` block in YAML.
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `HEALTH_DISK_MIN_FREE_GB` | `5` | Minimum free disk space in GB before health check fails |
+| `HEALTH_STORAGE_CHECK_TTL_SECONDS` | `300` | How long `/health` caches its per-project storage reachability probe. Each probe is a real restic round trip, so lowering this increases API calls (and cost) against billed backends like B2 |
 
 ### Daily Summary
 
@@ -102,13 +116,13 @@ These are used when a project has no `encryption` block in YAML.
 Project-specific secrets follow the naming pattern `{PROJECT}_DB_PASSWORD` and `{PROJECT}_RESTIC_PASSWORD` (uppercase project name with hyphens replaced by underscores):
 
 ```env
-VINSWARE_DB_PASSWORD=secret
-VINSWARE_RESTIC_PASSWORD=restic-secret
+VINELAB_DB_PASSWORD=secret
+VINELAB_RESTIC_PASSWORD=restic-secret
 PROJECTX_DB_PASSWORD=secret
 PROJECTY_DB_PASSWORD=secret
 ```
 
-These are referenced in `projects.yml` via `${VINSWARE_DB_PASSWORD}`.
+These are referenced in `projects.yml` via `${VINELAB_DB_PASSWORD}`.
 
 ## Project Configuration (projects.yml)
 
@@ -155,13 +169,92 @@ Only applies when `database` is configured.
 |-------|------|----------|---------|-------------|
 | `assets.paths` | string[] | no | `[]` | Filesystem paths to include in the backup alongside the database dump (or as the sole backup target for files-only projects). Paths that don't exist at backup time are skipped with a warning |
 
-### Restic
+### Storage
+
+Each project chooses its own backend. Whatever the backend, restic encrypts the repository, so the provider never sees plaintext.
 
 | Field | Type | Required | Default | Description |
 |-------|------|----------|---------|-------------|
-| `restic.repository_path` | string | yes | — | Path on the Hetzner Storage Box for this project's restic repo. **Must be relative** (e.g., `backups/myproject`, not `/backups/myproject`) — Hetzner Storage Box chroots to the user home directory |
-| `restic.password` | string | no | `RESTIC_PASSWORD` from `.env` | Per-project restic repo password |
-| `restic.snapshot_mode` | string | no | `combined` | `combined` (one snapshot for dump + assets) or `separate` (individual snapshots) |
+| `storage.type` | string | no | `sftp` | One of `sftp`, `s3`, `b2`, `rclone`, `local` |
+| `storage.repository` | string | yes | — | Repository location. Meaning depends on `type` — see the table below |
+| `storage.password` | string | no | `RESTIC_PASSWORD` from `.env` | Per-project restic repo password |
+| `storage.snapshot_mode` | string | no | `combined` | `combined` (one snapshot for dump + assets) or `separate` (individual snapshots) |
+| `storage.config` | map | depends | `{}` | Per-backend credentials. Required keys depend on `type` |
+
+#### Backends
+
+| `type` | `repository` format | Required `config` keys | Notes |
+|--------|--------------------|------------------------|-------|
+| `sftp` | `backups/myproject` | none — uses `HETZNER_SSH_*` from `.env` | **Must be relative** — Hetzner Storage Box chroots to the user home directory |
+| `s3` | `<bucket>/<path>` | `endpoint`, `access_key_id`, `secret_access_key`. Optional `region` | Backblaze B2, Wasabi, Cloudflare R2, MinIO, AWS S3 |
+| `b2` | `<bucket>:<path>` | `account_id`, `account_key` | B2's native API. Restic recommends using `s3` against B2 instead |
+| `rclone` | `<remote>:<path>` | none. Optional `config_path` | Google Drive, OneDrive, Dropbox. Requires an authorized rclone remote |
+| `local` | `/srv/restic-repo` | none | A path inside the container. Useful for testing or a mounted disk |
+
+`config validate` checks the required keys for the chosen type, so a missing credential is caught before a backup runs rather than at 2am.
+
+#### Backblaze B2 / S3-compatible
+
+The recommended cloud backend. One block covers every S3-compatible provider; only the endpoint changes.
+
+```yaml
+storage:
+  type: s3
+  repository: my-backup-bucket/myproject
+  password: ${MYPROJECT_RESTIC_PASSWORD}
+  snapshot_mode: combined
+  config:
+    endpoint: ${B2_ENDPOINT}          # https://s3.eu-central-003.backblazeb2.com
+    access_key_id: ${B2_KEY_ID}
+    secret_access_key: ${B2_APP_KEY}
+```
+
+#### Google Drive, OneDrive, Dropbox (rclone)
+
+These go through rclone, which needs an authorized remote. OAuth needs a browser, so authorize on your laptop and paste the token into the container:
+
+```bash
+rclone authorize "drive"                    # on a machine with a browser
+docker exec -it backupctl rclone config     # paste the token here
+```
+
+The remote name becomes the repository prefix:
+
+```yaml
+storage:
+  type: rclone
+  repository: gdrive:backups/myproject
+  password: ${MYPROJECT_RESTIC_PASSWORD}
+```
+
+rclone's config lives at `/home/node/.config/rclone/rclone.conf`, mounted read-write from `./rclone-config`. That mount **must stay writable**: rclone rewrites refreshed OAuth tokens into it, and a read-only mount loses them on every container recreate, surfacing later as an expired-token failure.
+
+Worth knowing before you pick these: a restic repository is thousands of small pack files, and consumer Drive/OneDrive/Dropbox APIs are rate-limited and slow for that access pattern. Fine for modest data; prefer `s3` for anything large. Automated bulk storage on consumer tiers is also a grey area in those providers' terms.
+
+::: warning iCloud is not supported
+rclone's iCloud Drive backend is experimental, rejects app-specific passwords, and needs interactive 2FA with a trust token that expires every 30 days — which breaks unattended cron backups and would put your primary Apple ID password in `.env`.
+:::
+
+#### Deprecated: the `restic:` block
+
+The old SFTP-only block still works and is read as `storage:` with `type: sftp`, logging a warning on load. Migrate by renaming the key and `repository_path` → `repository`:
+
+```yaml
+# Before
+restic:
+  repository_path: backups/myproject
+  password: ${MYPROJECT_RESTIC_PASSWORD}
+  snapshot_mode: combined
+
+# After
+storage:
+  type: sftp
+  repository: backups/myproject
+  password: ${MYPROJECT_RESTIC_PASSWORD}
+  snapshot_mode: combined
+```
+
+Specifying both `restic:` and `storage:` is a validation error.
 
 ### Retention
 
@@ -256,7 +349,7 @@ Times are interpreted in the timezone set by the `TIMEZONE` environment variable
 A single restic snapshot contains both the database dump and all asset paths. Tagged with `backupctl:combined,project:{name}`.
 
 ```yaml
-restic:
+storage:
   snapshot_mode: combined
 ```
 
@@ -269,7 +362,7 @@ Cons: any change in assets triggers a new snapshot even if the DB hasn't changed
 Individual restic snapshots for the database dump and each asset path. The dump snapshot is tagged `backupctl:db,project:{name}`. Each asset snapshot is tagged `backupctl:assets:{path},project:{name}`.
 
 ```yaml
-restic:
+storage:
   snapshot_mode: separate
 ```
 
@@ -323,7 +416,7 @@ The webhook notifier POSTs `application/json` with an `event` field, a `text` fi
 encryption:
   enabled: true
   type: gpg
-  recipient: vinsware-backup@company.com
+  recipient: vinelab-backup@company.com
 ```
 
 ### Global (via .env)
@@ -345,28 +438,29 @@ A full `config/projects.yml` with three projects using different databases and s
 ```yaml
 projects:
   # PostgreSQL with full configuration
-  - name: vinsware
+  - name: vinelab
     enabled: true
     cron: "0 0 * * *"
     timeout_minutes: 30
-    docker_network: vinsware_vinsware-network
+    docker_network: vinelab_vinelab-network
 
     database:
       type: postgres
-      host: postgres-vinsware
+      host: postgres-vinelab
       port: 5432
-      name: vinsware_db
+      name: vinelab_db
       user: backup_user
-      password: ${VINSWARE_DB_PASSWORD}
+      password: ${VINELAB_DB_PASSWORD}
 
     assets:
       paths:
-        - /data/vinsware/uploads
-        - /data/vinsware/assets
+        - /data/vinelab/uploads
+        - /data/vinelab/assets
 
-    restic:
-      repository_path: backups/vinsware
-      password: ${VINSWARE_RESTIC_PASSWORD}
+    storage:
+      type: sftp
+      repository: backups/vinelab
+      password: ${VINELAB_RESTIC_PASSWORD}
       snapshot_mode: combined
 
     retention:
@@ -378,11 +472,11 @@ projects:
     encryption:
       enabled: true
       type: gpg
-      recipient: vinsware-backup@company.com
+      recipient: vinelab-backup@company.com
 
     hooks:
-      pre_backup: "curl -s http://vinsware-app:3000/maintenance/on"
-      post_backup: "curl -s http://vinsware-app:3000/maintenance/off"
+      pre_backup: "curl -s http://vinelab-app:3000/maintenance/on"
+      post_backup: "curl -s http://vinelab-app:3000/maintenance/off"
 
     verification:
       enabled: true
@@ -390,12 +484,12 @@ projects:
     notification:
       type: slack
       config:
-        webhook_url: https://hooks.slack.com/services/VINSWARE/SPECIFIC/HOOK
+        webhook_url: https://hooks.slack.com/services/VINELAB/SPECIFIC/HOOK
 
     monitor:
       type: uptime-kuma
       config:
-        push_token: YOUR_VINSWARE_PUSH_TOKEN
+        push_token: YOUR_VINELAB_PUSH_TOKEN
 
   # MySQL with email notifications and separate snapshots
   - name: project-x
@@ -414,8 +508,9 @@ projects:
       paths:
         - /data/projectx/storage
 
-    restic:
-      repository_path: backups/project-x
+    storage:
+      type: sftp
+      repository: backups/project-x
       snapshot_mode: separate
 
     retention:
@@ -449,8 +544,9 @@ projects:
     assets:
       paths: []
 
-    restic:
-      repository_path: backups/analytics
+    storage:
+      type: sftp
+      repository: backups/analytics
       snapshot_mode: combined
 
     retention:
@@ -471,8 +567,9 @@ projects:
         - /data/static/uploads
         - /data/static/media
 
-    restic:
-      repository_path: backups/static-assets
+    storage:
+      type: sftp
+      repository: backups/static-assets
       snapshot_mode: combined
 
     retention:
@@ -487,10 +584,10 @@ backupctl organizes all data under `BACKUP_BASE_DIR` (default `/data/backups`):
 
 ```
 ${BACKUP_BASE_DIR}/
-├── vinsware/
-│   ├── vinsware_backup_20260318_000000_a1b2.sql.gz       # compressed dump
-│   ├── vinsware_backup_20260318_000000_a1b2.sql.gz.gpg   # encrypted dump (if enabled)
-│   ├── vinsware_backup_20260317_000000_c3d4.sql.gz
+├── vinelab/
+│   ├── vinelab_backup_20260318_000000_a1b2.sql.gz       # compressed dump
+│   ├── vinelab_backup_20260318_000000_a1b2.sql.gz.gpg   # encrypted dump (if enabled)
+│   ├── vinelab_backup_20260317_000000_c3d4.sql.gz
 │   └── .lock                                             # present while backup is running
 ├── project-x/
 │   ├── project-x_backup_20260318_013000_e5f6.sql.gz
@@ -515,7 +612,7 @@ Use the CLI to validate configuration at any time:
 backupctl config validate
 
 # Show resolved config for a specific project (secrets masked)
-backupctl config show vinsware
+backupctl config show vinelab
 ```
 
 `config validate` checks:

@@ -19,10 +19,11 @@ import { ConfigLoaderPort, ValidationResult } from '@domain/config/application/p
 import { BackupResult } from '@domain/backup/domain/backup-result.model';
 import { BackupStage } from '@domain/backup/domain/value-objects/backup-stage.enum';
 import { BackupStatus } from '@domain/backup/domain/value-objects/backup-status.enum';
-import { HealthCheckResult } from '@domain/audit/domain/health-check-result.model';
+import { buildHealthCheckResult } from '@test/support/health-check-result.builder';
 import { SnapshotInfo } from '@domain/backup/domain/value-objects/snapshot-info.model';
 import { ProjectConfig } from '@domain/config/domain/project-config.model';
 import { RetentionPolicy } from '@domain/config/domain/retention-policy.model';
+import { buildProjectConfig } from '@test/support/project-config.builder';
 import { GpgKeyManagerPort } from '@domain/backup/application/ports/gpg-key-manager.port';
 import { CONFIG_LOADER_PORT, GPG_KEY_MANAGER_PORT } from '@common/di/injection-tokens';
 
@@ -31,7 +32,7 @@ jest.setTimeout(30000);
 function buildResult(overrides: Partial<BackupResult> = {}): BackupResult {
   return new BackupResult({
     runId: 'run-1',
-    projectName: 'vinsware',
+    projectName: 'vinelab',
     status: BackupStatus.Success,
     currentStage: BackupStage.NotifyResult,
     startedAt: new Date('2026-03-18T02:00:00Z'),
@@ -53,33 +54,25 @@ function buildResult(overrides: Partial<BackupResult> = {}): BackupResult {
 }
 
 function buildTestConfig(): ProjectConfig {
-  return new ProjectConfig({
-    name: 'vinsware',
-    enabled: true,
-    cron: '0 2 * * *',
-    timeoutMinutes: null,
+  return buildProjectConfig({
+    name: 'vinelab',
     database: {
       type: 'postgres',
       host: 'localhost',
       port: 5432,
-      name: 'vinsware_prod',
+      name: 'vinelab_prod',
       user: 'user',
       password: 'pass',
       dumpTimeoutMinutes: null,
     },
-    compression: { enabled: true },
-    assets: { paths: [] },
-    restic: {
-      repositoryPath: '/backups/vinsware',
+    storage: {
+      type: 'sftp',
+      repository: '/backups/vinelab',
       password: 'rpass',
       snapshotMode: 'combined',
+      config: {},
     },
     retention: new RetentionPolicy(7, 7, 4),
-    encryption: null,
-    hooks: null,
-    verification: { enabled: false },
-    notification: null,
-    monitor: null,
   });
 }
 
@@ -153,10 +146,10 @@ describe('CLI commands (integration)', () => {
     it('should trigger backup for a named project', async () => {
       mockOrchestrator.execute.mockResolvedValue([buildResult()]);
 
-      await CommandTestFactory.run(commandModule, ['run', 'vinsware']);
+      await CommandTestFactory.run(commandModule, ['run', 'vinelab']);
 
       expect(mockOrchestrator.execute).toHaveBeenCalledWith(
-        expect.objectContaining({ projectName: 'vinsware', isAll: false }),
+        expect.objectContaining({ projectName: 'vinelab', isAll: false }),
       );
     });
 
@@ -172,14 +165,14 @@ describe('CLI commands (integration)', () => {
 
     it('should call getDryRunReport for --dry-run flag', async () => {
       mockOrchestrator.getDryRunReport.mockResolvedValue({
-        projectName: 'vinsware',
+        projectName: 'vinelab',
         checks: [{ name: 'Config loaded', passed: true, message: 'OK' }],
         allPassed: true,
       });
 
-      await CommandTestFactory.run(commandModule, ['run', 'vinsware', '--dry-run']);
+      await CommandTestFactory.run(commandModule, ['run', 'vinelab', '--dry-run']);
 
-      expect(mockOrchestrator.getDryRunReport).toHaveBeenCalledWith('vinsware', { verifyDump: undefined });
+      expect(mockOrchestrator.getDryRunReport).toHaveBeenCalledWith('vinelab', { verifyDump: undefined });
       expect(mockOrchestrator.execute).not.toHaveBeenCalled();
     });
   });
@@ -187,7 +180,7 @@ describe('CLI commands (integration)', () => {
   describe('health command', () => {
     it('should call health check and display results', async () => {
       mockHealthCheck.execute.mockResolvedValue(
-        new HealthCheckResult(true, true, 50, true, true, true, 3600),
+        buildHealthCheckResult(),
       );
 
       await CommandTestFactory.run(commandModule, ['health']);
@@ -198,7 +191,7 @@ describe('CLI commands (integration)', () => {
 
     it('should report unhealthy when audit DB is down', async () => {
       mockHealthCheck.execute.mockResolvedValue(
-        new HealthCheckResult(false, true, 50, true, true, true, 3600),
+        buildHealthCheckResult({ auditDbConnected: false }),
       );
 
       await CommandTestFactory.run(commandModule, ['health']);
@@ -218,7 +211,7 @@ describe('CLI commands (integration)', () => {
     it('should report configuration errors', async () => {
       mockConfigLoader.validate.mockReturnValue({
         isValid: false,
-        errors: ['Project "vinsware": missing required field: cron'],
+        errors: ['Project "vinelab": missing required field: cron'],
       });
 
       await CommandTestFactory.run(commandModule, ['config', 'validate']);
@@ -233,26 +226,26 @@ describe('CLI commands (integration)', () => {
         new SnapshotInfo(
           'abc123def456',
           '2026-03-18T02:05:00Z',
-          ['/data/backups/vinsware'],
+          ['/data/backups/vinelab'],
           'backupctl',
-          ['project:vinsware', 'db:postgres'],
+          ['project:vinelab', 'db:postgres'],
           '512MB',
         ),
       ]);
 
-      await CommandTestFactory.run(commandModule, ['snapshots', 'vinsware']);
+      await CommandTestFactory.run(commandModule, ['snapshots', 'vinelab']);
 
       expect(mockSnapshotManagement.execute).toHaveBeenCalledWith(
-        expect.objectContaining({ projectName: 'vinsware' }),
+        expect.objectContaining({ projectName: 'vinelab' }),
       );
     });
 
     it('should display message when no snapshots found', async () => {
       mockSnapshotManagement.execute.mockResolvedValue([]);
 
-      await CommandTestFactory.run(commandModule, ['snapshots', 'vinsware']);
+      await CommandTestFactory.run(commandModule, ['snapshots', 'vinelab']);
 
-      expect(console.log).toHaveBeenCalledWith('No snapshots found for vinsware.');
+      expect(console.log).toHaveBeenCalledWith('No snapshots found for vinelab.');
     });
   });
 });

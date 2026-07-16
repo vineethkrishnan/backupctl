@@ -10,21 +10,21 @@ jest.setTimeout(30000);
 
 function buildTestYaml(overrides: Record<string, unknown> = {}): string {
   const project = {
-    name: 'vinsware',
+    name: 'vinelab',
     enabled: true,
     cron: '0 2 * * *',
     timeout_minutes: 30,
     database: {
       type: 'postgres',
-      host: 'db.vinsware.test',
+      host: 'db.vinelab.test',
       port: 5432,
-      name: 'vinsware_prod',
-      user: 'vinsware_user',
-      password: '${VINSWARE_DB_PASSWORD}',
+      name: 'vinelab_prod',
+      user: 'vinelab_user',
+      password: '${VINELAB_DB_PASSWORD}',
     },
-    assets: { paths: ['/data/vinsware/uploads'] },
+    assets: { paths: ['/data/vinelab/uploads'] },
     restic: {
-      repository_path: 'sftp:storage:/backups/vinsware',
+      repository_path: 'sftp:storage:/backups/vinelab',
       password: '${RESTIC_PASSWORD}',
       snapshot_mode: 'combined',
     },
@@ -44,18 +44,18 @@ function buildTestYaml(overrides: Record<string, unknown> = {}): string {
 function buildMultiProjectYaml(): string {
   const projects = [
     {
-      name: 'vinsware',
+      name: 'vinelab',
       cron: '0 2 * * *',
       database: {
         type: 'postgres',
-        host: 'db.vinsware.test',
+        host: 'db.vinelab.test',
         port: 5432,
-        name: 'vinsware_prod',
-        user: 'vinsware_user',
+        name: 'vinelab_prod',
+        user: 'vinelab_user',
         password: 'plain-pass',
       },
       restic: {
-        repository_path: 'sftp:storage:/backups/vinsware',
+        repository_path: 'sftp:storage:/backups/vinelab',
         password: 'restic-pass',
       },
       retention: { local_days: 7, keep_daily: 7, keep_weekly: 4 },
@@ -93,9 +93,16 @@ describe('YamlConfigLoaderAdapter (integration)', () => {
   }
 
   function createAdapter(envOverrides: Record<string, string> = {}): YamlConfigLoaderAdapter {
+    const env: Record<string, string> = {
+      HETZNER_SSH_HOST: 'storage.example.com',
+      HETZNER_SSH_USER: 'u123',
+      HETZNER_SSH_KEY_PATH: '/home/node/.ssh/id_ed25519',
+      ...envOverrides,
+    };
+
     const configService = {
       get: jest.fn((key: string, defaultValue?: string) => {
-        if (key in envOverrides) return envOverrides[key];
+        if (key in env) return env[key];
         return defaultValue;
       }),
     } as unknown as ConfigService;
@@ -132,7 +139,7 @@ describe('YamlConfigLoaderAdapter (integration)', () => {
 
   describe('loadAll', () => {
     it('should load YAML and create ProjectConfig objects', () => {
-      setEnvVar('VINSWARE_DB_PASSWORD', 'test-secret-123');
+      setEnvVar('VINELAB_DB_PASSWORD', 'test-secret-123');
       setEnvVar('RESTIC_PASSWORD', 'restic-secret');
       fs.writeFileSync(tempConfigPath, buildTestYaml());
 
@@ -141,9 +148,9 @@ describe('YamlConfigLoaderAdapter (integration)', () => {
 
       expect(result).toHaveLength(1);
       expect(result[0]).toBeInstanceOf(ProjectConfig);
-      expect(result[0].name).toBe('vinsware');
+      expect(result[0].name).toBe('vinelab');
       expect(result[0].database?.type).toBe('postgres');
-      expect(result[0].database?.host).toBe('db.vinsware.test');
+      expect(result[0].database?.host).toBe('db.vinelab.test');
       expect(result[0].database?.port).toBe(5432);
       expect(result[0].cron).toBe('0 2 * * *');
       expect(result[0].timeoutMinutes).toBe(30);
@@ -152,7 +159,7 @@ describe('YamlConfigLoaderAdapter (integration)', () => {
     });
 
     it('should resolve ${VAR_NAME} placeholders from environment', () => {
-      setEnvVar('VINSWARE_DB_PASSWORD', 'resolved-db-pass');
+      setEnvVar('VINELAB_DB_PASSWORD', 'resolved-db-pass');
       setEnvVar('RESTIC_PASSWORD', 'resolved-restic-pass');
       fs.writeFileSync(tempConfigPath, buildTestYaml());
 
@@ -160,13 +167,13 @@ describe('YamlConfigLoaderAdapter (integration)', () => {
       const result = adapter.loadAll();
 
       expect(result[0].database?.password).toBe('resolved-db-pass');
-      expect(result[0].restic.password).toBe('resolved-restic-pass');
+      expect(result[0].storage.password).toBe('resolved-restic-pass');
     });
   });
 
   describe('env fallbacks', () => {
     it('should fall back to env defaults when notification block is missing', () => {
-      setEnvVar('VINSWARE_DB_PASSWORD', 'pass');
+      setEnvVar('VINELAB_DB_PASSWORD', 'pass');
       setEnvVar('RESTIC_PASSWORD', 'rpass');
       fs.writeFileSync(tempConfigPath, buildTestYaml());
 
@@ -183,7 +190,7 @@ describe('YamlConfigLoaderAdapter (integration)', () => {
     });
 
     it('should fall back to env defaults for missing encryption', () => {
-      setEnvVar('VINSWARE_DB_PASSWORD', 'pass');
+      setEnvVar('VINELAB_DB_PASSWORD', 'pass');
       setEnvVar('RESTIC_PASSWORD', 'rpass');
       fs.writeFileSync(tempConfigPath, buildTestYaml());
 
@@ -205,7 +212,7 @@ describe('YamlConfigLoaderAdapter (integration)', () => {
 
   describe('validate', () => {
     it('should return isValid:true for valid config', () => {
-      setEnvVar('VINSWARE_DB_PASSWORD', 'pass');
+      setEnvVar('VINELAB_DB_PASSWORD', 'pass');
       setEnvVar('RESTIC_PASSWORD', 'rpass');
       fs.writeFileSync(tempConfigPath, buildTestYaml());
 
@@ -217,7 +224,7 @@ describe('YamlConfigLoaderAdapter (integration)', () => {
     });
 
     it('should return errors for unresolved env vars', () => {
-      delete process.env.VINSWARE_DB_PASSWORD;
+      delete process.env.VINELAB_DB_PASSWORD;
       delete process.env.RESTIC_PASSWORD;
       fs.writeFileSync(tempConfigPath, buildTestYaml());
 
@@ -225,11 +232,11 @@ describe('YamlConfigLoaderAdapter (integration)', () => {
       const result = adapter.validate();
 
       expect(result.isValid).toBe(false);
-      expect(result.errors.some((e) => e.includes('VINSWARE_DB_PASSWORD'))).toBe(true);
+      expect(result.errors.some((e) => e.includes('VINELAB_DB_PASSWORD'))).toBe(true);
     });
 
     it('should return error when monitor is missing type', () => {
-      setEnvVar('VINSWARE_DB_PASSWORD', 'pass');
+      setEnvVar('VINELAB_DB_PASSWORD', 'pass');
       setEnvVar('RESTIC_PASSWORD', 'rpass');
       fs.writeFileSync(tempConfigPath, buildTestYaml({
         monitor: { config: { push_token: 'tok-123' } },
@@ -243,7 +250,7 @@ describe('YamlConfigLoaderAdapter (integration)', () => {
     });
 
     it('should return error when uptime-kuma monitor is missing push_token', () => {
-      setEnvVar('VINSWARE_DB_PASSWORD', 'pass');
+      setEnvVar('VINELAB_DB_PASSWORD', 'pass');
       setEnvVar('RESTIC_PASSWORD', 'rpass');
       fs.writeFileSync(tempConfigPath, buildTestYaml({
         monitor: { type: 'uptime-kuma', config: {} },
@@ -257,7 +264,7 @@ describe('YamlConfigLoaderAdapter (integration)', () => {
     });
 
     it('should return error when uptime-kuma monitor is missing UPTIME_KUMA_BASE_URL', () => {
-      setEnvVar('VINSWARE_DB_PASSWORD', 'pass');
+      setEnvVar('VINELAB_DB_PASSWORD', 'pass');
       setEnvVar('RESTIC_PASSWORD', 'rpass');
       fs.writeFileSync(tempConfigPath, buildTestYaml({
         monitor: { type: 'uptime-kuma', config: { push_token: 'tok-123' } },
@@ -271,7 +278,7 @@ describe('YamlConfigLoaderAdapter (integration)', () => {
     });
 
     it('should pass validation for valid uptime-kuma monitor config', () => {
-      setEnvVar('VINSWARE_DB_PASSWORD', 'pass');
+      setEnvVar('VINELAB_DB_PASSWORD', 'pass');
       setEnvVar('RESTIC_PASSWORD', 'rpass');
       fs.writeFileSync(tempConfigPath, buildTestYaml({
         monitor: { type: 'uptime-kuma', config: { push_token: 'tok-123' } },
@@ -290,11 +297,11 @@ describe('YamlConfigLoaderAdapter (integration)', () => {
       fs.writeFileSync(tempConfigPath, buildMultiProjectYaml());
 
       const adapter = createAdapter();
-      const vinsware = adapter.getProject('vinsware');
+      const vinelab = adapter.getProject('vinelab');
       const shopify = adapter.getProject('shopify-sync');
 
-      expect(vinsware.name).toBe('vinsware');
-      expect(vinsware.database?.type).toBe('postgres');
+      expect(vinelab.name).toBe('vinelab');
+      expect(vinelab.database?.type).toBe('postgres');
       expect(shopify.name).toBe('shopify-sync');
       expect(shopify.database?.type).toBe('mysql');
     });

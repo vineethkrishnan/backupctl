@@ -153,8 +153,9 @@ backupctl restic myproject init
 
 ```yaml
 # Relative to the storage box user's home (avoid a leading slash, e.g. not `/backups/...`)
-restic:
-  repository_path: backups/myproject
+storage:
+  type: sftp
+  repository: backups/myproject
 ```
 
 The resulting SFTP URI should look like `sftp:user@host:backups/myproject` (no leading `/` after the colon).
@@ -988,7 +989,7 @@ Set `enabled: false` in `config/projects.yml`:
 
 ```yaml
 projects:
-  - name: vinsware
+  - name: vinelab
     enabled: false    # Pauses scheduled and --all backups
     cron: "0 0 * * *"
     # ... rest of config
@@ -1009,9 +1010,9 @@ backupctl config reload
 
 **What still works:**
 
-- `backupctl run vinsware` — manual single-project runs still work, so you can do ad-hoc backups while paused
-- `backupctl snapshots vinsware` — you can still browse existing snapshots
-- `backupctl restore vinsware ...` — restores from existing snapshots still work
+- `backupctl run vinelab` — manual single-project runs still work, so you can do ad-hoc backups while paused
+- `backupctl snapshots vinelab` — you can still browse existing snapshots
+- `backupctl restore vinelab ...` — restores from existing snapshots still work
 
 To re-enable, set `enabled: true` and reload config again.
 

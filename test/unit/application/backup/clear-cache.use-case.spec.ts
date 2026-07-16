@@ -3,8 +3,10 @@ import { ClearCacheCommand } from '@domain/backup/application/use-cases/clear-ca
 import { ConfigLoaderPort } from '@domain/config/application/ports/config-loader.port';
 import { RemoteStorageFactoryPort } from '@domain/backup/application/ports/remote-storage-factory.port';
 import { RemoteStoragePort } from '@domain/backup/application/ports/remote-storage.port';
+import { createMockRemoteStorage } from '@test/support/remote-storage.mock';
 import { ProjectConfig } from '@domain/config/domain/project-config.model';
 import { RetentionPolicy } from '@domain/config/domain/retention-policy.model';
+import { buildProjectConfig } from '@test/support/project-config.builder';
 
 describe('ClearCacheUseCase', () => {
   let useCase: ClearCacheUseCase;
@@ -13,34 +15,10 @@ describe('ClearCacheUseCase', () => {
   let mockStorage: jest.Mocked<RemoteStoragePort>;
 
   const createProjectConfig = (name: string, enabled = true): ProjectConfig =>
-    new ProjectConfig({
-      name,
-      enabled,
-      cron: '0 2 * * *',
-      timeoutMinutes: null,
-      database: { type: 'postgres', host: 'localhost', port: 5432, name: 'db', user: 'u', password: 'p', dumpTimeoutMinutes: null },
-      compression: { enabled: true },
-      assets: { paths: [] },
-      restic: { repositoryPath: '/repo', password: 'secret', snapshotMode: 'combined' },
-      retention: new RetentionPolicy(7, 7, 4, 6),
-      encryption: null,
-      hooks: null,
-      verification: { enabled: false },
-      notification: null,
-      monitor: null,
-    });
+    buildProjectConfig({ name, enabled, retention: new RetentionPolicy(7, 7, 4, 6) });
 
   beforeEach(() => {
-    mockStorage = {
-      sync: jest.fn(),
-      prune: jest.fn(),
-      listSnapshots: jest.fn(),
-      restore: jest.fn(),
-      exec: jest.fn(),
-      getCacheInfo: jest.fn(),
-      clearCache: jest.fn().mockResolvedValue(undefined),
-      unlock: jest.fn(),
-    };
+    mockStorage = createMockRemoteStorage({ clearCache: jest.fn().mockResolvedValue(undefined) });
 
     mockStorageFactory = {
       create: jest.fn().mockReturnValue(mockStorage),

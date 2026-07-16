@@ -1113,8 +1113,9 @@ add_project() {
   fi
 
   yaml+=""$'\n'
-  yaml+="    restic:"$'\n'
-  yaml+="      repository_path: ${proj_restic_path}"$'\n'
+  yaml+="    storage:"$'\n'
+  yaml+="      type: sftp"$'\n'
+  yaml+="      repository: ${proj_restic_path}"$'\n'
   if [ "$proj_restic_password_mode" = "custom" ]; then
     yaml+="      password: \${${proj_env_key}_RESTIC_PASSWORD}"$'\n'
   else
@@ -1558,7 +1559,7 @@ step_docker() {
       print_info "Creating remote directories on storage box..."
       for proj_yaml in "${PROJECTS[@]}"; do
         local repo_path
-        repo_path=$(echo "$proj_yaml" | grep 'repository_path:' | head -1 | sed 's/.*repository_path: //')
+        repo_path=$(echo "$proj_yaml" | grep -E '^[[:space:]]*repository:' | head -1 | sed 's/.*repository: //')
         if [ -n "$repo_path" ]; then
           echo -ne "  Creating remote directory: ${repo_path}..."
           if echo "mkdir ${repo_path}" | sftp -b - \

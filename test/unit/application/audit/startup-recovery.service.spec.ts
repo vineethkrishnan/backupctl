@@ -5,6 +5,7 @@ import { ConfigLoaderPort } from '@domain/config/application/ports/config-loader
 import { BackupLockPort } from '@domain/backup/application/ports/backup-lock.port';
 import { RemoteStorageFactoryPort } from '@domain/backup/application/ports/remote-storage-factory.port';
 import { RemoteStoragePort } from '@domain/backup/application/ports/remote-storage.port';
+import { createMockRemoteStorage } from '@test/support/remote-storage.mock';
 import { GpgKeyManagerPort } from '@domain/backup/application/ports/gpg-key-manager.port';
 import { ClockPort } from '@common/clock/clock.port';
 import { FileSystemPort } from '@common/filesystem/filesystem.port';
@@ -13,6 +14,7 @@ import { BackupStatus } from '@domain/backup/domain/value-objects/backup-status.
 import { BackupStage } from '@domain/backup/domain/value-objects/backup-stage.enum';
 import { ProjectConfig } from '@domain/config/domain/project-config.model';
 import { RetentionPolicy } from '@domain/config/domain/retention-policy.model';
+import { buildProjectConfig } from '@test/support/project-config.builder';
 import { ConfigService } from '@nestjs/config';
 
 describe('RecoverStartupUseCase', () => {
@@ -31,22 +33,7 @@ describe('RecoverStartupUseCase', () => {
   const fixedNow = new Date('2026-03-18T10:00:00Z');
 
   const createProjectConfig = (name: string, enabled = true): ProjectConfig =>
-    new ProjectConfig({
-      name,
-      enabled,
-      cron: '0 2 * * *',
-      timeoutMinutes: null,
-      database: { type: 'postgres', host: 'localhost', port: 5432, name: 'db', user: 'u', password: 'p', dumpTimeoutMinutes: null },
-      compression: { enabled: true },
-      assets: { paths: [] },
-      restic: { repositoryPath: '/repo', password: 'secret', snapshotMode: 'combined' },
-      retention: new RetentionPolicy(7, 7, 4, 6),
-      encryption: null,
-      hooks: null,
-      verification: { enabled: false },
-      notification: null,
-      monitor: null,
-    });
+    buildProjectConfig({ name, enabled, retention: new RetentionPolicy(7, 7, 4, 6) });
 
   const createOrphanedResult = (runId: string, projectName: string): BackupResult =>
     new BackupResult({
@@ -71,16 +58,7 @@ describe('RecoverStartupUseCase', () => {
     });
 
   beforeEach(() => {
-    mockStorage = {
-      sync: jest.fn(),
-      prune: jest.fn(),
-      listSnapshots: jest.fn(),
-      restore: jest.fn(),
-      exec: jest.fn(),
-      getCacheInfo: jest.fn(),
-      clearCache: jest.fn(),
-      unlock: jest.fn(),
-    };
+    mockStorage = createMockRemoteStorage();
 
     mockAuditLog = {
       startRun: jest.fn(),
@@ -154,7 +132,7 @@ describe('RecoverStartupUseCase', () => {
   });
 
   it('marks orphaned runs as failed', async () => {
-    const orphan = createOrphanedResult('run-orphan-1', 'vinsware');
+    const orphan = createOrphanedResult('run-orphan-1', 'vinelab');
     mockAuditLog.findOrphaned.mockResolvedValue([orphan]);
 
     await service.onModuleInit();
@@ -171,19 +149,19 @@ describe('RecoverStartupUseCase', () => {
   });
 
   it('cleans orphaned dump files only for projects with orphaned runs', async () => {
-    const orphan = createOrphanedResult('run-orphan-1', 'vinsware');
+    const orphan = createOrphanedResult('run-orphan-1', 'vinelab');
     mockAuditLog.findOrphaned.mockResolvedValue([orphan]);
-    const projects = [createProjectConfig('vinsware')];
+    const projects = [createProjectConfig('vinelab')];
     mockConfigLoader.loadAll.mockReturnValue(projects);
     mockFilesystem.exists.mockReturnValue(true);
-    mockFilesystem.listDirectory.mockReturnValue(['vinsware.sql.gz', 'vinsware.sql.gz.gpg', '.lock', 'notes.txt']);
+    mockFilesystem.listDirectory.mockReturnValue(['vinelab.sql.gz', 'vinelab.sql.gz.gpg', '.lock', 'notes.txt']);
 
     await service.onModuleInit();
 
-    expect(mockFilesystem.removeFile).toHaveBeenCalledWith('/data/backups/vinsware/vinsware.sql.gz');
-    expect(mockFilesystem.removeFile).toHaveBeenCalledWith('/data/backups/vinsware/vinsware.sql.gz.gpg');
-    expect(mockFilesystem.removeFile).not.toHaveBeenCalledWith('/data/backups/vinsware/.lock');
-    expect(mockFilesystem.removeFile).not.toHaveBeenCalledWith('/data/backups/vinsware/notes.txt');
+    expect(mockFilesystem.removeFile).toHaveBeenCalledWith('/data/backups/vinelab/vinelab.sql.gz');
+    expect(mockFilesystem.removeFile).toHaveBeenCalledWith('/data/backups/vinelab/vinelab.sql.gz.gpg');
+    expect(mockFilesystem.removeFile).not.toHaveBeenCalledWith('/data/backups/vinelab/.lock');
+    expect(mockFilesystem.removeFile).not.toHaveBeenCalledWith('/data/backups/vinelab/notes.txt');
   });
 
   it('skips dump cleanup when project has no orphaned runs', async () => {
@@ -198,24 +176,24 @@ describe('RecoverStartupUseCase', () => {
   });
 
   it('releases stale locks only for projects with orphaned runs', async () => {
-    const orphan1 = createOrphanedResult('run-1', 'vinsware');
+    const orphan1 = createOrphanedResult('run-1', 'vinelab');
     const orphan2 = createOrphanedResult('run-2', 'webapp');
     mockAuditLog.findOrphaned.mockResolvedValue([orphan1, orphan2]);
-    const projects = [createProjectConfig('vinsware'), createProjectConfig('webapp'), createProjectConfig('untouched')];
+    const projects = [createProjectConfig('vinelab'), createProjectConfig('webapp'), createProjectConfig('untouched')];
     mockConfigLoader.loadAll.mockReturnValue(projects);
     mockBackupLock.isLocked.mockReturnValue(true);
     mockBackupLock.release.mockResolvedValue(undefined);
 
     await service.onModuleInit();
 
-    expect(mockBackupLock.release).toHaveBeenCalledWith('vinsware');
+    expect(mockBackupLock.release).toHaveBeenCalledWith('vinelab');
     expect(mockBackupLock.release).toHaveBeenCalledWith('webapp');
     expect(mockBackupLock.release).not.toHaveBeenCalledWith('untouched');
   });
 
   it('unlocks restic repos for enabled projects (non-fatal on error)', async () => {
     const projects = [
-      createProjectConfig('vinsware', true),
+      createProjectConfig('vinelab', true),
       createProjectConfig('webapp', true),
       createProjectConfig('disabled-project', false),
     ];
@@ -236,7 +214,7 @@ describe('RecoverStartupUseCase', () => {
       type: 'audit',
       payload: new BackupResult({
         runId: 'run-fb-1',
-        projectName: 'vinsware',
+        projectName: 'vinelab',
         status: BackupStatus.Success,
         currentStage: BackupStage.NotifyResult,
         startedAt: new Date('2026-03-18T02:00:00Z'),
@@ -260,7 +238,7 @@ describe('RecoverStartupUseCase', () => {
     const notificationEntry: FallbackEntry = {
       id: 'fb-2',
       type: 'notification',
-      payload: { project: 'vinsware', message: 'Backup succeeded' },
+      payload: { project: 'vinelab', message: 'Backup succeeded' },
       timestamp: '2026-03-18T02:05:01Z',
     };
 
@@ -295,9 +273,9 @@ describe('RecoverStartupUseCase', () => {
   });
 
   it('handles dump cleanup failure for individual files gracefully', async () => {
-    const orphan = createOrphanedResult('run-1', 'vinsware');
+    const orphan = createOrphanedResult('run-1', 'vinelab');
     mockAuditLog.findOrphaned.mockResolvedValue([orphan]);
-    const projects = [createProjectConfig('vinsware')];
+    const projects = [createProjectConfig('vinelab')];
     mockConfigLoader.loadAll.mockReturnValue(projects);
     mockFilesystem.exists.mockReturnValue(true);
     mockFilesystem.listDirectory.mockReturnValue(['dump.sql.gz']);

@@ -32,8 +32,8 @@ cmd_setup() {
 
   # Create required directories
   echo "[1/6] Creating directories..."
-  mkdir -p config ssh-keys gpg-keys
-  echo "  Created: config/ ssh-keys/ gpg-keys/"
+  mkdir -p config ssh-keys gpg-keys rclone-config
+  echo "  Created: config/ ssh-keys/ gpg-keys/ rclone-config/"
 
   # Generate .env if missing
   echo "[2/6] Checking .env..."
@@ -142,8 +142,9 @@ projects: []
   #     password: ${DB_PASSWORD}
   #   compression:
   #     enabled: true
-  #   restic:
-  #     repository_path: backups/myproject
+  #   storage:
+  #     type: sftp            # sftp | s3 | b2 | rclone | local
+  #     repository: backups/myproject
   #     password: ${RESTIC_PASSWORD}
   #     snapshot_mode: combined
   #   retention:

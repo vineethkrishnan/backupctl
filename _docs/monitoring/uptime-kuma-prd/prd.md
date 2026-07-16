@@ -52,7 +52,7 @@ This creates a blind spot: the absence of a backup going undetected until someon
 2. Run `docker compose up -d` — Kuma container starts alongside existing containers
 3. Access Kuma UI at the configured port (default `3001`)
 4. Complete Kuma's first-time setup (create admin account)
-5. Create a Push Monitor for each backup project (e.g., "vinsware-backup"), set heartbeat interval to match the project's cron schedule + grace period
+5. Create a Push Monitor for each backup project (e.g., "vinelab-backup"), set heartbeat interval to match the project's cron schedule + grace period
 6. Copy the push token from each monitor into `projects.yml` under `monitor.config.push_token`
 7. Run `backupctl config validate` to verify the monitor config is valid
 
@@ -174,7 +174,7 @@ This creates a blind spot: the absence of a backup going undetected until someon
 - FR-5.2: No HTTP call is made to Kuma during dry runs
 
 **Acceptance Criteria:**
-- AC-5.1: Running `backupctl run vinsware --dry-run` with monitor config does NOT send a heartbeat to Kuma
+- AC-5.1: Running `backupctl run vinelab --dry-run` with monitor config does NOT send a heartbeat to Kuma
 - AC-5.2: Kuma's heartbeat timer is unaffected by dry runs
 
 **Dependencies:** None
@@ -224,14 +224,14 @@ UPTIME_KUMA_PORT=3001
 
 ```yaml
 projects:
-  - name: vinsware
+  - name: vinelab
     enabled: true
     cron: '0 0 * * *'
     # ... existing config ...
     notification:
       type: slack
       config:
-        webhook_url: https://hooks.slack.com/services/VINSWARE/SPECIFIC/HOOK
+        webhook_url: https://hooks.slack.com/services/VINELAB/SPECIFIC/HOOK
     monitor:
       type: uptime-kuma
       config:

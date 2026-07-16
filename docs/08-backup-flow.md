@@ -102,7 +102,7 @@ The orchestrator calls `retryPolicy.evaluateRetry(error, attemptCount)` to decid
 Each project gets its own lock file at `{BACKUP_BASE_DIR}/{project}/.lock`. The lock file contains the PID and start timestamp of the process holding the lock.
 
 ```
-# Example: /data/backups/vinsware/.lock
+# Example: /data/backups/vinelab/.lock
 pid=1234
 started=2026-03-18T00:00:05.000Z
 ```
@@ -145,10 +145,10 @@ A single restic snapshot contains both the database dump and all asset directori
 backupctl:combined, project:{name}
 ```
 
-Example for `vinsware`:
+Example for `vinelab`:
 
 ```
-backupctl:combined, project:vinsware
+backupctl:combined, project:vinelab
 ```
 
 ### Separate Mode
@@ -198,7 +198,7 @@ The timeout check runs between each step. If the elapsed time exceeds `timeout_m
 
 If a configured asset path does not exist on disk when the backup runs, the orchestrator:
 
-1. Logs a warning: `Asset path not found: /data/vinsware/missing-dir`
+1. Logs a warning: `Asset path not found: /data/vinelab/missing-dir`
 2. Fires `NotifierPort.notifyWarning(projectName, message)` with details
 3. Continues the backup with the remaining asset paths
 
@@ -302,7 +302,7 @@ Sent at the beginning of each backup run (step 1).
 **Slack/Email text:**
 
 ```
-🔄 Backup started for vinsware
+🔄 Backup started for vinelab
 Run ID: a1b2c3d4
 Time: 2026-03-18 00:00:05 (Europe/Berlin)
 ```
@@ -314,7 +314,7 @@ Sent when a backup completes successfully (step 11).
 **Slack/Email text:**
 
 ```
-✅ Backup completed for vinsware
+✅ Backup completed for vinelab
 Run ID: a1b2c3d4
 Duration: 1m 19s
 Dump size: 145.2 MB
@@ -329,7 +329,7 @@ Sent when a backup fails at any stage (step 11).
 **Slack/Email text:**
 
 ```
-❌ Backup failed for vinsware
+❌ Backup failed for vinelab
 Run ID: a1b2c3d4
 Failed at stage: Sync (attempt 3/3)
 Duration: 2m 10s
@@ -343,7 +343,7 @@ Sent when a backup exceeds `timeout_minutes` (mid-run, between steps).
 **Slack/Email text:**
 
 ```
-⚠️ Backup timeout warning for vinsware
+⚠️ Backup timeout warning for vinelab
 Run ID: a1b2c3d4
 Elapsed: 32m (timeout: 30m)
 Current stage: Sync (6/11)
@@ -359,7 +359,7 @@ Sent on the schedule defined by `DAILY_SUMMARY_CRON` (default: `0 7 * * *`).
 ```
 📊 Daily Backup Summary — 2026-03-18
 
-  ✅ vinsware     — success (1m 19s)
+  ✅ vinelab     — success (1m 19s)
   ✅ project-x   — success (1m 25s)
   ❌ project-y   — failed (Dump: connection refused)
 
@@ -373,11 +373,11 @@ All notification types sent via the webhook adapter use this JSON structure:
 ```json
 {
   "event": "backup_success",
-  "project": "vinsware",
-  "text": "✅ Backup completed for vinsware\nRun ID: a1b2c3d4\nDuration: 1m 19s\nDump size: 145.2 MB\nSnapshot: abc12345\nRepository size: 1.8 GB",
+  "project": "vinelab",
+  "text": "✅ Backup completed for vinelab\nRun ID: a1b2c3d4\nDuration: 1m 19s\nDump size: 145.2 MB\nSnapshot: abc12345\nRepository size: 1.8 GB",
   "data": {
     "runId": "a1b2c3d4",
-    "project": "vinsware",
+    "project": "vinelab",
     "status": "success",
     "duration": 79,
     "dumpSize": 152253030,

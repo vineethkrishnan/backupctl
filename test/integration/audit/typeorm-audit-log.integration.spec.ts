@@ -13,12 +13,12 @@ jest.setTimeout(30000);
 function buildBackupResult(overrides: Partial<BackupResult> = {}): BackupResult {
   return new BackupResult({
     runId: uuidv4(),
-    projectName: 'vinsware',
+    projectName: 'vinelab',
     status: BackupStatus.Success,
     currentStage: BackupStage.NotifyResult,
     startedAt: new Date('2026-03-18T02:00:00Z'),
     completedAt: new Date('2026-03-18T02:05:00Z'),
-    dumpResult: { filePath: '/data/backups/vinsware/dump.sql.gz', sizeBytes: 1024000, durationMs: 5000 },
+    dumpResult: { filePath: '/data/backups/vinelab/dump.sql.gz', sizeBytes: 1024000, durationMs: 5000 },
     syncResult: { snapshotId: 'snap-abc123', filesNew: 2, filesChanged: 1, bytesAdded: 512000, durationMs: 8000 },
     pruneResult: { snapshotsRemoved: 1, spaceFreed: '100MB' },
     cleanupResult: { filesRemoved: 3, spaceFreed: 2048 },
@@ -118,13 +118,13 @@ describe('TypeormAuditLogRepository (integration)', () => {
 
   describe('startRun', () => {
     it('should create a record with status=started', async () => {
-      const runId = await adapter.startRun('vinsware');
+      const runId = await adapter.startRun('vinelab');
 
       expect(runId).toBeDefined();
       expect(typeof runId).toBe('string');
       expect(repository.create).toHaveBeenCalledWith(
         expect.objectContaining({
-          projectName: 'vinsware',
+          projectName: 'vinelab',
           status: BackupStatus.Started,
           currentStage: BackupStage.NotifyStarted,
         }),
@@ -133,7 +133,7 @@ describe('TypeormAuditLogRepository (integration)', () => {
     });
 
     it('should assign a UUID as the runId', async () => {
-      const runId = await adapter.startRun('vinsware');
+      const runId = await adapter.startRun('vinelab');
 
       // UUID v4 format
       expect(runId).toMatch(
@@ -144,7 +144,7 @@ describe('TypeormAuditLogRepository (integration)', () => {
 
   describe('trackProgress', () => {
     it('should update current_stage on the record', async () => {
-      const runId = await adapter.startRun('vinsware');
+      const runId = await adapter.startRun('vinelab');
 
       await adapter.trackProgress(runId, BackupStage.Dump);
 
@@ -154,7 +154,7 @@ describe('TypeormAuditLogRepository (integration)', () => {
     });
 
     it('should track multiple stages sequentially', async () => {
-      const runId = await adapter.startRun('vinsware');
+      const runId = await adapter.startRun('vinelab');
 
       await adapter.trackProgress(runId, BackupStage.Dump);
       await adapter.trackProgress(runId, BackupStage.Verify);
@@ -169,7 +169,7 @@ describe('TypeormAuditLogRepository (integration)', () => {
 
   describe('finishRun', () => {
     it('should update all fields on the record', async () => {
-      const runId = await adapter.startRun('vinsware');
+      const runId = await adapter.startRun('vinelab');
       const result = buildBackupResult({ runId });
 
       await adapter.finishRun(runId, result);
@@ -189,7 +189,7 @@ describe('TypeormAuditLogRepository (integration)', () => {
     });
 
     it('should persist dump and sync metadata', async () => {
-      const runId = await adapter.startRun('vinsware');
+      const runId = await adapter.startRun('vinelab');
       const result = buildBackupResult({ runId });
 
       await adapter.finishRun(runId, result);
@@ -209,7 +209,7 @@ describe('TypeormAuditLogRepository (integration)', () => {
     });
 
     it('should handle failure result with error details', async () => {
-      const runId = await adapter.startRun('vinsware');
+      const runId = await adapter.startRun('vinelab');
       const result = buildBackupResult({
         runId,
         status: BackupStatus.Failed,
@@ -237,21 +237,21 @@ describe('TypeormAuditLogRepository (integration)', () => {
   describe('findByProject', () => {
     it('should return results ordered by started_at DESC', async () => {
       // Insert two runs
-      const runId1 = await adapter.startRun('vinsware');
+      const runId1 = await adapter.startRun('vinelab');
       const store = (repository as unknown as { _store: BackupLogRecord[] })._store;
       const entity1 = store.find((e) => e.id === runId1);
       if (entity1) entity1.startedAt = new Date('2026-03-17T02:00:00Z');
 
-      const runId2 = await adapter.startRun('vinsware');
+      const runId2 = await adapter.startRun('vinelab');
       const entity2 = store.find((e) => e.id === runId2);
       if (entity2) entity2.startedAt = new Date('2026-03-18T02:00:00Z');
 
-      const results = await adapter.findByProject('vinsware');
+      const results = await adapter.findByProject('vinelab');
 
       expect(results).toHaveLength(2);
       expect(repository.find).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: { projectName: 'vinsware' },
+          where: { projectName: 'vinelab' },
           order: { startedAt: 'DESC' },
           take: 20,
         }),
@@ -259,11 +259,11 @@ describe('TypeormAuditLogRepository (integration)', () => {
     });
 
     it('should respect the limit parameter', async () => {
-      await adapter.startRun('vinsware');
-      await adapter.startRun('vinsware');
-      await adapter.startRun('vinsware');
+      await adapter.startRun('vinelab');
+      await adapter.startRun('vinelab');
+      await adapter.startRun('vinelab');
 
-      await adapter.findByProject('vinsware', 2);
+      await adapter.findByProject('vinelab', 2);
 
       expect(repository.find).toHaveBeenCalledWith(
         expect.objectContaining({ take: 2 }),
@@ -273,7 +273,7 @@ describe('TypeormAuditLogRepository (integration)', () => {
 
   describe('findOrphaned', () => {
     it('should return records with status=started and no completed_at', async () => {
-      await adapter.startRun('vinsware');
+      await adapter.startRun('vinelab');
       await adapter.startRun('shopify');
 
       const results = await adapter.findOrphaned();

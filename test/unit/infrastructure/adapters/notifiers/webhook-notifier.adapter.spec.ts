@@ -40,12 +40,12 @@ describe('WebhookNotifierAdapter', () => {
   function createSuccessResult(overrides?: Partial<ConstructorParameters<typeof BackupResult>[0]>): BackupResult {
     return new BackupResult({
       runId: 'run-123',
-      projectName: 'vinsware',
+      projectName: 'vinelab',
       status: BackupStatus.Success,
       currentStage: BackupStage.NotifyResult,
       startedAt: new Date('2026-03-18T00:00:00Z'),
       completedAt: new Date('2026-03-18T00:03:12Z'),
-      dumpResult: new DumpResult('/data/backups/vinsware/backup.sql.gz', 257949696, 45000),
+      dumpResult: new DumpResult('/data/backups/vinelab/backup.sql.gz', 257949696, 45000),
       syncResult: new SyncResult('a1b2c3d4', 12, 3, 54525952, 120000),
       pruneResult: new PruneResult(2, '150 MB'),
       cleanupResult: new CleanupResult(1, 1048576),
@@ -63,7 +63,7 @@ describe('WebhookNotifierAdapter', () => {
 
   describe('notifyStarted', () => {
     it('should post JSON with event=backup_started', async () => {
-      await adapter.notifyStarted('vinsware');
+      await adapter.notifyStarted('vinelab');
 
       expect(mockedAxios.post).toHaveBeenCalledTimes(1);
       const url = mockedAxios.post.mock.calls[0][0];
@@ -73,10 +73,10 @@ describe('WebhookNotifierAdapter', () => {
       expect(config).toEqual({ headers: { 'Content-Type': 'application/json' } });
       expect(payload).toMatchObject({
         event: 'backup_started',
-        project: 'vinsware',
+        project: 'vinelab',
       });
-      expect(payload.text).toContain('🔄 Backup started — vinsware');
-      expect(payload.data).toHaveProperty('project_name', 'vinsware');
+      expect(payload.text).toContain('🔄 Backup started — vinelab');
+      expect(payload.data).toHaveProperty('project_name', 'vinelab');
       expect(payload.data).toHaveProperty('timestamp');
     });
   });
@@ -91,17 +91,17 @@ describe('WebhookNotifierAdapter', () => {
       const payload = getPayload();
 
       expect(payload.event).toBe('backup_success');
-      expect(payload.project).toBe('vinsware');
+      expect(payload.project).toBe('vinelab');
 
       // Verify text field contains formatted markdown
-      expect(payload.text).toContain('✅ Backup completed — vinsware');
+      expect(payload.text).toContain('✅ Backup completed — vinelab');
       expect(payload.text).toContain('Snapshot: a1b2c3d4');
       expect(payload.text).toContain('Duration: 3m 12s');
 
       // Verify data field includes structured backup result info
       expect(payload.data).toMatchObject({
         run_id: 'run-123',
-        project_name: 'vinsware',
+        project_name: 'vinelab',
         status: 'success',
         snapshot_id: 'a1b2c3d4',
         dump_size_bytes: 257949696,
@@ -121,15 +121,15 @@ describe('WebhookNotifierAdapter', () => {
         true,
       );
 
-      await adapter.notifyFailure('vinsware', error);
+      await adapter.notifyFailure('vinelab', error);
 
       const payload = getPayload();
       expect(payload.event).toBe('backup_failed');
-      expect(payload.project).toBe('vinsware');
-      expect(payload.text).toContain('❌ Backup failed — vinsware');
+      expect(payload.project).toBe('vinelab');
+      expect(payload.text).toContain('❌ Backup failed — vinelab');
       expect(payload.text).toContain('connection timeout');
       expect(payload.data).toMatchObject({
-        project_name: 'vinsware',
+        project_name: 'vinelab',
         stage: BackupStage.Sync,
         is_retryable: true,
         error_message: 'connection timeout',
@@ -139,14 +139,14 @@ describe('WebhookNotifierAdapter', () => {
 
   describe('notifyWarning', () => {
     it('should post JSON with event=backup_warning', async () => {
-      await adapter.notifyWarning('vinsware', 'Backup exceeded timeout');
+      await adapter.notifyWarning('vinelab', 'Backup exceeded timeout');
 
       const payload = getPayload();
       expect(payload.event).toBe('backup_warning');
-      expect(payload.project).toBe('vinsware');
+      expect(payload.project).toBe('vinelab');
       expect(payload.text).toBe('⚠️ Backup exceeded timeout');
       expect(payload.data).toMatchObject({
-        project_name: 'vinsware',
+        project_name: 'vinelab',
         message: 'Backup exceeded timeout',
       });
     });
@@ -202,7 +202,7 @@ describe('WebhookNotifierAdapter', () => {
       const projects = payloadData.projects as Record<string, unknown>[];
       expect(projects).toHaveLength(2);
       expect(projects[0]).toMatchObject({
-        project_name: 'vinsware',
+        project_name: 'vinelab',
         status: 'success',
         snapshot_id: 'a1b2c3d4',
         dump_size_bytes: 257949696,

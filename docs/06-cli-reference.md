@@ -91,19 +91,19 @@ backupctl run --all
 **Dry run — failure detected:**
 
 ```
-$ backupctl run vinsware --dry-run
+$ backupctl run vinelab --dry-run
 
-=== Dry Run: vinsware ===
+=== Dry Run: vinelab ===
 Validating config and connectivity without executing backup.
-  ✅ Config loaded — Project "vinsware" configuration is valid
+  ✅ Config loaded — Project "vinelab" configuration is valid
   ✅ Database dumper — Adapter found for database type: postgres
   ✅ Notifier — Adapter found for notification type: slack
-  ❌ Restic repo — Cannot access repository at /backups/vinsware: repository does not exist
+  ❌ Restic repo — Cannot access repository at /backups/vinelab: repository does not exist
   ✅ Disk space — 42.0 GB free (minimum: 5 GB)
-  ✅ GPG key — Key found for recipient: vinsware-backup@company.com
-  ⚠️  Asset paths — 1 of 2 path(s) missing: /data/vinsware/assets
+  ✅ GPG key — Key found for recipient: vinelab-backup@company.com
+  ⚠️  Asset paths — 1 of 2 path(s) missing: /data/vinelab/assets
 
-❌ 2 check(s) failed — vinsware is NOT ready for backup.
+❌ 2 check(s) failed — vinelab is NOT ready for backup.
 ```
 
 **Single project backup:**
@@ -117,8 +117,8 @@ $ backupctl run --all
 
 [2026-03-18 01:00:00] Running backups for 3 enabled project(s)...
 
-[2026-03-18 01:00:00] [1/3] vinsware — starting...
-[2026-03-18 01:01:19] [1/3] vinsware — ✅ completed in 1m 19s
+[2026-03-18 01:00:00] [1/3] vinelab — starting...
+[2026-03-18 01:01:19] [1/3] vinelab — ✅ completed in 1m 19s
 
 [2026-03-18 01:01:20] [2/3] project-x — starting...
 [2026-03-18 01:02:45] [2/3] project-x — ✅ completed in 1m 25s
@@ -127,7 +127,7 @@ $ backupctl run --all
 [2026-03-18 01:02:52] [3/3] project-y — ❌ failed at stage Dump: connection refused
 
 === Summary ===
-  ✅ vinsware     — success (1m 19s)
+  ✅ vinelab     — success (1m 19s)
   ✅ project-x   — success (1m 25s)
   ❌ project-y   — failed (Dump: connection refused)
 
@@ -137,11 +137,11 @@ $ backupctl run --all
 **Lock collision:**
 
 ```
-$ backupctl run vinsware
+$ backupctl run vinelab
 
-❌ Backup already in progress for vinsware.
+❌ Backup already in progress for vinelab.
    Lock held since 2026-03-18 00:00:05 (PID: 1234)
-   Use "backupctl status vinsware" to check progress.
+   Use "backupctl status vinelab" to check progress.
 
 Exit code: 2
 ```
@@ -187,9 +187,9 @@ backupctl status <project> [--last <n>]
 **In-progress backup:**
 
 ```
-$ backupctl status vinsware
+$ backupctl status vinelab
 
-=== vinsware — Current Status ===
+=== vinelab — Current Status ===
 
 🔄 Backup in progress (run: a1b2c3d4)
    Started: 2026-03-18 00:00:05 (35s ago)
@@ -232,19 +232,19 @@ None.
 ```
 $ backupctl health
 
-=== System Health Check ===
+System unhealthy
 
-  ✅ Audit DB — Connected (PostgreSQL 16.2, 142 records)
-  ❌ Disk space — 3.2 GB free (minimum: 5 GB)
-  ✅ SSH — Connection to u123456.your-storagebox.de successful
-  ✅ Restic repo (vinsware) — Repository OK, 42 snapshots
-  ❌ Restic repo (project-x) — Lock detected, may need unlock
-  ✅ Restic repo (project-y) — Repository OK, 14 snapshots
-
-⚠️  2 check(s) failed. Run "backupctl restic project-x unlock" for stale locks.
+  ✓ Audit DB
+  ✗ Disk space (3.2 GB free)
+  ✓ Storage: vinelab (sftp)
+  ✗ Storage: project-x (s3) (Fatal: unable to open config file: Stat: The request signature we calculated does not match the signature you provided)
+  ✓ Storage: project-y (rclone)
+  Uptime: 2h 15m
 
 Exit code: 1
 ```
+
+Each project is probed through its own backend, so one unreachable repository does not mask the others.
 
 ---
 
@@ -284,14 +284,14 @@ backupctl restore <project> <snapshot-id> <target-path> [--only db|assets] [--de
 **Basic restore:**
 
 ```
-$ backupctl restore vinsware abc12345 /tmp/restore
+$ backupctl restore vinelab abc12345 /tmp/restore
 
-Restoring snapshot abc12345 for vinsware...
-  Source: sftp:u123456@u123456.your-storagebox.de:/backups/vinsware
+Restoring snapshot abc12345 for vinelab...
+  Source: sftp:u123456@u123456.your-storagebox.de:/backups/vinelab
   Target: /tmp/restore
 
 Restoring files...
-  restored /tmp/restore/vinsware_db_20260318_000032.sql.gz
+  restored /tmp/restore/vinelab_db_20260318_000032.sql.gz
   restored /tmp/restore/uploads/ (1,248 files)
   restored /tmp/restore/assets/ (346 files)
 
@@ -301,19 +301,19 @@ Restoring files...
 **Latest snapshot with decompress and guide:**
 
 ```
-$ backupctl restore vinsware latest /tmp/restore --decompress --guide
+$ backupctl restore vinelab latest /tmp/restore --decompress --guide
 
-Restoring latest snapshot (abc12345) for vinsware...
-  Source: sftp:u123456@u123456.your-storagebox.de:/backups/vinsware
+Restoring latest snapshot (abc12345) for vinelab...
+  Source: sftp:u123456@u123456.your-storagebox.de:/backups/vinelab
   Target: /tmp/restore
 
 Restoring files...
-  restored /tmp/restore/vinsware_db_20260318_000032.sql.gz
+  restored /tmp/restore/vinelab_db_20260318_000032.sql.gz
   restored /tmp/restore/uploads/ (1,248 files)
   restored /tmp/restore/assets/ (346 files)
 
 Decompressing dump...
-  vinsware_db_20260318_000032.sql.gz → vinsware_db_20260318_000032.sql (487 MB)
+  vinelab_db_20260318_000032.sql.gz → vinelab_db_20260318_000032.sql (487 MB)
 
 ✅ Restore complete.
 
@@ -322,13 +322,13 @@ Decompressing dump...
 The dump file is a pg_dump custom-format archive. To import:
 
   1. Create the target database (if it doesn't exist):
-     createdb -h <host> -U <user> vinsware_db
+     createdb -h <host> -U <user> vinelab_db
 
   2. Restore the dump:
-     pg_restore -h <host> -U <user> -d vinsware_db /tmp/restore/vinsware_db_20260318_000032.sql
+     pg_restore -h <host> -U <user> -d vinelab_db /tmp/restore/vinelab_db_20260318_000032.sql
 
   3. If restoring to an existing database, add --clean to drop objects first:
-     pg_restore -h <host> -U <user> -d vinsware_db --clean /tmp/restore/vinsware_db_20260318_000032.sql
+     pg_restore -h <host> -U <user> -d vinelab_db --clean /tmp/restore/vinelab_db_20260318_000032.sql
 
 Note: The dump was originally encrypted with GPG. It was decrypted
 automatically during restore. The .sql file is ready for import.
@@ -337,14 +337,14 @@ automatically during restore. The .sql file is ready for import.
 **Selective restore — database only:**
 
 ```
-$ backupctl restore vinsware abc12345 /tmp/restore --only db
+$ backupctl restore vinelab abc12345 /tmp/restore --only db
 
-Restoring snapshot abc12345 for vinsware (database only)...
-  Source: sftp:u123456@u123456.your-storagebox.de:/backups/vinsware
+Restoring snapshot abc12345 for vinelab (database only)...
+  Source: sftp:u123456@u123456.your-storagebox.de:/backups/vinelab
   Target: /tmp/restore
 
 Restoring files...
-  restored /tmp/restore/vinsware_db_20260318_000032.sql.gz
+  restored /tmp/restore/vinelab_db_20260318_000032.sql.gz
 
 ✅ Restore complete. Database dump restored to /tmp/restore
 ```
@@ -352,10 +352,10 @@ Restoring files...
 **Selective restore — assets only:**
 
 ```
-$ backupctl restore vinsware abc12345 /tmp/restore --only assets
+$ backupctl restore vinelab abc12345 /tmp/restore --only assets
 
-Restoring snapshot abc12345 for vinsware (assets only)...
-  Source: sftp:u123456@u123456.your-storagebox.de:/backups/vinsware
+Restoring snapshot abc12345 for vinelab (assets only)...
+  Source: sftp:u123456@u123456.your-storagebox.de:/backups/vinelab
   Target: /tmp/restore
 
 Restoring files...
@@ -451,13 +451,13 @@ backupctl prune --all
 **Single project:**
 
 ```
-$ backupctl prune vinsware
+$ backupctl prune vinelab
 
-Pruning vinsware with retention: keep_daily=7, keep_weekly=4, keep_monthly=0
+Pruning vinelab with retention: keep_daily=7, keep_weekly=4, keep_monthly=0
   Removed 3 snapshots
   Freed 412.5 MB
 
-✅ Prune complete for vinsware. Repository: 1.4 GB (was 1.8 GB)
+✅ Prune complete for vinelab. Repository: 1.4 GB (was 1.8 GB)
 ```
 
 **All projects:**
@@ -465,7 +465,7 @@ Pruning vinsware with retention: keep_daily=7, keep_weekly=4, keep_monthly=0
 ```
 $ backupctl prune --all
 
-[1/3] vinsware — pruning...
+[1/3] vinelab — pruning...
   Removed 3 snapshots, freed 412.5 MB ✅
 [2/3] project-x — pruning...
   Removed 5 snapshots, freed 287.3 MB ✅
@@ -515,9 +515,9 @@ backupctl logs <project> [--last <n>] [--failed]
 **Failed runs only:**
 
 ```
-$ backupctl logs vinsware --last 10 --failed
+$ backupctl logs vinelab --last 10 --failed
 
-=== vinsware — Failed Runs ===
+=== vinelab — Failed Runs ===
 
 RUN ID      STARTED               DURATION  FAILED STAGE   ERROR
 e7f8a9b0    2026-03-14 00:00:03   45s       Dump           connection timeout
@@ -572,7 +572,7 @@ $ backupctl config validate
 
 Validating config/projects.yml...
 
-  ✅ vinsware — valid
+  ✅ vinelab — valid
   ❌ project-x — 2 error(s):
      • database.password: unresolved variable ${PROJECTX_DB_PASSWORD}
      • retention.keep_daily: must be a non-negative integer
@@ -601,11 +601,11 @@ Reloading configuration...
 **Import GPG key:**
 
 ```
-$ backupctl config import-gpg-key /app/gpg-keys/vinsware-backup.pub
+$ backupctl config import-gpg-key /app/gpg-keys/vinelab-backup.pub
 
-Importing GPG key from /app/gpg-keys/vinsware-backup.pub...
+Importing GPG key from /app/gpg-keys/vinelab-backup.pub...
   Key ID: 0xABCDEF1234567890
-  User ID: vinsware-backup@company.com
+  User ID: vinelab-backup@company.com
   Fingerprint: 1234 5678 ABCD EF01 2345 6789 ABCD EF12 3456 7890
 
 ✅ GPG key imported successfully.
@@ -649,12 +649,12 @@ backupctl cache --clear-all
 **Clear single project cache:**
 
 ```
-$ backupctl cache vinsware --clear
+$ backupctl cache vinelab --clear
 
-Clearing restic cache for vinsware...
+Clearing restic cache for vinelab...
   Removed 28.5 MB from /root/.cache/restic/abc123def456
 
-✅ Cache cleared for vinsware.
+✅ Cache cleared for vinelab.
 ```
 
 **Clear all caches:**
@@ -663,7 +663,7 @@ Clearing restic cache for vinsware...
 $ backupctl cache --clear-all
 
 Clearing restic cache for all projects...
-  vinsware — 28.5 MB cleared
+  vinelab — 28.5 MB cleared
   project-x — 15.2 MB cleared
   project-y — 12.1 MB cleared
 
@@ -724,7 +724,7 @@ backupctl restic <project> <cmd> [args...]
 **Unlock stale locks:**
 
 ```
-$ backupctl restic vinsware unlock
+$ backupctl restic vinelab unlock
 
 repository abc12345 opened (version 2, compression auto)
 successfully removed 1 locks
@@ -733,9 +733,9 @@ successfully removed 1 locks
 **Initialize a new repository:**
 
 ```
-$ backupctl restic vinsware init
+$ backupctl restic vinelab init
 
-created restic repository abc12345 at sftp:u123456@u123456.your-storagebox.de:/backups/vinsware
+created restic repository abc12345 at sftp:u123456@u123456.your-storagebox.de:/backups/vinelab
 
 Please note that knowledge of your password is required to access
 the repository. Losing your password means that your data is
@@ -745,7 +745,7 @@ irrecoverably lost.
 **Mount repository for browsing (interactive):**
 
 ```
-$ backupctl restic vinsware mount /mnt/restic
+$ backupctl restic vinelab mount /mnt/restic
 
 repository abc12345 opened (version 2, compression auto)
 Now serving the repository at /mnt/restic
@@ -913,7 +913,7 @@ All commands follow a consistent exit code scheme:
 Use exit codes for scripting:
 
 ```bash
-backupctl run vinsware
+backupctl run vinelab
 case $? in
   0) echo "Backup succeeded" ;;
   1) echo "Backup failed" ;;

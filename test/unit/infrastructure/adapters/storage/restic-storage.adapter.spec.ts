@@ -12,29 +12,20 @@ import { safeExecFile } from '@common/helpers/child-process.util';
 const mockedSafeExecFile = safeExecFile as jest.MockedFunction<typeof safeExecFile>;
 
 describe('ResticStorageAdapter', () => {
-  const repositoryPath = '/backups/myproject';
+  const repository = 'sftp:backup@storage.example.com:/backups/myproject';
   const password = 'restic-secret';
-  const sshHost = 'storage.example.com';
-  const sshUser = 'backup';
-  const sshKeyPath = '/root/.ssh/id_ed25519';
+  const backendEnv = { RESTIC_SSH_COMMAND: 'ssh -i "/root/.ssh/id_ed25519" -p 22' };
   const projectName = 'myproject';
 
   let adapter: ResticStorageAdapter;
 
   beforeEach(() => {
     jest.clearAllMocks();
-    adapter = new ResticStorageAdapter(
-      repositoryPath,
-      password,
-      sshHost,
-      sshUser,
-      sshKeyPath,
-      projectName,
-    );
+    adapter = new ResticStorageAdapter(repository, password, backendEnv, projectName);
   });
 
-  describe('RESTIC_REPOSITORY', () => {
-    it('should build correctly as sftp URL', async () => {
+  describe('restic env', () => {
+    it('should pass the resolved repository and password through', async () => {
       mockedSafeExecFile.mockResolvedValue({ stdout: '', stderr: '' });
 
       await adapter.unlock();
@@ -43,8 +34,41 @@ describe('ResticStorageAdapter', () => {
       expect(callArgs[2]?.env).toEqual(
         expect.objectContaining({
           RESTIC_REPOSITORY: 'sftp:backup@storage.example.com:/backups/myproject',
+          RESTIC_PASSWORD: 'restic-secret',
         }),
       );
+    });
+
+    it('should merge backend env into the restic environment', async () => {
+      mockedSafeExecFile.mockResolvedValue({ stdout: '', stderr: '' });
+
+      await adapter.unlock();
+
+      const callArgs = mockedSafeExecFile.mock.calls[0];
+      expect(callArgs[2]?.env).toEqual(
+        expect.objectContaining({
+          RESTIC_SSH_COMMAND: 'ssh -i "/root/.ssh/id_ed25519" -p 22',
+        }),
+      );
+    });
+
+    it('should carry whatever env the backend supplies, without knowing the backend', async () => {
+      const s3Adapter = new ResticStorageAdapter(
+        's3:https://s3.example.com/bucket/repo',
+        password,
+        { AWS_ACCESS_KEY_ID: 'key', AWS_SECRET_ACCESS_KEY: 'secret' },
+        projectName,
+      );
+      mockedSafeExecFile.mockResolvedValue({ stdout: '', stderr: '' });
+
+      await s3Adapter.unlock();
+
+      expect(mockedSafeExecFile.mock.calls[0][2]?.env).toEqual({
+        RESTIC_REPOSITORY: 's3:https://s3.example.com/bucket/repo',
+        RESTIC_PASSWORD: 'restic-secret',
+        AWS_ACCESS_KEY_ID: 'key',
+        AWS_SECRET_ACCESS_KEY: 'secret',
+      });
     });
   });
 

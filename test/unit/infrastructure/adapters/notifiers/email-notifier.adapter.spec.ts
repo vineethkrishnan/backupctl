@@ -37,12 +37,12 @@ describe('EmailNotifierAdapter', () => {
   function createSuccessResult(overrides?: Partial<ConstructorParameters<typeof BackupResult>[0]>): BackupResult {
     return new BackupResult({
       runId: 'run-123',
-      projectName: 'vinsware',
+      projectName: 'vinelab',
       status: BackupStatus.Success,
       currentStage: BackupStage.NotifyResult,
       startedAt: new Date('2026-03-18T00:00:00Z'),
       completedAt: new Date('2026-03-18T00:03:12Z'),
-      dumpResult: new DumpResult('/data/backups/vinsware/backup.sql.gz', 257949696, 45000),
+      dumpResult: new DumpResult('/data/backups/vinelab/backup.sql.gz', 257949696, 45000),
       syncResult: new SyncResult('a1b2c3d4', 12, 3, 54525952, 120000),
       pruneResult: new PruneResult(2, '150 MB'),
       cleanupResult: new CleanupResult(1, 1048576),
@@ -86,12 +86,12 @@ describe('EmailNotifierAdapter', () => {
 
   describe('notifyStarted', () => {
     it('should send email with correct subject', async () => {
-      await adapter.notifyStarted('vinsware');
+      await adapter.notifyStarted('vinelab');
 
       expect(mockSendMail).toHaveBeenCalledTimes(1);
       expect(mockSendMail).toHaveBeenCalledWith(
         expect.objectContaining({
-          subject: '🔄 Backup started — vinsware',
+          subject: '🔄 Backup started — vinelab',
           from: 'backup@company.com',
           to: 'devops@company.com',
         }),
@@ -99,7 +99,7 @@ describe('EmailNotifierAdapter', () => {
     });
 
     it('should include time in email body', async () => {
-      await adapter.notifyStarted('vinsware');
+      await adapter.notifyStarted('vinelab');
 
       const htmlBody = mockSendMail.mock.calls[0][0].html as string;
       expect(htmlBody).toContain('Backup started');
@@ -116,12 +116,12 @@ describe('EmailNotifierAdapter', () => {
       expect(mockSendMail).toHaveBeenCalledTimes(1);
       expect(mockSendMail).toHaveBeenCalledWith(
         expect.objectContaining({
-          subject: '✅ Backup completed — vinsware',
+          subject: '✅ Backup completed — vinelab',
         }),
       );
 
       const htmlBody = mockSendMail.mock.calls[0][0].html as string;
-      expect(htmlBody).toContain('Backup completed — vinsware');
+      expect(htmlBody).toContain('Backup completed — vinelab');
       expect(htmlBody).toContain('246.00 MB');
       expect(htmlBody).toContain('Encrypted');
       expect(htmlBody).toContain('Yes');
@@ -162,16 +162,16 @@ describe('EmailNotifierAdapter', () => {
         true,
       );
 
-      await adapter.notifyFailure('vinsware', error);
+      await adapter.notifyFailure('vinelab', error);
 
       expect(mockSendMail).toHaveBeenCalledWith(
         expect.objectContaining({
-          subject: '❌ Backup failed — vinsware',
+          subject: '❌ Backup failed — vinelab',
         }),
       );
 
       const htmlBody = mockSendMail.mock.calls[0][0].html as string;
-      expect(htmlBody).toContain('Backup failed — vinsware');
+      expect(htmlBody).toContain('Backup failed — vinelab');
       expect(htmlBody).toContain('sync');
       expect(htmlBody).toContain('connection timeout');
     });
@@ -179,11 +179,11 @@ describe('EmailNotifierAdapter', () => {
 
   describe('notifyWarning', () => {
     it('should send email with warning subject and message', async () => {
-      await adapter.notifyWarning('vinsware', 'Backup exceeded timeout threshold');
+      await adapter.notifyWarning('vinelab', 'Backup exceeded timeout threshold');
 
       expect(mockSendMail).toHaveBeenCalledWith(
         expect.objectContaining({
-          subject: '⚠️ Backup warning — vinsware',
+          subject: '⚠️ Backup warning — vinelab',
         }),
       );
 
@@ -214,7 +214,7 @@ describe('EmailNotifierAdapter', () => {
       expect(call.subject).toContain('📊 Daily Backup Summary');
 
       const htmlBody = call.html as string;
-      expect(htmlBody).toContain('vinsware');
+      expect(htmlBody).toContain('vinelab');
       expect(htmlBody).toContain('project-y');
       expect(htmlBody).toContain('FAILED');
       expect(htmlBody).toContain('1/2 successful');

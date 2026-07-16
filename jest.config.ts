@@ -24,6 +24,7 @@ const config: Config = {
     '^@infrastructure/(.*)$': '<rootDir>/src/infrastructure/$1',
     '^@common/(.*)$': '<rootDir>/src/common/$1',
     '^@shared/(.*)$': '<rootDir>/src/shared/$1',
+    '^@test/(.*)$': '<rootDir>/test/$1',
   },
   coverageThreshold: {
     global: {

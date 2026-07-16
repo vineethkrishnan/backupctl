@@ -564,9 +564,10 @@ Couldn't create directory: Failure
 Use **relative paths** in `projects.yml`:
 
 ```yaml
-restic:
-  repository_path: backups/myproject    # ✅ Relative — correct
-  # repository_path: /backups/myproject # ❌ Absolute — will fail
+storage:
+  type: sftp
+  repository: backups/myproject    # ✅ Relative — correct
+  # repository: /backups/myproject # ❌ Absolute — will fail
 ```
 
 Create the directory via SFTP using relative paths:

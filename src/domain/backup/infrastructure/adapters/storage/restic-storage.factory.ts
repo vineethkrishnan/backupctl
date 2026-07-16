@@ -4,36 +4,29 @@ import { ConfigService } from '@nestjs/config';
 import { RemoteStorageFactoryPort } from '@domain/backup/application/ports/remote-storage-factory.port';
 import { RemoteStoragePort } from '@domain/backup/application/ports/remote-storage.port';
 import { ProjectConfig } from '@domain/config/domain/project-config.model';
+import { ResticBackendRegistry } from './backends/restic-backend.registry';
 import { ResticStorageAdapter } from './restic-storage.adapter';
 
 @Injectable()
 export class ResticStorageFactory implements RemoteStorageFactoryPort {
-  constructor(private readonly configService: ConfigService) {}
+  constructor(
+    private readonly configService: ConfigService,
+    private readonly backendRegistry: ResticBackendRegistry,
+  ) {}
 
   create(config: ProjectConfig): RemoteStoragePort {
-    const sshHost = this.configService.getOrThrow<string>('HETZNER_SSH_HOST');
-    const sshUser = this.configService.getOrThrow<string>('HETZNER_SSH_USER');
-    const sshKeyPath = this.configService.getOrThrow<string>('HETZNER_SSH_KEY_PATH');
-    const sshPort = parseInt(String(this.configService.get('HETZNER_SSH_PORT', '22')), 10);
     const globalPassword = this.configService.get<string>('RESTIC_PASSWORD', '');
-
-    const password = config.restic.password || globalPassword;
+    const password = config.storage.password || globalPassword;
 
     if (!password) {
       throw new Error(
         `Restic password not configured for project "${config.name}". ` +
-        'Set restic.password in projects.yml or RESTIC_PASSWORD in .env.',
+        'Set storage.password in projects.yml or RESTIC_PASSWORD in .env.',
       );
     }
 
-    return new ResticStorageAdapter(
-      config.restic.repositoryPath,
-      password,
-      sshHost,
-      sshUser,
-      sshKeyPath,
-      config.name,
-      sshPort,
-    );
+    const backend = this.backendRegistry.resolve(config.storage.type).resolve(config.storage);
+
+    return new ResticStorageAdapter(backend.repository, password, backend.env, config.name);
   }
 }

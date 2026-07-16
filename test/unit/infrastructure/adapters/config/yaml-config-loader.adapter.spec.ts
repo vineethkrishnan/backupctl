@@ -1,5 +1,6 @@
 import * as fs from 'fs';
 import * as yaml from 'js-yaml';
+import { Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { YamlConfigLoaderAdapter } from '@domain/config/infrastructure/yaml-config-loader.adapter';
 import { ProjectConfig } from '@domain/config/domain/project-config.model';
@@ -37,10 +38,18 @@ function buildMinimalYaml(overrides: Record<string, unknown> = {}): string {
   return yaml.dump({ projects: [project] });
 }
 
+const SFTP_ENV: Record<string, string> = {
+  HETZNER_SSH_HOST: 'storage.example.com',
+  HETZNER_SSH_USER: 'u123',
+  HETZNER_SSH_KEY_PATH: '/home/node/.ssh/id_ed25519',
+};
+
 function createAdapter(envOverrides: Record<string, string> = {}): YamlConfigLoaderAdapter {
+  const env: Record<string, string> = { ...SFTP_ENV, ...envOverrides };
+
   const configService = {
     get: jest.fn((key: string, defaultValue?: string) => {
-      if (key in envOverrides) return envOverrides[key];
+      if (key in env) return env[key];
       return defaultValue;
     }),
   } as unknown as ConfigService;
@@ -71,7 +80,7 @@ describe('YamlConfigLoaderAdapter', () => {
       expect(result[0]).toBeInstanceOf(ProjectConfig);
       expect(result[0].name).toBe('test-project');
       expect(result[0].database?.type).toBe('postgres');
-      expect(result[0].restic.repositoryPath).toBe('/backups/test');
+      expect(result[0].storage.repository).toBe('/backups/test');
     });
 
     it('should resolve ${VAR_NAME} from environment', () => {
@@ -171,7 +180,7 @@ describe('YamlConfigLoaderAdapter', () => {
 
       const result = adapter.loadAll();
 
-      expect(result[0].restic.password).toBe('global-restic-pass');
+      expect(result[0].storage.password).toBe('global-restic-pass');
     });
 
     it('should load files-only config (no database)', () => {
@@ -232,6 +241,176 @@ describe('YamlConfigLoaderAdapter', () => {
 
       expect(mockedFs.readFileSync).toHaveBeenCalledTimes(1);
       expect(result.name).toBe('test-project');
+    });
+  });
+
+  describe('storage backends', () => {
+    const s3Storage = {
+      type: 's3',
+      repository: 'my-bucket/test',
+      password: 'restic-pass',
+      snapshot_mode: 'separate',
+      config: {
+        endpoint: 'https://s3.eu-central-003.backblazeb2.com',
+        access_key_id: 'key-id',
+        secret_access_key: 'secret',
+      },
+    };
+
+    function buildStorageYaml(storage: unknown): string {
+      const project = {
+        name: 'test-project',
+        enabled: true,
+        cron: '0 0 * * *',
+        database: { type: 'postgres', host: 'localhost', port: 5432, name: 'testdb', user: 'user', password: 'secret' },
+        storage,
+        retention: { local_days: 7, keep_daily: 7, keep_weekly: 4 },
+      };
+      return yaml.dump({ projects: [project] });
+    }
+
+    it('loads an s3 storage block', () => {
+      mockedFs.readFileSync.mockReturnValue(buildStorageYaml(s3Storage));
+
+      const result = createAdapter().loadAll();
+
+      expect(result[0].storage).toEqual({
+        type: 's3',
+        repository: 'my-bucket/test',
+        password: 'restic-pass',
+        snapshotMode: 'separate',
+        config: {
+          endpoint: 'https://s3.eu-central-003.backblazeb2.com',
+          access_key_id: 'key-id',
+          secret_access_key: 'secret',
+        },
+      });
+    });
+
+    it('maps a legacy restic block onto storage with type sftp', () => {
+      mockedFs.readFileSync.mockReturnValue(buildMinimalYaml());
+
+      const result = createAdapter().loadAll();
+
+      expect(result[0].storage).toEqual({
+        type: 'sftp',
+        repository: '/backups/test',
+        password: 'restic-pass',
+        snapshotMode: 'combined',
+        config: {},
+      });
+    });
+
+    it('accepts a legacy restic block as valid', () => {
+      mockedFs.readFileSync.mockReturnValue(buildMinimalYaml());
+
+      expect(createAdapter().validate().isValid).toBe(true);
+    });
+
+    it('warns about the deprecated block only once, however often loadAll is called', () => {
+      mockedFs.readFileSync.mockReturnValue(buildMinimalYaml());
+      const warnSpy = jest.spyOn(Logger.prototype, 'warn').mockImplementation();
+      const adapter = createAdapter();
+
+      adapter.loadAll();
+      adapter.loadAll();
+      adapter.loadAll();
+
+      const deprecationWarnings = warnSpy.mock.calls.filter((call) =>
+        String(call[0]).includes('is deprecated'),
+      );
+      expect(deprecationWarnings).toHaveLength(1);
+      warnSpy.mockRestore();
+    });
+
+    it('warns again after an explicit reload', () => {
+      mockedFs.readFileSync.mockReturnValue(buildMinimalYaml());
+      const warnSpy = jest.spyOn(Logger.prototype, 'warn').mockImplementation();
+      const adapter = createAdapter();
+
+      adapter.loadAll();
+      adapter.reload();
+
+      const deprecationWarnings = warnSpy.mock.calls.filter((call) =>
+        String(call[0]).includes('is deprecated'),
+      );
+      expect(deprecationWarnings).toHaveLength(2);
+      warnSpy.mockRestore();
+    });
+
+    it('rejects a config carrying both restic and storage', () => {
+      const project = {
+        name: 'test-project',
+        cron: '0 0 * * *',
+        database: { type: 'postgres', host: 'localhost', port: 5432, name: 'testdb', user: 'user', password: 'secret' },
+        restic: { repository_path: '/backups/test', password: 'p' },
+        storage: s3Storage,
+        retention: { local_days: 7, keep_daily: 7, keep_weekly: 4 },
+      };
+      mockedFs.readFileSync.mockReturnValue(yaml.dump({ projects: [project] }));
+
+      const result = createAdapter().validate();
+
+      expect(result.isValid).toBe(false);
+      expect(result.errors).toContainEqual(expect.stringContaining('both "restic" and "storage"'));
+    });
+
+    it('rejects an unknown storage type', () => {
+      mockedFs.readFileSync.mockReturnValue(buildStorageYaml({ ...s3Storage, type: 'dropbox' }));
+
+      const result = createAdapter().validate();
+
+      expect(result.isValid).toBe(false);
+      expect(result.errors).toContainEqual(expect.stringContaining('invalid storage type "dropbox"'));
+    });
+
+    it('rejects an s3 block missing required credentials', () => {
+      mockedFs.readFileSync.mockReturnValue(
+        buildStorageYaml({ ...s3Storage, config: { endpoint: 'https://s3.example.com' } }),
+      );
+
+      const result = createAdapter().validate();
+
+      expect(result.isValid).toBe(false);
+      expect(result.errors).toContainEqual(expect.stringContaining('requires config.access_key_id'));
+      expect(result.errors).toContainEqual(expect.stringContaining('requires config.secret_access_key'));
+    });
+
+    it('rejects an invalid snapshot_mode', () => {
+      mockedFs.readFileSync.mockReturnValue(buildStorageYaml({ ...s3Storage, snapshot_mode: 'combinedd' }));
+
+      const result = createAdapter().validate();
+
+      expect(result.isValid).toBe(false);
+      expect(result.errors).toContainEqual(expect.stringContaining('invalid snapshot_mode "combinedd"'));
+    });
+
+    it('does not require Hetzner SSH env for a non-sftp backend', () => {
+      mockedFs.readFileSync.mockReturnValue(buildStorageYaml(s3Storage));
+      const adapter = createAdapter({ HETZNER_SSH_HOST: '', HETZNER_SSH_USER: '', HETZNER_SSH_KEY_PATH: '' });
+
+      expect(adapter.validate().isValid).toBe(true);
+    });
+
+    it('requires Hetzner SSH env for an sftp backend', () => {
+      mockedFs.readFileSync.mockReturnValue(buildMinimalYaml());
+      const adapter = createAdapter({ HETZNER_SSH_HOST: '' });
+
+      const result = adapter.validate();
+
+      expect(result.isValid).toBe(false);
+      expect(result.errors).toContainEqual(expect.stringContaining('requires HETZNER_SSH_HOST in .env'));
+    });
+
+    it('requires a password from either the project or RESTIC_PASSWORD', () => {
+      mockedFs.readFileSync.mockReturnValue(
+        buildStorageYaml({ ...s3Storage, password: undefined }),
+      );
+
+      const result = createAdapter().validate();
+
+      expect(result.isValid).toBe(false);
+      expect(result.errors).toContainEqual(expect.stringContaining('requires a password'));
     });
   });
 

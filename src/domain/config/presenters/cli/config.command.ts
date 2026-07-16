@@ -3,6 +3,7 @@ import { Command, CommandRunner, SubCommand } from 'nest-commander';
 import { ConfigLoaderPort } from '@domain/config/application/ports/config-loader.port';
 import { GpgKeyManagerPort } from '@domain/backup/application/ports/gpg-key-manager.port';
 import { CONFIG_LOADER_PORT, GPG_KEY_MANAGER_PORT } from '@common/di/injection-tokens';
+import { maskSecretValues } from '@common/helpers/mask.util';
 
 @SubCommand({ name: 'validate', description: 'Validate project configuration' })
 export class ConfigValidateSubCommand extends CommandRunner {
@@ -30,8 +31,16 @@ export class ConfigShowSubCommand extends CommandRunner {
         name: config.name, enabled: config.enabled, cron: config.cron, timeoutMinutes: config.timeoutMinutes,
         database: config.database ? { type: config.database.type, host: config.database.host, port: config.database.port, name: config.database.name, user: config.database.user, password: '********' } : null,
         compression: config.compression, assets: config.assets,
-        restic: { repositoryPath: config.restic.repositoryPath, password: '********', snapshotMode: config.restic.snapshotMode },
-        retention: config.retention, encryption: config.encryption, hooks: config.hooks, verification: config.verification, notification: config.notification,
+        storage: {
+          type: config.storage.type,
+          repository: config.storage.repository,
+          password: '********',
+          snapshotMode: config.storage.snapshotMode,
+          config: maskSecretValues(config.storage.config),
+        },
+        retention: config.retention, encryption: config.encryption, hooks: config.hooks, verification: config.verification,
+        notification: config.notification ? { type: config.notification.type, config: maskSecretValues(config.notification.config) } : null,
+        monitor: config.monitor ? { type: config.monitor.type, config: maskSecretValues(config.monitor.config) } : null,
       };
       console.log(JSON.stringify(masked, null, 2));
     } catch (error) { const message = error instanceof Error ? error.message : String(error); console.error(`Error: ${message}`); process.exitCode = 1; }

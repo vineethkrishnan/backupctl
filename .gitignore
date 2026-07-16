@@ -13,6 +13,7 @@ config/projects.yml
 # SSH & GPG keys
 ssh-keys/
 gpg-keys/
+rclone-config/
 
 # Backup artifacts
 *.sql.gz

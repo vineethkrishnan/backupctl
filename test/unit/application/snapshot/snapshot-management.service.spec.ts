@@ -3,9 +3,11 @@ import { ListSnapshotsQuery } from '@domain/backup/application/use-cases/list-sn
 import { ConfigLoaderPort } from '@domain/config/application/ports/config-loader.port';
 import { RemoteStorageFactoryPort } from '@domain/backup/application/ports/remote-storage-factory.port';
 import { RemoteStoragePort } from '@domain/backup/application/ports/remote-storage.port';
+import { createMockRemoteStorage } from '@test/support/remote-storage.mock';
 import { SnapshotInfo } from '@domain/backup/domain/value-objects/snapshot-info.model';
 import { ProjectConfig } from '@domain/config/domain/project-config.model';
 import { RetentionPolicy } from '@domain/config/domain/retention-policy.model';
+import { buildProjectConfig } from '@test/support/project-config.builder';
 
 describe('ListSnapshotsUseCase', () => {
   let service: ListSnapshotsUseCase;
@@ -18,36 +20,15 @@ describe('ListSnapshotsUseCase', () => {
     new SnapshotInfo(id, time, ['/data/backups/test'], 'host', ['db'], '100MB');
 
   beforeEach(() => {
-    mockStorage = {
-      sync: jest.fn(),
-      prune: jest.fn(),
-      listSnapshots: jest.fn(),
-      restore: jest.fn(),
-      exec: jest.fn(),
-      getCacheInfo: jest.fn(),
-      clearCache: jest.fn(),
-      unlock: jest.fn(),
-    };
+    mockStorage = createMockRemoteStorage();
 
     mockStorageFactory = {
       create: jest.fn().mockReturnValue(mockStorage),
     };
 
-    projectConfig = new ProjectConfig({
-      name: 'test-project',
-      enabled: true,
-      cron: '0 2 * * *',
-      timeoutMinutes: null,
+    projectConfig = buildProjectConfig({
       database: { type: 'postgres', host: 'localhost', port: 5432, name: 'testdb', user: 'user', password: 'pass', dumpTimeoutMinutes: null },
-      compression: { enabled: true },
-      assets: { paths: [] },
-      restic: { repositoryPath: '/repo', password: 'secret', snapshotMode: 'combined' },
       retention: new RetentionPolicy(7, 7, 4, 6),
-      encryption: null,
-      hooks: null,
-      verification: { enabled: false },
-      notification: null,
-      monitor: null,
     });
 
     mockConfigLoader = {

@@ -1,5 +1,6 @@
 import { Controller, Get, HttpException, HttpStatus } from '@nestjs/common';
 import { CheckHealthUseCase } from '@domain/health/application/use-cases/check-health/check-health.use-case';
+import { CheckLivenessUseCase } from '@domain/health/application/use-cases/check-liveness/check-liveness.use-case';
 import { HealthCheckResult } from '@domain/audit/domain/health-check-result.model';
 
 interface HealthResponse {
@@ -7,16 +8,51 @@ interface HealthResponse {
   checks: {
     auditDb: boolean;
     diskSpace: { available: boolean; freeGb: number };
-    ssh: { connected: boolean; authenticated: boolean };
-    resticRepos: boolean;
+    storage: Array<{ project: string; backendType: string; reachable: boolean; error?: string }>;
     uptimeKuma?: { configured: boolean; connected: boolean };
+  };
+  uptime: number;
+}
+
+interface LivenessResponse {
+  status: 'healthy' | 'unhealthy';
+  checks: {
+    auditDb: boolean;
+    diskSpace: { available: boolean; freeGb: number };
   };
   uptime: number;
 }
 
 @Controller('health')
 export class HealthController {
-  constructor(private readonly healthUseCase: CheckHealthUseCase) {}
+  constructor(
+    private readonly healthUseCase: CheckHealthUseCase,
+    private readonly livenessUseCase: CheckLivenessUseCase,
+  ) {}
+
+  /**
+   * Backs the Docker HEALTHCHECK. Never touches remote storage — a container restart
+   * cannot fix a remote outage, and a storage probe can outlast the healthcheck timeout.
+   */
+  @Get('live')
+  async live(): Promise<LivenessResponse> {
+    const result = await this.livenessUseCase.execute();
+
+    const body: LivenessResponse = {
+      status: result.isAlive() ? 'healthy' : 'unhealthy',
+      checks: {
+        auditDb: result.auditDbConnected,
+        diskSpace: { available: result.diskSpaceAvailable, freeGb: result.diskFreeGb },
+      },
+      uptime: result.uptime,
+    };
+
+    if (!result.isAlive()) {
+      throw new HttpException(body, HttpStatus.SERVICE_UNAVAILABLE);
+    }
+
+    return body;
+  }
 
   @Get()
   async check(): Promise<HealthResponse> {
@@ -30,11 +66,12 @@ export class HealthController {
           available: result.diskSpaceAvailable,
           freeGb: result.diskFreeGb,
         },
-        ssh: {
-          connected: result.sshConnected,
-          authenticated: result.sshAuthenticated,
-        },
-        resticRepos: result.resticReposHealthy,
+        storage: result.storageChecks.map((check) => ({
+          project: check.project,
+          backendType: check.backendType,
+          reachable: check.reachable,
+          ...(check.error ? { error: check.error } : {}),
+        })),
         ...(result.uptimeKumaConfigured && {
           uptimeKuma: {
             configured: result.uptimeKumaConfigured,

@@ -12,6 +12,15 @@ if [ ! -w "$BACKUP_BASE_DIR" ]; then
   exit 1
 fi
 
+# rclone rewrites refreshed OAuth tokens into its config. A read-only mount loses them
+# on every container recreate, which surfaces much later as an expired-token failure.
+RCLONE_CONFIG_DIR="${RCLONE_CONFIG_DIR:-/home/node/.config/rclone}"
+if [ -d "$RCLONE_CONFIG_DIR" ] && [ ! -w "$RCLONE_CONFIG_DIR" ]; then
+  echo "WARNING: $RCLONE_CONFIG_DIR is not writable by user $(id -u):$(id -g)"
+  echo "  rclone backends will lose refreshed OAuth tokens when the container is recreated."
+  echo "  Fix: run 'sudo chown -R $(id -u):$(id -g) rclone-config' on the host"
+fi
+
 # Run pending database migrations
 if [ -f dist/db/datasource.js ]; then
   echo "Running database migrations..."

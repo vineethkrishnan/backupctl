@@ -53,7 +53,7 @@ Add a `monitor` block to any project in `config/projects.yml`:
 
 ```yaml
 projects:
-  - name: vinsware
+  - name: vinelab
     cron: '0 0 * * *'
     # ... existing config ...
     monitor:
@@ -89,7 +89,7 @@ For each project you want to monitor:
 1. Open your Uptime Kuma dashboard
 2. Click **Add New Monitor**
 3. Set **Monitor Type** to **Push**
-4. Set **Friendly Name** (e.g., `vinsware-backup`)
+4. Set **Friendly Name** (e.g., `vinelab-backup`)
 5. Set **Heartbeat Interval** to match your backup schedule (see [Recommended Intervals](#recommended-intervals))
 6. Set **Retries** to `0` (backupctl sends `status=down` on failure — no need for Kuma to retry)
 7. Click **Save**
@@ -180,14 +180,58 @@ System healthy
 
   ✓ Audit DB
   ✓ Disk space (42 GB free)
-  ✓ SSH connection
-  ✓ SSH auth
-  ✓ Restic repos
+  ✓ Storage: vinelab (sftp)
+  ✓ Storage: project-x (s3)
   ✓ Uptime Kuma
   Uptime: 2h 15m
 ```
 
 The HTTP health endpoint also includes Kuma status when configured.
+
+### HTTP Endpoints
+
+There are two, and the distinction matters if you monitor them.
+
+| Endpoint | Checks | Use for |
+|----------|--------|---------|
+| `GET /health/live` | Audit DB, disk. Container-local only | Docker `HEALTHCHECK`, orchestrator liveness probes |
+| `GET /health` | Everything above **plus** a real reachability probe of every enabled project's repository | Dashboards, alerting, on-call debugging |
+
+Both return `200` when healthy and `503` when not.
+
+The container's `HEALTHCHECK` points at `/health/live` deliberately. `/health` reaches out to your storage provider, and restarting the container cannot fix a Backblaze or Drive outage — pointing Docker at it would turn a remote outage into a restart loop.
+
+```bash
+curl -s localhost:3100/health | jq
+```
+
+```json
+{
+  "status": "unhealthy",
+  "checks": {
+    "auditDb": true,
+    "diskSpace": { "available": true, "freeGb": 42.1 },
+    "storage": [
+      { "project": "vinelab", "backendType": "sftp", "reachable": true },
+      {
+        "project": "project-x",
+        "backendType": "s3",
+        "reachable": false,
+        "error": "Fatal: unable to open config file: Stat: The request signature we calculated does not match the signature you provided"
+      }
+    ]
+  },
+  "uptime": 8130.4
+}
+```
+
+Each entry is a real `restic cat config` against that project's repository, which proves reachability, credentials and the repository password in one call. Failures are isolated per project.
+
+Results are cached for `HEALTH_STORAGE_CHECK_TTL_SECONDS` (default 300). Alerting on `/health` more often than that returns the cached answer rather than issuing new requests — which matters because each probe is a billable transaction on B2 and a rate-limited call on Drive.
+
+::: tip Breaking change in this version
+`/health` previously reported `checks.ssh` and `checks.resticRepos`. Both are replaced by the `checks.storage` array. If you alert on those fields, update your queries. `backupctl health` output changed the same way.
+:::
 
 ---
 

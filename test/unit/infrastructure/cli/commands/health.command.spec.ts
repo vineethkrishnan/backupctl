@@ -1,6 +1,6 @@
 import { HealthCommand } from '@domain/health/presenters/cli/health.command';
 import { CheckHealthUseCase } from '@domain/health/application/use-cases/check-health/check-health.use-case';
-import { HealthCheckResult } from '@domain/audit/domain/health-check-result.model';
+import { buildHealthCheckResult, buildStorageHealthCheck } from '@test/support/health-check-result.builder';
 
 describe('HealthCommand', () => {
   let command: HealthCommand;
@@ -24,7 +24,7 @@ describe('HealthCommand', () => {
 
   it('should print healthy status when all checks pass', async () => {
     checkHealth.execute.mockResolvedValue(
-      new HealthCheckResult(true, true, 50, true, true, true, 3600),
+      buildHealthCheckResult(),
     );
 
     await command.run([]);
@@ -35,7 +35,7 @@ describe('HealthCommand', () => {
 
   it('should set exit code 1 when unhealthy', async () => {
     checkHealth.execute.mockResolvedValue(
-      new HealthCheckResult(false, true, 50, true, true, true, 3600),
+      buildHealthCheckResult({ auditDbConnected: false }),
     );
 
     await command.run([]);
@@ -46,7 +46,7 @@ describe('HealthCommand', () => {
 
   it('should display individual check results', async () => {
     checkHealth.execute.mockResolvedValue(
-      new HealthCheckResult(true, true, 42, true, true, true, 7200),
+      buildHealthCheckResult({ diskFreeGb: 42, uptime: 7200 }),
     );
 
     await command.run([]);
@@ -55,9 +55,48 @@ describe('HealthCommand', () => {
     expect(console.log).toHaveBeenCalledWith(expect.stringContaining('42 GB free'));
   });
 
+  it('should print a line per project with its backend type', async () => {
+    checkHealth.execute.mockResolvedValue(
+      buildHealthCheckResult({
+        storageChecks: [
+          buildStorageHealthCheck({ project: 'vinelab', backendType: 's3' }),
+          buildStorageHealthCheck({ project: 'project-x', backendType: 'rclone' }),
+        ],
+      }),
+    );
+
+    await command.run([]);
+
+    const printed = (console.log as jest.Mock).mock.calls.map((call) => String(call[0])).join('\n');
+    expect(printed).toContain('Storage: vinelab (s3)');
+    expect(printed).toContain('Storage: project-x (rclone)');
+  });
+
+  it('should show the backend error and exit 1 when a repo is unreachable', async () => {
+    checkHealth.execute.mockResolvedValue(
+      buildHealthCheckResult({
+        storageChecks: [
+          buildStorageHealthCheck({
+            project: 'vinelab',
+            backendType: 's3',
+            reachable: false,
+            error: 'Fatal: unable to open config file',
+          }),
+        ],
+      }),
+    );
+
+    await command.run([]);
+
+    const printed = (console.log as jest.Mock).mock.calls.map((call) => String(call[0])).join('\n');
+    expect(printed).toContain('Fatal: unable to open config file');
+    expect(console.log).toHaveBeenCalledWith('System unhealthy');
+    expect(process.exitCode).toBe(1);
+  });
+
   it('should print Uptime Kuma line when configured', async () => {
     checkHealth.execute.mockResolvedValue(
-      new HealthCheckResult(true, true, 50, true, true, true, 3600, true, true, true),
+      buildHealthCheckResult({ uptimeKumaConfigured: true, uptimeKumaConnected: true }),
     );
 
     await command.run([]);
@@ -67,7 +106,7 @@ describe('HealthCommand', () => {
 
   it('should not print Uptime Kuma when not configured', async () => {
     checkHealth.execute.mockResolvedValue(
-      new HealthCheckResult(true, true, 50, true, true, true, 3600),
+      buildHealthCheckResult(),
     );
 
     await command.run([]);

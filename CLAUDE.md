@@ -10,7 +10,7 @@ Backup orchestration for databases, files, or both. Database-agnostic, NestJS 11
 - **Entry points**: `src/main.ts` (HTTP), `src/cli.ts` (CLI via nest-commander)
 - **Config**: `config/projects.yml` (per-project YAML) + `.env` (global secrets/defaults)
 - **Audit DB**: PostgreSQL 16 via TypeORM with explicit migrations (separate container)
-- **Remote storage**: Restic over SFTP to Hetzner Storage Box
+- **Remote storage**: Restic, backend per project — sftp (Hetzner Storage Box), s3 (Backblaze B2/Wasabi/R2/MinIO/AWS), b2, rclone (Drive/OneDrive/Dropbox), local
 
 ## Git Workflow
 
@@ -112,7 +112,7 @@ src/
 │   │   ├── infrastructure/                    # Adapters implementing ports
 │   │   │   ├── adapters/
 │   │   │   │   ├── dumpers/                   # postgres, mysql, mongo
-│   │   │   │   ├── storage/                   # restic + factory + tagging
+│   │   │   │   ├── storage/                   # restic adapter + factory + backends/ (per-type resolvers)
 │   │   │   │   ├── encryptors/                # gpg + key manager
 │   │   │   │   ├── cleanup/                   # file cleanup
 │   │   │   │   ├── hooks/                     # shell hook executor
@@ -285,6 +285,8 @@ Modules may only import another module's **`application/ports/`** or **`domain/`
 | Ports in `application/ports/` (not `domain/`) | Ports define outbound contracts; application layer owns the orchestration interface |
 | `DumperRegistry` + `NotifierRegistry` | Dynamic adapter resolution by project config type |
 | `BackupLockPort` — file-based `.lock` | Survives crashes, visible on disk, cleaned on startup recovery |
+| Storage backend per project (`storage.type`) | `ResticBackendRegistry` resolves a `StorageConfig` to a restic repository string + env. Adapter stays backend-neutral; SSH lives only in the sftp resolver |
+| `/health/live` vs `/health` | Docker HEALTHCHECK uses `/health/live` (container-local). `/health` probes remote storage, cached for `HEALTH_STORAGE_CHECK_TTL_SECONDS` (default 300) — a remote outage must not restart the container |
 | `AuditLogPort` — `startRun`/`trackProgress`/`finishRun` | Real-time progress visibility + crash detection via orphaned records |
 | `FallbackWriterPort` — JSONL format | Append-only, replayed on startup. Backup success never lost to infra failure |
 | TypeORM entities as `*.record.ts` | Infrastructure concern, named "record" not "entity" to avoid DDD confusion |
@@ -310,9 +312,10 @@ Modules may only import another module's **`application/ports/`** or **`domain/`
 3. Secrets always in `.env`, referenced via `${}` in YAML
 4. Missing `notification` → global `NOTIFICATION_TYPE` + config from `.env`
 5. Missing `encryption` → global `ENCRYPTION_ENABLED` / `ENCRYPTION_TYPE` / `GPG_RECIPIENT`
-6. Missing `restic.password` → global `RESTIC_PASSWORD`
-7. `compression.enabled` defaults to `true` (always compress)
-8. Config changes require explicit `backupctl config reload` — no hot-reload
+6. Missing `storage.password` → global `RESTIC_PASSWORD`
+7. Legacy `restic:` block → read as `storage:` with `type: sftp` (deprecated, warns on load). Both keys present is a validation error
+8. `compression.enabled` defaults to `true` (always compress)
+9. Config changes require explicit `backupctl config reload` — no hot-reload
 
 ## Tech Stack
 
@@ -328,7 +331,7 @@ Modules may only import another module's **`application/ports/`** or **`domain/`
 | Logging        | Winston (nest-winston) with rotation |
 | Testing        | Jest                                 |
 | Container      | Docker + Docker Compose              |
-| Remote storage | Restic → Hetzner Storage Box (SFTP)  |
+| Remote storage | Restic → sftp / s3 / b2 / rclone / local |
 | Encryption     | GPG                                  |
 
 ## Development Commands
@@ -364,7 +367,7 @@ scripts/backupctl-manage.sh check            # validate prerequisites
 
 # Inside container
 docker exec backupctl node dist/cli.js health
-docker exec backupctl node dist/cli.js run vinsware --dry-run
+docker exec backupctl node dist/cli.js run vinelab --dry-run
 
 # Migrations — dev (manual via scripts/dev.sh)
 scripts/dev.sh migrate:run                    # run pending
@@ -574,7 +577,7 @@ Explain **why**, not obvious **what**. No comments on self-evident code.
 |---------|-------------|
 | `run <project> [--all] [--dry-run]` | Trigger backup or simulate |
 | `status [project] [--last n]` | Backup status (shows current_stage) |
-| `health` | Audit DB, restic repos, disk (`HEALTH_DISK_MIN_FREE_GB`), SSH |
+| `health` | Audit DB, disk (`HEALTH_DISK_MIN_FREE_GB`), per-project storage reachability |
 | `restore <project> <snap> <path> [--only db/assets] [--decompress] [--guide]` | Restore + guidance |
 | `snapshots <project> [--last n]` | List snapshots with tags |
 | `prune <project> / --all` | Manual restic prune |
@@ -599,10 +602,10 @@ Explain **why**, not obvious **what**. No comments on self-evident code.
 ## Docker
 
 Two containers via `docker-compose.yml`:
-- `backupctl` — Node.js 20 Alpine + database clients + restic + GPG
+- `backupctl` — Node.js 20 Alpine + database clients + restic + rclone + GPG
 - `backupctl-audit-db` — PostgreSQL 16 Alpine
 
-Volumes: `${BACKUP_BASE_DIR}`, `./config:ro`, `./ssh-keys:ro`, `./gpg-keys:ro`, asset paths
+Volumes: `${BACKUP_BASE_DIR}`, `./config:ro`, `./ssh-keys:ro`, `./gpg-keys:ro`, `./rclone-config` (read-write — rclone rewrites refreshed OAuth tokens), asset paths
 
 Host scripts: `scripts/backupctl-manage.sh` (prod), `scripts/dev.sh` (dev)
 
@@ -611,6 +614,7 @@ Host scripts: `scripts/backupctl-manage.sh` (prod), `scripts/dev.sh` (dev)
 - `.env` (secrets)
 - `ssh-keys/` (SSH private keys)
 - `gpg-keys/`
+- `rclone-config/` (rclone OAuth tokens)
 - `node_modules/`, `dist/`
 - `*.sql.gz`, `*.gpg` (backup artifacts)
 - `*.lock` (backup lock files)

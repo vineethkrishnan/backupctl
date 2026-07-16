@@ -57,6 +57,7 @@ RUN apk upgrade --no-cache \
     openssh-client \
     gnupg \
     fuse3 \
+    rclone \
     docker-cli \
     curl \
     tini \
@@ -71,9 +72,10 @@ RUN mkdir -p /data/backups/.logs /data/backups/.fallback-audit \
     && chown -R node:node /data/backups
 
 # Run as non-root — SSH keys mounted to /home/node/.ssh
-RUN mkdir -p /home/node/.ssh /home/node/.gnupg \
-    && chmod 700 /home/node/.gnupg \
-    && chown -R node:node /home/node/.ssh /home/node/.gnupg
+# rclone rewrites refreshed OAuth tokens into its config, so .config/rclone must stay writable.
+RUN mkdir -p /home/node/.ssh /home/node/.gnupg /home/node/.config/rclone \
+    && chmod 700 /home/node/.gnupg /home/node/.config/rclone \
+    && chown -R node:node /home/node/.ssh /home/node/.gnupg /home/node/.config
 
 WORKDIR /app
 ENV NODE_ENV=production
@@ -86,7 +88,9 @@ RUN chmod +x /usr/local/bin/docker-entrypoint.sh \
 USER node
 
 EXPOSE 3100
+# /health/live is container-local only. /health additionally probes remote storage,
+# which must not restart the container when a cloud backend has an outage.
 HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 \
-  CMD curl -f http://localhost:${APP_PORT:-3100}/health || exit 1
+  CMD curl -f http://localhost:${APP_PORT:-3100}/health/live || exit 1
 ENTRYPOINT ["/sbin/tini", "--", "docker-entrypoint.sh"]
 CMD ["node", "dist/main.js"]
