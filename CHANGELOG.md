@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.1](https://github.com/vineethkrishnan/backupctl/compare/v0.2.0...v0.2.1) (2026-07-18)
+
+
+### Documentation
+
+* add storage backend drill walkthrough (BCTL-0) ([#99](https://github.com/vineethkrishnan/backupctl/issues/99)) ([3829a61](https://github.com/vineethkrishnan/backupctl/commit/3829a6111cd9b9decbf3ab6db68e4e0689c4e434))
+
+
+### CI/CD
+
+* **deps:** bump the actions group across 1 directory with 2 updates ([#101](https://github.com/vineethkrishnan/backupctl/issues/101)) ([4e3438a](https://github.com/vineethkrishnan/backupctl/commit/4e3438a2d3e75d7a05d3cdfe9010c247a3fddd23))
+
 ## [0.2.0](https://github.com/vineethkrishnan/backupctl/compare/v0.1.26...v0.2.0) (2026-07-16)
 
 
