@@ -1,0 +1,20 @@
+$ backupctl run drill-rclone-s3 --dry-run
+
+=== Dry Run: drill-rclone-s3 ===
+
+Validating config and connectivity without executing backup.
+
+  ✓ Config loaded
+     Project "drill-rclone-s3" configuration is valid
+  ✓ Database connection
+     Connected to postgres database "backupctl_drill" on postgres:5432
+  ✓ Notifier
+     Adapter found for notification type: webhook
+  ✓ Restic repo
+     Repository accessible at drills3:drill-rclone-s3/repo
+  ✓ Disk space
+     7421.0 GB free (minimum: 5 GB)
+  ✓ GPG key
+     Key found for recipient: drill@backupctl.test
+
+✓ All checks passed — drill-rclone-s3 is ready for backup.

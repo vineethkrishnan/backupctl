@@ -55,6 +55,7 @@ export default defineConfig({
         items: [
           { text: 'Backup Flow', link: '/08-backup-flow' },
           { text: 'Restore Guide', link: '/09-restore-guide' },
+          { text: 'Storage Backend Drill', link: '/18-storage-backend-drill' },
         ],
       },
       {

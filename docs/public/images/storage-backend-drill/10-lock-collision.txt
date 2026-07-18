@@ -1,0 +1,5 @@
+$ backupctl run drill-local; echo "exit=$?"
+
+Starting backup for drill-local...
+Error: Backup already in progress for drill-local
+exit=2

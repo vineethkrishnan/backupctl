@@ -229,6 +229,10 @@ storage:
 
 rclone's config lives at `/home/node/.config/rclone/rclone.conf`, mounted read-write from `./rclone-config`. That mount **must stay writable**: rclone rewrites refreshed OAuth tokens into it, and a read-only mount loses them on every container recreate, surfacing later as an expired-token failure.
 
+::: tip Initialize and drill a newly added backend
+A backend added after initial setup has no restic repository yet, and `backupctl run` will not create one. Run `backupctl restic myproject init` once, then walk the [Storage Backend Drill](18-storage-backend-drill.md) to confirm the backend can be backed up **and** restored before relying on it.
+:::
+
 Worth knowing before you pick these: a restic repository is thousands of small pack files, and consumer Drive/OneDrive/Dropbox APIs are rate-limited and slow for that access pattern. Fine for modest data; prefer `s3` for anything large. Automated bulk storage on consumer tiers is also a grey area in those providers' terms.
 
 ::: warning iCloud is not supported

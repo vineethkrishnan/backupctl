@@ -1,0 +1,22 @@
+$ backupctl restore drill-rclone-s3 45798b5106 /tmp/restore --guide
+
+Restore Guide for drill-rclone-s3 (postgres — backupctl_drill)
+════════════════════════════════════════════════════════════
+
+Step 1: Restore snapshot from Restic
+  backupctl restore drill-rclone-s3 <SNAPSHOT_ID> <OUTPUT_PATH>
+
+  To find available snapshots:
+  backupctl snapshots drill-rclone-s3
+
+Step 2: Decrypt the dump (GPG-encrypted)
+  gpg --decrypt <file>.dump.gpg > <file>.dump
+  Recipient: drill@backupctl.test
+  ⚠ The private key must be available in your GPG keyring
+
+Step 3: Restore to database
+  pg_restore -h <HOST> -p <PORT> -U <USER> -d backupctl_drill <file>.dump
+
+────────────────────────────────────────────────────────────
+Tip: Connection details are in your projects.yml config.
+Tip: Never store the GPG private key on the backup server.

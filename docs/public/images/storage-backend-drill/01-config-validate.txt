@@ -1,0 +1,3 @@
+$ backupctl config validate
+
+Configuration is valid.

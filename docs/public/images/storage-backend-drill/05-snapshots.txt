@@ -1,0 +1,7 @@
+$ backupctl snapshots drill-rclone-s3
+
+Snapshots for drill-rclone-s3:
+
+ID          Time                        Size        Tags
+────────────────────────────────────────────────────────────────────────
+45798b5106  2026-07-18T11:09:00.876778318Z            project:drill-rclone-s3, timestamp:20260718_130900, db:postgres

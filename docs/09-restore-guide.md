@@ -19,6 +19,10 @@ Example: `docker exec backupctl node dist/cli.js snapshots myproject` instead of
 
 The `--guide` flag prints a config-aware restore guide tailored to your project's exact setup (database type, encryption status, GPG recipient).
 
+::: tip Practise before you need it
+To rehearse a restore against a scratch database and verify the restored data matches the source exactly, follow the [Storage Backend Drill](18-storage-backend-drill.md). Encryption only needs the public key, so a backup can succeed for months while the private key required to restore it is already lost.
+:::
+
 ---
 
 ## Quick Restore

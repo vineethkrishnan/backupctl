@@ -23,6 +23,7 @@
 | 15 | [FAQ](15-faq.md) | Setup issues, Docker networking, ISP port blocking, SSH/GPG/restic fixes |
 | 16 | [Monitoring](16-monitoring.md) | Uptime Kuma push monitors for passive failure detection |
 | 17 | [Network](17-network.md) | Docker network management, Docker socket setup, multi-arch image support |
+| 18 | [Storage Backend Drill](18-storage-backend-drill.md) | End-to-end backup and restore walkthrough that proves a backend actually works |
 | —  | [Help Center](helpcenter/index.md) | Step-by-step runbooks for recurring production issues |
 
 ## Quick Links
@@ -33,6 +34,7 @@
 - **Configure a project** — [Configuration](05-configuration.md) (YAML format, docker_network, all fields)
 - **Run a backup** — [CLI Reference → `run`](06-cli-reference.md)
 - **Restore from snapshot** — [Restore Guide](09-restore-guide.md)
+- **Verify a backend works end to end** — [Storage Backend Drill](18-storage-backend-drill.md) (init, backup, restore, fidelity check)
 - **Daily commands** — [Cheatsheet](10-cheatsheet.md)
 - **Host scripts** — [Bash Scripts](07-bash-scripts.md) (`dev.sh`, `install.sh`, `backupctl-manage.sh`)
 - **Database migrations** — [TypeORM migration guide](14-migrations.md)

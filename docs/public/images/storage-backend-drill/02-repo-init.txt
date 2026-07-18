@@ -1,0 +1,5 @@
+$ backupctl restic drill-rclone-s3 init
+
+Please note that knowledge of your password is required to access
+the repository. Losing your password means that your data is
+irrecoverably lost.
