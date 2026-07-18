@@ -4,24 +4,27 @@ Terminal output captured during the end-to-end backup and restore drill document
 [`docs/18-storage-backend-drill.md`](../../../18-storage-backend-drill.md).
 
 Each `NN-name.txt` holds the captured terminal text; the matching `NN-name.png` is its
-rendered image. Regenerate any image after editing its `.txt`:
+rendered image. After editing any `.txt`, regenerate with:
 
 ```bash
-freeze docs/public/images/storage-backend-drill/03-dry-run.txt \
-  --window --theme dracula --border.radius 12 --shadow.blur 20 \
-  -o docs/public/images/storage-backend-drill/03-dry-run.png
+docs/public/images/storage-backend-drill/render.sh
 ```
 
-Regenerate all of them:
-
-```bash
-for f in docs/public/images/storage-backend-drill/*.txt; do
-  freeze "$f" --window --theme dracula --border.radius 12 --shadow.blur 20 -o "${f%.txt}.png"
-done
-```
+Always use the script rather than calling `freeze` by hand. It renders every capture with
+identical settings and prints the resulting dimensions so a width regression is obvious.
 
 ## Conventions
 
+- **Every image must be the same pixel width.** VitePress fits each image to the content
+  column, so on-page text size is inversely proportional to an image's pixel width. Mixing
+  widths makes narrow captures render with huge text and wide ones with tiny text. The
+  script pins the width by padding the first line to `COLUMNS` characters.
+- `COLUMNS` is 120, the smallest budget that fits the widest capture (118 characters)
+  without wrapping. Wrapping tighter than the content splits table rows mid-value. If you
+  add a capture wider than 120 characters, either shorten it or raise `COLUMNS` and
+  re-render everything so the set stays uniform.
+- freeze's `--width` flag does not solve this: it widens the canvas without scaling the
+  font, which shrinks the text rather than keeping it consistent.
 - Rendered with [freeze](https://github.com/charmbracelet/freeze), always with `--window`.
   The older `docs/public/images/helpcenter/` set predates this and used silicon.
 - `--font.family` is not usable: freeze v0.2.2 renders a blank image for any font other
