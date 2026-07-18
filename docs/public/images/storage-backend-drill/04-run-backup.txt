@@ -1,0 +1,6 @@
+$ backupctl run drill-rclone-s3
+
+Starting backup for drill-rclone-s3...
+✓ drill-rclone-s3 — success (1s)
+   Dump: 257.63 KB | Encrypted: Yes | Verified: Yes
+   Snapshot: 45798b51069c0ace8794ac3991cb159a8c5798423435076858ef8c333b25b5ed | New: 1 | Changed: 0 | Added: 187.72 KB

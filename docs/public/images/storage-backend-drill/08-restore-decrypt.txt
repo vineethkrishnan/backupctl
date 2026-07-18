@@ -1,0 +1,14 @@
+$ backupctl restore drill-rclone-s3 45798b5106 /data/backups/restore/rclone-s3
+
+Restoring drill-rclone-s3 from snapshot 45798b5106 to /data/backups/restore/rclone-s3...
+Restore completed successfully.
+
+$ gpg --batch --yes --decrypt drill-rclone-s3_backup_20260718_130900.dump.gpg > restored.dump
+
+gpg: encrypted with cv25519 key, ID 0BEFFEE1ECA3BA4C, created 2026-07-18
+      "backupctl drill <drill@backupctl.test>"
+
+$ head -c 5 restored.dump | od -c
+
+0000000   P   G   D   M   P
+0000005

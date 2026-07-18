@@ -128,6 +128,7 @@ Also available in [`docs/`](docs/README.md):
 | 11  | [Adding Adapters](docs/11-adding-adapters.md) | Extending with new DB engines, notifiers, storage backends |
 | 12  | [Troubleshooting](docs/12-troubleshooting.md) | Common issues, debug commands, log locations               |
 | 16  | [Monitoring](docs/16-monitoring.md)           | Uptime Kuma push monitors, setup, heartbeat details        |
+| 18  | [Storage Backend Drill](docs/18-storage-backend-drill.md) | End-to-end backup + restore walkthrough proving a backend works |
 
 ## Tech Stack
 

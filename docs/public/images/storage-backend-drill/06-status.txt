@@ -1,0 +1,8 @@
+$ backupctl status
+
+Project             Status      Stage           Duration    Started At
+────────────────────────────────────────────────────────────────────────────────
+✓ drill-local       success     notify_result   1s          2026-07-18T11:08:49.763Z
+✓ drill-rclone-localsuccess     notify_result   1s          2026-07-18T11:08:58.796Z
+✓ drill-rclone-s3   success     notify_result   1s          2026-07-18T11:09:00.762Z
+✓ drill-s3          success     notify_result   1s          2026-07-18T11:09:02.648Z

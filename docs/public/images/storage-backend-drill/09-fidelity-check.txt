@@ -1,0 +1,9 @@
+=== ORIGINAL (backupctl_drill) ===
+drill_fidelity=0b825ce99cb889c5f839e99d6ff4ad3a
+drill_large_text=547585235cb49d05d84858c363423c93
+counts=5000/50
+
+=== RESTORED (drill_restored) ===
+drill_fidelity=0b825ce99cb889c5f839e99d6ff4ad3a
+drill_large_text=547585235cb49d05d84858c363423c93
+counts=5000/50
