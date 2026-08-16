@@ -94,7 +94,10 @@
       "picomatch": "2.3.2"
     },
     "typeorm": {
-      "brace-expansion": "2.0.3"
+      "brace-expansion": "2.1.4"
+    },
+    "minimatch": {
+      "brace-expansion": "2.1.4"
     }
   }
 }
