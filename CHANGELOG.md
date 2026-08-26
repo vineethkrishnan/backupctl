@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.2](https://github.com/vineethkrishnan/backupctl/compare/v0.2.1...v0.2.2) (2026-08-26)
+
+
+### Bug Fixes
+
+* **deps:** patch brace-expansion and js-yaml DoS vulnerabilities ([#110](https://github.com/vineethkrishnan/backupctl/issues/110)) ([6e96635](https://github.com/vineethkrishnan/backupctl/commit/6e96635f984541f3f00bb689a8bd58b54c5f9da2))
+
+
+### Documentation
+
+* render drill screenshots at a uniform width (BCTL-0) ([#102](https://github.com/vineethkrishnan/backupctl/issues/102)) ([e6c50b4](https://github.com/vineethkrishnan/backupctl/commit/e6c50b41d40b876670cd3fc6bcee86ec9ef95b9f))
+
 ## [0.2.1](https://github.com/vineethkrishnan/backupctl/compare/v0.2.0...v0.2.1) (2026-07-18)
 
 
