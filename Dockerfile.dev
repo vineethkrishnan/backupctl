@@ -1,5 +1,5 @@
 # ── Build stage: restic with patched dependencies ─────────
-FROM golang:1.26-alpine AS restic-builder
+FROM golang:1.27-alpine AS restic-builder
 
 RUN apk add --no-cache git
 WORKDIR /build

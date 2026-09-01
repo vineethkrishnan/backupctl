@@ -9,7 +9,7 @@ COPY src/ ./src/
 RUN npm run build
 
 # ── Build stage: restic with patched dependencies ─────────
-FROM golang:1.26.1-alpine AS restic-builder
+FROM golang:1.27.0-alpine AS restic-builder
 
 RUN apk add --no-cache git
 WORKDIR /build
